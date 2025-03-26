@@ -1,0 +1,68 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "back": "Atrás"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "register": "Registrarse",
+    "logout": "Cerrar Sesión",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "username": "Nombre de Usuario",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "resetPassword": "Restablecer Contraseña"
+  },
+  "nav": {
+    "home": "Inicio",
+    "dashboard": "Panel de Control",
+    "upload": "Subir Video",
+    "profile": "Perfil",
+    "settings": "Configuración"
+  },
+  "video": {
+    "upload": "Subir Video",
+    "title": "Título",
+    "description": "Descripción",
+    "thumbnail": "Miniatura",
+    "processing": "Procesando",
+    "ready": "Listo",
+    "error": "Error",
+    "duration": "Duración",
+    "uploadSuccess": "Video subido exitosamente",
+    "uploadError": "Error al subir el video",
+    "deleteConfirm": "¿Estás seguro de que quieres eliminar este video?",
+    "deleteSuccess": "Video eliminado exitosamente",
+    "deleteError": "Error al eliminar el video"
+  },
+  "h5p": {
+    "create": "Crear Contenido H5P",
+    "edit": "Editar Contenido H5P",
+    "preview": "Vista Previa",
+    "save": "Guardar Contenido",
+    "delete": "Eliminar Contenido",
+    "library": "Biblioteca",
+    "content": "Contenido",
+    "settings": "Configuración"
+  },
+  "dashboard": {
+    "welcome": "Bienvenido a tu panel de control",
+    "recentVideos": "Videos Recientes",
+    "totalVideos": "Total de Videos",
+    "processingVideos": "Videos en Proceso",
+    "completedVideos": "Videos Completados"
+  },
+  "errors": {
+    "required": "Este campo es requerido",
+    "email": "Por favor ingresa un correo electrónico válido",
+    "password": "La contraseña debe tener al menos 6 caracteres",
+    "serverError": "Error del servidor",
+    "networkError": "Error de red"
+  }
+} 

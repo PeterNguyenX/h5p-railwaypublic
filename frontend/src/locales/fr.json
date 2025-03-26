@@ -1,0 +1,68 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "back": "Retour"
+  },
+  "auth": {
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "logout": "Déconnexion",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "username": "Nom d'utilisateur",
+    "forgotPassword": "Mot de passe oublié ?",
+    "resetPassword": "Réinitialiser le mot de passe"
+  },
+  "nav": {
+    "home": "Accueil",
+    "dashboard": "Tableau de bord",
+    "upload": "Télécharger une vidéo",
+    "profile": "Profil",
+    "settings": "Paramètres"
+  },
+  "video": {
+    "upload": "Télécharger une vidéo",
+    "title": "Titre",
+    "description": "Description",
+    "thumbnail": "Miniature",
+    "processing": "Traitement en cours",
+    "ready": "Prêt",
+    "error": "Erreur",
+    "duration": "Durée",
+    "uploadSuccess": "Vidéo téléchargée avec succès",
+    "uploadError": "Erreur lors du téléchargement de la vidéo",
+    "deleteConfirm": "Êtes-vous sûr de vouloir supprimer cette vidéo ?",
+    "deleteSuccess": "Vidéo supprimée avec succès",
+    "deleteError": "Erreur lors de la suppression de la vidéo"
+  },
+  "h5p": {
+    "create": "Créer du contenu H5P",
+    "edit": "Modifier le contenu H5P",
+    "preview": "Aperçu",
+    "save": "Enregistrer le contenu",
+    "delete": "Supprimer le contenu",
+    "library": "Bibliothèque",
+    "content": "Contenu",
+    "settings": "Paramètres"
+  },
+  "dashboard": {
+    "welcome": "Bienvenue sur votre tableau de bord",
+    "recentVideos": "Vidéos récentes",
+    "totalVideos": "Total des vidéos",
+    "processingVideos": "Vidéos en cours de traitement",
+    "completedVideos": "Vidéos terminées"
+  },
+  "errors": {
+    "required": "Ce champ est requis",
+    "email": "Veuillez entrer une adresse e-mail valide",
+    "password": "Le mot de passe doit contenir au moins 6 caractères",
+    "serverError": "Erreur serveur",
+    "networkError": "Erreur réseau"
+  }
+} 

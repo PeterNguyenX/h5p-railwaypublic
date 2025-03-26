@@ -1,0 +1,87 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "username": "Username",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "emailPlaceholder": "Enter your email",
+    "passwordPlaceholder": "Enter your password",
+    "usernamePlaceholder": "Choose a username",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Confirm your password",
+    "loginSuccess": "Login successful",
+    "registerSuccess": "Registration successful",
+    "loginError": "Login failed",
+    "registerError": "Registration failed",
+    "emailRequired": "Email is required",
+    "passwordRequired": "Password is required",
+    "usernameRequired": "Username is required",
+    "invalidEmail": "Please enter a valid email address",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordMismatch": "Passwords do not match",
+    "emailAlreadyRegistered": "Email is already registered",
+    "invalidCredentials": "Invalid email or password"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "upload": "Upload Video",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "video": {
+    "upload": "Upload Video",
+    "title": "Title",
+    "description": "Description",
+    "thumbnail": "Thumbnail",
+    "processing": "Processing",
+    "ready": "Ready",
+    "error": "Error",
+    "duration": "Duration",
+    "uploadSuccess": "Video uploaded successfully",
+    "uploadError": "Error uploading video",
+    "deleteConfirm": "Are you sure you want to delete this video?",
+    "deleteSuccess": "Video deleted successfully",
+    "deleteError": "Error deleting video"
+  },
+  "h5p": {
+    "create": "Create H5P Content",
+    "edit": "Edit H5P Content",
+    "preview": "Preview",
+    "save": "Save Content",
+    "delete": "Delete Content",
+    "library": "Library",
+    "content": "Content",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "welcome": "Welcome to your dashboard",
+    "recentVideos": "Recent Videos",
+    "totalVideos": "Total Videos",
+    "processingVideos": "Videos in Processing",
+    "completedVideos": "Completed Videos"
+  },
+  "errors": {
+    "required": "This field is required",
+    "invalidEmail": "Please enter a valid email address",
+    "passwordLength": "Password must be at least 6 characters",
+    "serverError": "Server error",
+    "networkError": "Network error"
+  }
+} 
