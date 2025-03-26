@@ -6,12 +6,14 @@ export interface Video {
   title: string;
   description: string;
   filePath: string;
+  thumbnailPath: string;
   userId: string;
   status: string;
-  thumbnailUrl: string;
   duration: string;
   createdAt: string;
   updatedAt: string;
+  h5pContent?: any;
+  metadata?: any;
 }
 
 class VideoStore {

@@ -101,7 +101,7 @@ const VideoEdit = observer(() => {
         
         <Box>
           <Image
-            src={`http://localhost:3001${video.thumbnailUrl}`}
+            src={`http://localhost:3001${video.thumbnailPath}`}
             alt={video.title}
             borderRadius="md"
             height="200px"
@@ -109,7 +109,7 @@ const VideoEdit = observer(() => {
             fallback={<Box height="200px" bg="gray.200" borderRadius="md" />}
           />
           <Text mt={2} color="gray.500">
-            Duration: {video.duration}
+            Duration: {video.duration || 'N/A'}
           </Text>
         </Box>
 

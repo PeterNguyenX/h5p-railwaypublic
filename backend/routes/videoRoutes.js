@@ -7,6 +7,7 @@ const { auth } = require("../middleware/auth");
 const Video = require("../models/Video");
 const User = require("../models/User");
 const path = require("path");
+const videoProcessingService = require("../services/videoProcessing");
 
 const s3 = new AWS.S3({ region: "us-east-1" });
 
@@ -34,7 +35,7 @@ const formatDuration = (seconds) => {
 const mapVideoData = (video) => {
   return {
     ...video.toJSON(),
-    thumbnailUrl: video.thumbnailPath || '/default-thumbnail.jpg',
+    thumbnailPath: video.thumbnailPath || '/default-thumbnail.jpg',
     duration: formatDuration(video.duration)
   };
 };
@@ -47,15 +48,32 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
     }
 
     const { title, description } = req.body;
+    const videoPath = req.file.path;
+    const thumbnailPath = path.join('uploads', `thumbnail-${Date.now()}.jpg`);
 
     // Create video record in database
     const video = await Video.create({
       title: title || req.file.originalname,
       description: description || '',
-      filePath: req.file.path,
+      filePath: videoPath,
+      thumbnailPath: thumbnailPath,
       userId: req.user.id,
       status: 'processing'
     });
+
+    // Start video processing in the background
+    videoProcessingService.generateThumbnail(videoPath, thumbnailPath)
+      .then(async () => {
+        const duration = await videoProcessingService.getVideoDuration(videoPath);
+        await video.update({ 
+          status: 'ready',
+          duration: duration
+        });
+      })
+      .catch(async (error) => {
+        console.error('Error processing video:', error);
+        await video.update({ status: 'error' });
+      });
 
     res.status(201).json({ 
       message: "Video uploaded successfully",
