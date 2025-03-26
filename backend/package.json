@@ -28,7 +28,8 @@
     "multer": "^1.4.5-lts.2",
     "pg": "^8.14.1",
     "sequelize": "^6.37.1",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "ytdl-core": "^4.11.5"
   },
   "description": "Backend for H5P Video Platform",
   "devDependencies": {

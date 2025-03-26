@@ -202,6 +202,38 @@ class VideoStore {
       this.setLoading(false);
     }
   }
+
+  async uploadYoutubeVideo(url: string) {
+    try {
+      this.setLoading(true);
+      this.setError(null);
+      const token = authStore.getToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch('http://localhost:3001/api/videos/youtube', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to import YouTube video');
+      }
+      
+      await this.fetchVideos();
+    } catch (error) {
+      this.setError(error instanceof Error ? error.message : 'An error occurred while importing YouTube video');
+      throw error;
+    } finally {
+      this.setLoading(false);
+    }
+  }
 }
 
 export default new VideoStore(); 

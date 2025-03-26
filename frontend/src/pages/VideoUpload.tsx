@@ -2,74 +2,43 @@ import React, { useState } from 'react';
 import {
   Box,
   Button,
+  Container,
   FormControl,
   FormLabel,
   Input,
   VStack,
-  Textarea,
   useToast,
-  Heading,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
   Text,
-  Progress,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import { observer } from 'mobx-react-lite';
 import videoStore from '../stores/videoStore';
-import authStore from '../stores/authStore';
 
-const VideoUpload = observer(() => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+const VideoUpload = () => {
   const [file, setFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const toast = useToast();
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const toast = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) {
-      toast({
-        title: 'Error',
-        description: 'Please select a video file',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    if (!title.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a title for your video',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress(0);
+  const handleFileUpload = async () => {
+    if (!file) return;
 
     try {
+      setLoading(true);
       const formData = new FormData();
       formData.append('video', file);
-      formData.append('title', title);
-      formData.append('description', description);
-
-      await videoStore.uploadVideo(formData, (progress: number) => {
-        setUploadProgress(progress);
-      });
-
+      await videoStore.uploadVideo(formData);
       toast({
         title: 'Success',
         description: 'Video uploaded successfully',
@@ -77,82 +46,108 @@ const VideoUpload = observer(() => {
         duration: 3000,
         isClosable: true,
       });
-
       navigate('/dashboard');
     } catch (error) {
-      console.error('Upload error:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to upload video',
+        description: 'Failed to upload video',
         status: 'error',
-        duration: 5000,
+        duration: 3000,
         isClosable: true,
       });
     } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
+      setLoading(false);
+    }
+  };
+
+  const handleYoutubeUpload = async () => {
+    if (!youtubeUrl) return;
+
+    try {
+      setLoading(true);
+      await videoStore.uploadYoutubeVideo(youtubeUrl);
+      toast({
+        title: 'Success',
+        description: 'YouTube video import started. It will be available soon.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+      navigate('/dashboard');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to import YouTube video',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Box maxW="container.md" mx="auto" p={6}>
-      <Heading mb={6}>Upload Video</Heading>
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4}>
-          <FormControl isRequired>
-            <FormLabel>Title</FormLabel>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter video title"
-            />
-          </FormControl>
+    <Container maxW="container.md" py={8}>
+      <VStack spacing={8}>
+        <Tabs isFitted variant="enclosed" width="100%">
+          <TabList mb="1em">
+            <Tab>Upload Video File</Tab>
+            <Tab>YouTube URL</Tab>
+          </TabList>
 
-          <FormControl>
-            <FormLabel>Description</FormLabel>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter video description"
-              rows={4}
-            />
-          </FormControl>
+          <TabPanels>
+            <TabPanel>
+              <VStack spacing={4}>
+                <FormControl>
+                  <FormLabel>Choose Video File</FormLabel>
+                  <Input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileChange}
+                  />
+                </FormControl>
 
-          <FormControl isRequired>
-            <FormLabel>Video File</FormLabel>
-            <Input
-              type="file"
-              accept="video/*"
-              onChange={handleFileChange}
-              p={1}
-            />
-            <Text fontSize="sm" color="gray.500" mt={1}>
-              Supported formats: MP4, WebM, Ogg
-            </Text>
-          </FormControl>
+                <Button
+                  colorScheme="blue"
+                  onClick={handleFileUpload}
+                  isLoading={loading}
+                  isDisabled={!file}
+                  width="100%"
+                >
+                  Upload Video
+                </Button>
+              </VStack>
+            </TabPanel>
 
-          {isUploading && (
-            <Box w="100%">
-              <Progress value={uploadProgress} size="sm" colorScheme="blue" />
-              <Text fontSize="sm" mt={2} textAlign="center">
-                Uploading: {uploadProgress}%
-              </Text>
-            </Box>
-          )}
+            <TabPanel>
+              <VStack spacing={4}>
+                <FormControl>
+                  <FormLabel>YouTube Video URL</FormLabel>
+                  <Input
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                  />
+                </FormControl>
 
-          <Button
-            type="submit"
-            colorScheme="blue"
-            width="100%"
-            isLoading={isUploading}
-            loadingText="Uploading..."
-          >
-            Upload Video
-          </Button>
-        </VStack>
-      </form>
-    </Box>
+                <Button
+                  colorScheme="blue"
+                  onClick={handleYoutubeUpload}
+                  isLoading={loading}
+                  isDisabled={!youtubeUrl}
+                  width="100%"
+                >
+                  Import from YouTube
+                </Button>
+              </VStack>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      </VStack>
+    </Container>
   );
-});
+};
 
 export default VideoUpload; 

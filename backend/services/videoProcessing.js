@@ -37,6 +37,18 @@ class VideoProcessingService {
     });
   }
 
+  async trimVideo(inputPath, outputPath, startTime, endTime) {
+    return new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .setStartTime(startTime)
+        .setDuration(endTime - startTime)
+        .output(outputPath)
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
+    });
+  }
+
   async convertToHLS(videoPath, outputDir) {
     const outputPath = path.join(outputDir, 'stream.m3u8');
     
@@ -95,4 +107,4 @@ class VideoProcessingService {
   }
 }
 
-module.exports = new VideoProcessingService(); 
+module.exports = VideoProcessingService; 
