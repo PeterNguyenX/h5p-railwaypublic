@@ -1,151 +1,133 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
-  Button,
   Container,
-  FormControl,
-  FormLabel,
-  Input,
-  VStack,
-  useToast,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  Text,
-} from '@chakra-ui/react';
+  Typography,
+  Button,
+  TextField,
+  Paper,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import videoStore from '../stores/videoStore';
+import { useTranslation } from 'react-i18next';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import api from '../config/api';
 
-const VideoUpload = () => {
+const VideoUpload: React.FC = () => {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const toast = useToast();
+  const { t } = useTranslation();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setFile(event.target.files[0]);
     }
   };
 
-  const handleFileUpload = async () => {
-    if (!file) return;
-
-    try {
-      setLoading(true);
-      const formData = new FormData();
-      formData.append('video', file);
-      await videoStore.uploadVideo(formData);
-      toast({
-        title: 'Success',
-        description: 'Video uploaded successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-      navigate('/dashboard');
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to upload video',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setLoading(false);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!file) {
+      setError(t('videoUpload.noFileError'));
+      return;
     }
-  };
 
-  const handleYoutubeUpload = async () => {
-    if (!youtubeUrl) return;
+    setUploading(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('video', file);
 
     try {
-      setLoading(true);
-      await videoStore.uploadYoutubeVideo(youtubeUrl);
-      toast({
-        title: 'Success',
-        description: 'YouTube video import started. It will be available soon.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
+      await api.post('/videos/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
+
       navigate('/dashboard');
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to import YouTube video',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError(err instanceof Error ? err.message : t('videoUpload.uploadError'));
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
   return (
-    <Container maxW="container.md" py={8}>
-      <VStack spacing={8}>
-        <Tabs isFitted variant="enclosed" width="100%">
-          <TabList mb="1em">
-            <Tab>Upload Video File</Tab>
-            <Tab>YouTube URL</Tab>
-          </TabList>
+    <Container maxWidth="md">
+      <Box sx={{ py: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          {t('videoUpload.title')}
+        </Typography>
 
-          <TabPanels>
-            <TabPanel>
-              <VStack spacing={4}>
-                <FormControl>
-                  <FormLabel>Choose Video File</FormLabel>
-                  <Input
-                    type="file"
-                    accept="video/*"
-                    onChange={handleFileChange}
-                  />
-                </FormControl>
+        <Paper sx={{ p: 3, mt: 3 }}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
 
-                <Button
-                  colorScheme="blue"
-                  onClick={handleFileUpload}
-                  isLoading={loading}
-                  isDisabled={!file}
-                  width="100%"
-                >
-                  Upload Video
-                </Button>
-              </VStack>
-            </TabPanel>
+          <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label={t('videoUpload.titleLabel')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              margin="normal"
+            />
 
-            <TabPanel>
-              <VStack spacing={4}>
-                <FormControl>
-                  <FormLabel>YouTube Video URL</FormLabel>
-                  <Input
-                    type="url"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                  />
-                </FormControl>
+            <TextField
+              fullWidth
+              label={t('videoUpload.descriptionLabel')}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              multiline
+              rows={4}
+              margin="normal"
+            />
 
-                <Button
-                  colorScheme="blue"
-                  onClick={handleYoutubeUpload}
-                  isLoading={loading}
-                  isDisabled={!youtubeUrl}
-                  width="100%"
-                >
-                  Import from YouTube
-                </Button>
-              </VStack>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </VStack>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+              ref={fileInputRef}
+            />
+
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<CloudUploadIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {file ? file.name : t('videoUpload.selectFile')}
+              </Button>
+            </Box>
+
+            <Box sx={{ mt: 4 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={uploading || !file}
+                startIcon={uploading && <CircularProgress size={20} />}
+              >
+                {uploading ? t('videoUpload.uploading') : t('videoUpload.submit')}
+              </Button>
+            </Box>
+          </form>
+        </Paper>
+      </Box>
     </Container>
   );
 };

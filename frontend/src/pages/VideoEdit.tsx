@@ -1,79 +1,80 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Container,
-  VStack,
-  Heading,
-  FormControl,
-  FormLabel,
-  Input,
-  Textarea,
+  Stack,
+  Typography,
+  TextField,
   Button,
-  useToast,
-  HStack,
-  Text,
-  Image,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
   Tabs,
-  TabList,
-  TabPanels,
   Tab,
-  TabPanel,
-  IconButton,
-  Flex,
-  Icon,
-} from '@chakra-ui/react';
+  Paper,
+  Alert,
+  Snackbar,
+} from '@mui/material';
 import { observer } from 'mobx-react-lite';
-import { useParams, useNavigate } from 'react-router-dom';
-import { FiPlay, FiPause, FiScissors, FiSave } from 'react-icons/fi';
-import videoStore, { Video } from '../stores/videoStore';
-import { IconType } from 'react-icons';
+import { useParams } from 'react-router-dom';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
+import SaveIcon from '@mui/icons-material/Save';
+import { Video } from '../stores/videoStore';
+import H5PEditor from '../components/H5PEditor';
+import api from '../config/api';
+import { useTranslation } from 'react-i18next';
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+};
 
 const VideoEdit = observer(() => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const toast = useToast();
   const [video, setVideo] = useState<Video | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [trimStart, setTrimStart] = useState(0);
-  const [trimEnd, setTrimEnd] = useState(0);
-  const [h5pContent, setH5pContent] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [h5pContent, setH5pContent] = useState<any[]>([]);
+  const [showH5PEditor, setShowH5PEditor] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
+  const { t } = useTranslation();
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchVideo = async () => {
-      if (!id) return;
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3001/api/videos/${id}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        if (!response.ok) throw new Error('Failed to fetch video');
-        const data = await response.json();
+        const response = await api.get<Video>(`/videos/${id}`);
+        const data = response.data;
         setVideo(data);
         setTitle(data.title);
         setDescription(data.description);
-        setH5pContent(data.h5pContent || '');
-        if (data.duration) {
-          setTrimEnd(parseFloat(data.duration));
-        }
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch video details',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
+        setH5pContent(data.h5pContent || []);
+      } catch (err) {
+        setSnackbar({
+          open: true,
+          message: err instanceof Error ? err.message : 'Failed to fetch video',
+          severity: 'error',
         });
       } finally {
         setLoading(false);
@@ -81,269 +82,143 @@ const VideoEdit = observer(() => {
     };
 
     fetchVideo();
-  }, [id, toast]);
+  }, [id]);
 
-  const handleMetadataLoaded = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-      if (!trimEnd) {
-        setTrimEnd(videoRef.current.duration);
-      }
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleTrim = async () => {
-    if (!video) return;
+  const handleSave = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/videos/${video.id}/trim`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          startTime: trimStart,
-          endTime: trimEnd,
-        }),
+      await api.put(`/videos/${id}`, {
+        title,
+        description,
       });
-
-      if (!response.ok) throw new Error('Failed to trim video');
-
-      const data = await response.json();
-      setVideo(data.video);
-      toast({
-        title: 'Success',
-        description: 'Video trimmed successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
+      setSnackbar({
+        open: true,
+        message: t('video.updateSuccess'),
+        severity: 'success',
       });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to trim video',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : t('video.updateError'),
+        severity: 'error',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleH5PContentSave = async () => {
-    if (!video) return;
+  const handleAddH5PContent = async (contentData: any) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/videos/${video.id}/h5p`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          h5pContent,
-        }),
+      const response = await api.post<{ content: any }>(`/h5p/video/${video?.id}`, { contentData });
+      setH5pContent([...h5pContent, response.data.content]);
+      setShowH5PEditor(false);
+      setSnackbar({
+        open: true,
+        message: t('h5p.addSuccess'),
+        severity: 'success',
       });
-
-      if (!response.ok) throw new Error('Failed to save H5P content');
-
-      toast({
-        title: 'Success',
-        description: 'H5P content saved successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to save H5P content',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : t('h5p.addError'),
+        severity: 'error',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
   };
-
-  if (loading) {
-    return <Box>Loading...</Box>;
-  }
-
-  if (!video) {
-    return <Box>Video not found</Box>;
-  }
 
   return (
-    <Container maxW="container.xl" py={8}>
-      <VStack spacing={8} align="stretch">
-        <Heading>Edit Video</Heading>
-        
-        <Tabs isFitted variant="enclosed">
-          <TabList>
-            <Tab>Basic Info</Tab>
-            <Tab>Edit Video</Tab>
-            <Tab>H5P Content</Tab>
-          </TabList>
+    <Container maxWidth="lg">
+      <Box sx={{ py: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          {t('video.edit')}
+        </Typography>
 
-          <TabPanels>
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <FormControl>
-                  <FormLabel>Title</FormLabel>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter video title"
-                  />
-                </FormControl>
+        {loading && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t('common.loading')}
+          </Alert>
+        )}
 
-                <FormControl>
-                  <FormLabel>Description</FormLabel>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Enter video description"
-                    rows={4}
-                  />
-                </FormControl>
+        <Paper sx={{ mt: 3 }}>
+          <Tabs value={tabValue} onChange={handleTabChange}>
+            <Tab label={t('video.basicInfo')} />
+            <Tab label={t('h5p.content')} />
+          </Tabs>
 
-                <HStack spacing={4}>
-                  <Button type="submit" colorScheme="blue" isLoading={loading}>
-                    Save Changes
-                  </Button>
-                  <Button onClick={() => navigate('/dashboard')}>Cancel</Button>
-                </HStack>
-              </VStack>
-            </TabPanel>
-
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <Box position="relative">
-                  <video
-                    ref={videoRef}
-                    src={`http://localhost:3001/api/videos/${video.id}/stream`}
-                    style={{ width: '100%' }}
-                    onLoadedMetadata={handleMetadataLoaded}
-                    onTimeUpdate={handleTimeUpdate}
-                    onError={(e) => {
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to load video',
-                        status: 'error',
-                        duration: 3000,
-                        isClosable: true,
-                      });
-                    }}
-                    controls
-                  />
-                  <IconButton
-                    aria-label={isPlaying ? 'Pause' : 'Play'}
-                    icon={isPlaying ? <FiPause size={20} /> : <FiPlay size={20} />}
-                    position="absolute"
-                    bottom="4"
-                    left="4"
-                    onClick={togglePlay}
-                  />
-                </Box>
-
-                <Text>Current Time: {formatTime(currentTime)}</Text>
-
-                <Box>
-                  <Text mb={2}>Trim Video</Text>
-                  <Flex align="center">
-                    <Text mr={4}>Start: {formatTime(trimStart)}</Text>
-                    <Slider
-                      value={trimStart}
-                      min={0}
-                      max={duration}
-                      step={0.1}
-                      onChange={setTrimStart}
-                    >
-                      <SliderTrack>
-                        <SliderFilledTrack />
-                      </SliderTrack>
-                      <SliderThumb />
-                    </Slider>
-                  </Flex>
-                  <Flex align="center" mt={4}>
-                    <Text mr={4}>End: {formatTime(trimEnd)}</Text>
-                    <Slider
-                      value={trimEnd}
-                      min={0}
-                      max={duration}
-                      step={0.1}
-                      onChange={setTrimEnd}
-                    >
-                      <SliderTrack>
-                        <SliderFilledTrack />
-                      </SliderTrack>
-                      <SliderThumb />
-                    </Slider>
-                  </Flex>
-                  <Button
-                    leftIcon={<FiScissors size={20} />}
-                    mt={4}
-                    onClick={handleTrim}
-                    isLoading={loading}
-                  >
-                    Trim Video
-                  </Button>
-                </Box>
-              </VStack>
-            </TabPanel>
-
-            <TabPanel>
-              <VStack spacing={4} align="stretch">
-                <FormControl>
-                  <FormLabel>H5P Content</FormLabel>
-                  <Textarea
-                    value={h5pContent}
-                    onChange={(e) => setH5pContent(e.target.value)}
-                    placeholder="Enter H5P content"
-                    rows={10}
-                  />
-                </FormControl>
-
+          <TabPanel value={tabValue} index={0}>
+            <Stack spacing={3}>
+              <TextField
+                label={t('video.title')}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label={t('video.description')}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                multiline
+                rows={4}
+                fullWidth
+              />
+              <Box>
                 <Button
-                  leftIcon={<FiSave size={20} />}
-                  colorScheme="blue"
-                  onClick={handleH5PContentSave}
-                  isLoading={loading}
+                  variant="contained"
+                  color="primary"
+                  onClick={handleSave}
+                  disabled={loading}
+                  startIcon={<SaveIcon />}
                 >
-                  Save H5P Content
+                  {t('common.save')}
                 </Button>
-              </VStack>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </VStack>
+              </Box>
+            </Stack>
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            <Stack spacing={3}>
+              <Typography variant="h6">{t('h5p.timeline')}</Typography>
+              {h5pContent.map((content, index) => (
+                <Box key={index}>
+                  <Typography>{content.title}</Typography>
+                </Box>
+              ))}
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => setShowH5PEditor(true)}
+                startIcon={<ContentCutIcon />}
+              >
+                {t('h5p.add')}
+              </Button>
+            </Stack>
+          </TabPanel>
+        </Paper>
+
+        {showH5PEditor && (
+          <H5PEditor
+            onSave={handleAddH5PContent}
+            onCancel={() => setShowH5PEditor(false)}
+          />
+        )}
+
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
+          <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
     </Container>
   );
 });

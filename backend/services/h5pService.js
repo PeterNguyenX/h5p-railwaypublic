@@ -1,118 +1,64 @@
-const H5P = require('@h5p/nodejs-library');
-const path = require('path');
-const fs = require('fs').promises;
-require('dotenv').config();
+// Mock H5P service implementation
+// This is a temporary solution until the actual H5P library is properly installed
 
 class H5PService {
   constructor() {
-    this.h5p = new H5P({
-      baseUrl: process.env.H5P_BASE_URL || 'http://localhost:3000',
-      librariesPath: process.env.H5P_LIBRARY_PATH,
-      temporaryStoragePath: process.env.H5P_TEMP_PATH,
-      userDataPath: path.join(process.env.H5P_TEMP_PATH, 'userData'),
-      contentTypeCachePath: path.join(process.env.H5P_TEMP_PATH, 'contentTypeCache'),
-      logLevel: 'debug'
-    });
+    console.log('Using mock H5P service');
   }
 
   async initialize() {
-    try {
-      await this.h5p.init();
-      console.log('H5P initialized successfully');
-    } catch (error) {
-      console.error('Error initializing H5P:', error);
-      throw error;
-    }
+    console.log('Mock H5P initialized');
+    return Promise.resolve();
   }
 
-  async createContent(contentData, userId) {
-    try {
-      const content = await this.h5p.saveOrUpdateContent(
-        null,
-        contentData,
-        userId
-      );
-      return content;
-    } catch (error) {
-      console.error('Error creating H5P content:', error);
-      throw error;
-    }
+  async createTimeBasedContent(contentData, videoId, timestamp) {
+    console.log('Mock creating H5P content:', { contentData, videoId, timestamp });
+    return {
+      id: Date.now(),
+      content: contentData,
+      videoId,
+      timestamp
+    };
   }
 
-  async updateContent(contentId, contentData, userId) {
-    try {
-      const content = await this.h5p.saveOrUpdateContent(
-        contentId,
-        contentData,
-        userId
-      );
-      return content;
-    } catch (error) {
-      console.error('Error updating H5P content:', error);
-      throw error;
-    }
+  async updateTimeBasedContent(contentId, contentData, videoId, timestamp) {
+    console.log('Mock updating H5P content:', { contentId, contentData, videoId, timestamp });
+    return {
+      id: contentId,
+      content: contentData,
+      videoId,
+      timestamp
+    };
   }
 
-  async getContent(contentId) {
-    try {
-      const content = await this.h5p.getContent(contentId);
-      return content;
-    } catch (error) {
-      console.error('Error getting H5P content:', error);
-      throw error;
-    }
+  async getVideoContent(videoId) {
+    console.log('Mock getting H5P content for video:', videoId);
+    return [];
   }
 
   async deleteContent(contentId) {
-    try {
-      await this.h5p.deleteContent(contentId);
-    } catch (error) {
-      console.error('Error deleting H5P content:', error);
-      throw error;
-    }
+    console.log('Mock deleting H5P content:', contentId);
+    return true;
   }
 
   async installLibrary(libraryData) {
-    try {
-      const library = await this.h5p.installLibrary(libraryData);
-      return library;
-    } catch (error) {
-      console.error('Error installing H5P library:', error);
-      throw error;
-    }
+    console.error('Mock H5P service does not support installing libraries');
+    throw new Error('Mock H5P service does not support installing libraries');
   }
 
   async getLibraryInfo(machineName, majorVersion, minorVersion) {
-    try {
-      const library = await this.h5p.getLibraryInfo(
-        machineName,
-        majorVersion,
-        minorVersion
-      );
-      return library;
-    } catch (error) {
-      console.error('Error getting library info:', error);
-      throw error;
-    }
+    console.error('Mock H5P service does not support getting library info');
+    throw new Error('Mock H5P service does not support getting library info');
   }
 
   async getLibraryList() {
-    try {
-      const libraries = await this.h5p.getLibraryList();
-      return libraries;
-    } catch (error) {
-      console.error('Error getting library list:', error);
-      throw error;
-    }
+    console.error('Mock H5P service does not support getting library list');
+    throw new Error('Mock H5P service does not support getting library list');
   }
 
   async cleanup() {
-    try {
-      await this.h5p.cleanup();
-    } catch (error) {
-      console.error('Error cleaning up H5P:', error);
-      throw error;
-    }
+    console.error('Mock H5P service does not support cleaning up');
+    throw new Error('Mock H5P service does not support cleaning up');
   }
 }
 

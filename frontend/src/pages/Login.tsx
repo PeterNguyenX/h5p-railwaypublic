@@ -1,18 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent, FormEvent } from 'react';
 import {
   Box,
+  Container,
+  Typography,
+  TextField,
   Button,
-  FormControl,
-  FormLabel,
-  Input,
-  VStack,
-  Heading,
-  Text,
-  useToast,
-  Link,
-  FormErrorMessage,
-} from '@chakra-ui/react';
-import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
+  Paper,
+  Alert,
+  Stack,
+} from '@mui/material';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
 import authStore from '../stores/authStore';
@@ -20,111 +17,71 @@ import authStore from '../stores/authStore';
 const Login: React.FC = observer(() => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const { t } = useTranslation();
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-  const location = useLocation();
-  const toast = useToast();
+  const { t } = useTranslation();
 
-  const validateForm = () => {
-    let isValid = true;
-    setEmailError('');
-    setPasswordError('');
-
-    if (!email) {
-      setEmailError(t('auth.emailRequired'));
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      setEmailError(t('auth.invalidEmail'));
-      isValid = false;
-    }
-
-    if (!password) {
-      setPasswordError(t('auth.passwordRequired'));
-      isValid = false;
-    } else if (password.length < 6) {
-      setPasswordError(t('auth.passwordTooShort'));
-      isValid = false;
-    }
-
-    return isValid;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    setError('');
 
     try {
       await authStore.login(email, password);
-      toast({
-        title: t('auth.loginSuccess'),
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-      
-      // Redirect to the originally requested page or dashboard
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : t('auth.loginError');
-      toast({
-        title: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
     }
   };
 
   return (
-    <Box maxW="md" mx="auto" mt={8} p={6} borderWidth={1} borderRadius={8} boxShadow="lg">
-      <VStack spacing={4} align="stretch">
-        <Heading textAlign="center">{t('auth.login')}</Heading>
-        <form onSubmit={handleSubmit}>
-          <VStack spacing={4}>
-            <FormControl isInvalid={!!emailError}>
-              <FormLabel>{t('auth.email')}</FormLabel>
-              <Input
+    <Container maxWidth="sm">
+      <Box sx={{ mt: 8, mb: 4 }}>
+        <Typography variant="h4" component="h1" align="center" gutterBottom>
+          {t('auth.login')}
+        </Typography>
+        <Paper sx={{ p: 4, mt: 3 }}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
+              <TextField
+                label={t('auth.email')}
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('auth.emailPlaceholder')}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                fullWidth
+                required
               />
-              <FormErrorMessage>{emailError}</FormErrorMessage>
-            </FormControl>
-            <FormControl isInvalid={!!passwordError}>
-              <FormLabel>{t('auth.password')}</FormLabel>
-              <Input
+              <TextField
+                label={t('auth.password')}
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('auth.passwordPlaceholder')}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                fullWidth
+                required
               />
-              <FormErrorMessage>{passwordError}</FormErrorMessage>
-            </FormControl>
-            <Button type="submit" colorScheme="brand" width="full" isLoading={authStore.loading}>
-              {t('auth.login')}
-            </Button>
-          </VStack>
-        </form>
-        <Text textAlign="center">
-          {t('auth.noAccount')}{' '}
-          <Link as={RouterLink} to="/register" color="brand.500">
-            {t('auth.register')}
-          </Link>
-        </Text>
-        <Text textAlign="center">
-          <Link as={RouterLink} to="/forgot-password" color="brand.500">
-            {t('auth.forgotPassword')}
-          </Link>
-        </Text>
-      </VStack>
-    </Box>
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth
+              >
+                {t('auth.login')}
+              </Button>
+              <Typography variant="body2" align="center">
+                {t('auth.noAccount')}{' '}
+                <RouterLink to="/register" style={{ color: 'inherit' }}>
+                  {t('auth.register')}
+                </RouterLink>
+              </Typography>
+            </Stack>
+          </form>
+        </Paper>
+      </Box>
+    </Container>
   );
 });
 

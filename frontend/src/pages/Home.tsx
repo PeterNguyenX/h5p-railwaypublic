@@ -1,28 +1,44 @@
 import React from 'react';
-import { Box, Heading, Text, Button, VStack, Container } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
+import { Box, Typography, Button, Container, Stack } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 const Home: React.FC = () => {
-  const navigate = useNavigate();
   const { t } = useTranslation();
 
   return (
-    <Container maxW="container.xl" py={10}>
-      <VStack spacing={8} align="center" textAlign="center">
-        <Heading size="2xl">{t('welcome.title')}</Heading>
-        <Text fontSize="xl" color="gray.600">
-          {t('welcome.description')}
-        </Text>
-        <Box>
-          <Button size="lg" onClick={() => navigate('/login')} mr={4}>
-            {t('login.title')}
+    <Container maxWidth="lg">
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography variant="h2" component="h1" gutterBottom>
+          {t('home.title')}
+        </Typography>
+        <Typography variant="h5" color="text.secondary" paragraph>
+          {t('home.subtitle')}
+        </Typography>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          justifyContent="center"
+          sx={{ mt: 4 }}
+        >
+          <Button
+            component={RouterLink}
+            to="/login"
+            variant="contained"
+            size="large"
+          >
+            {t('auth.login')}
           </Button>
-          <Button size="lg" variant="outline" onClick={() => navigate('/register')}>
-            {t('register.title')}
+          <Button
+            component={RouterLink}
+            to="/register"
+            variant="outlined"
+            size="large"
+          >
+            {t('auth.register')}
           </Button>
-        </Box>
-      </VStack>
+        </Stack>
+      </Box>
     </Container>
   );
 };

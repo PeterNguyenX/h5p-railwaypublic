@@ -21,7 +21,7 @@ const Video = sequelize.define('Video', {
   },
   filePath: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true // Allow null for YouTube videos
   },
   thumbnailPath: {
     type: DataTypes.STRING,
@@ -42,6 +42,47 @@ const Video = sequelize.define('Video', {
   metadata: {
     type: DataTypes.JSONB,
     allowNull: true
+  },
+  // New fields for YouTube integration
+  youtubeUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isUrl: true
+    }
+  },
+  youtubeId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  // New fields for video editing
+  trimStart: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+    defaultValue: 0
+  },
+  trimEnd: {
+    type: DataTypes.FLOAT,
+    allowNull: true
+  },
+  captions: {
+    type: DataTypes.JSONB,
+    allowNull: true
+  },
+  // New field for LTI integration
+  ltiLink: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  // New field for templates
+  templateId: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  // New field for language
+  language: {
+    type: DataTypes.ENUM('en', 'vi'),
+    defaultValue: 'en'
   }
 });
 

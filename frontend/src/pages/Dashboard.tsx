@@ -1,208 +1,149 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Button,
   Container,
-  VStack,
-  Heading,
-  SimpleGrid,
+  Typography,
+  Grid,
   Card,
-  CardBody,
-  CardHeader,
-  CardFooter,
-  Image,
-  Text,
-  HStack,
+  CardContent,
+  CardMedia,
+  CardActions,
+  Button,
   IconButton,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  useToast,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  createIcon,
-} from '@chakra-ui/react';
+  CircularProgress,
+  Alert,
+} from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
-import { useNavigate } from 'react-router-dom';
-import { FiMoreVertical, FiEdit2, FiTrash2 } from 'react-icons/fi';
-import videoStore from '../stores/videoStore';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { formatDuration } from '../utils/format';
+import api from '../config/api';
 
-const MoreIcon = createIcon({
-  displayName: 'MoreIcon',
-  viewBox: '0 0 24 24',
-  path: (
-    <path
-      fill="currentColor"
-      d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"
-    />
-  ),
-});
+interface Video {
+  id: string;
+  title: string;
+  description: string;
+  thumbnailPath: string;
+  duration: string;
+}
 
-const EditIcon = createIcon({
-  displayName: 'EditIcon',
-  viewBox: '0 0 24 24',
-  path: (
-    <path
-      fill="currentColor"
-      d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-    />
-  ),
-});
-
-const TrashIcon = createIcon({
-  displayName: 'TrashIcon',
-  viewBox: '0 0 24 24',
-  path: (
-    <path
-      fill="currentColor"
-      d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-    />
-  ),
-});
-
-const Dashboard = observer(() => {
-  const navigate = useNavigate();
-  const toast = useToast();
+const Dashboard: React.FC = observer(() => {
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetchVideos = async () => {
       try {
-        await videoStore.fetchVideos();
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch videos',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
+        const response = await api.get<Video[]>('/videos');
+        setVideos(response.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch videos');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchVideos();
-  }, [toast]);
+  }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (videoId: string) => {
+    if (!window.confirm(t('dashboard.confirmDelete'))) return;
+
     try {
-      await videoStore.deleteVideo(id);
-      toast({
-        title: 'Success',
-        description: 'Video deleted successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete video',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      await api.delete(`/videos/${videoId}`);
+      setVideos(videos.filter(video => video.id !== videoId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete video');
     }
   };
 
-  const handleEdit = (id: string) => {
-    navigate(`/videos/${id}/edit`);
-  };
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <Container maxW="container.xl" py={8}>
-      <Box mb={8}>
-        <Heading mb={4}>My Videos</Heading>
-        <Button colorScheme="brand" onClick={() => navigate('/upload')}>
-          Upload New Video
-        </Button>
-      </Box>
+    <Container maxWidth="xl">
+      <Box sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Typography variant="h4" component="h1">
+            {t('dashboard.title')}
+          </Typography>
+          <Button
+            component={RouterLink}
+            to="/upload"
+            variant="contained"
+            color="primary"
+          >
+            {t('dashboard.uploadVideo')}
+          </Button>
+        </Box>
 
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-        {videoStore.videos.map((video) => (
-          <Card key={video.id} position="relative">
-            <Box
-              position="relative"
-              paddingTop="56.25%"
-              cursor="pointer"
-              onClick={() => navigate(`/videos/${video.id}/edit`)}
-            >
-              {video.thumbnailPath ? (
-                <Image
-                  src={`http://localhost:3001${video.thumbnailPath}`}
+        {error && (
+          <Alert severity="error" sx={{ mb: 4 }}>
+            {error}
+          </Alert>
+        )}
+
+        <Grid container spacing={4}>
+          {videos.map((video) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={video.id}>
+              <Card>
+                <CardMedia
+                  component="img"
+                  height="140"
+                  image={video.thumbnailPath || '/placeholder-video.jpg'}
                   alt={video.title}
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  width="100%"
-                  height="100%"
-                  objectFit="cover"
-                  borderRadius="md"
-                  fallback={<Box height="200px" bg="gray.200" borderRadius="md" />}
                 />
-              ) : (
-                <Box
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  width="100%"
-                  height="100%"
-                  bg="gray.100"
-                  borderRadius="md"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <Text color="gray.500">No thumbnail</Text>
-                </Box>
-              )}
-              <Menu>
-                <MenuButton
-                  as={IconButton}
-                  icon={<MoreIcon w={5} h={5} />}
-                  position="absolute"
-                  top={2}
-                  right={2}
-                  variant="ghost"
-                  aria-label="More options"
-                  size="sm"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <MenuList onClick={(e) => e.stopPropagation()}>
-                  <MenuItem icon={<EditIcon w={4} h={4} />} onClick={(e) => {
-                    e.stopPropagation();
-                    handleEdit(video.id);
-                  }}>
-                    Edit
-                  </MenuItem>
-                  <MenuItem
-                    icon={<TrashIcon w={4} h={4} />}
-                    color="red.500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(video.id);
-                    }}
+                <CardContent>
+                  <Typography variant="h6" noWrap>
+                    {video.title}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" noWrap>
+                    {video.description}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {formatDuration(parseFloat(video.duration))}
+                  </Typography>
+                </CardContent>
+                <CardActions>
+                  <IconButton
+                    component={RouterLink}
+                    to={`/videos/${video.id}`}
+                    size="small"
+                    color="primary"
                   >
-                    Delete
-                  </MenuItem>
-                </MenuList>
-              </Menu>
-            </Box>
-            <CardBody>
-              <Heading size="md" mb={2}>{video.title}</Heading>
-              <Text noOfLines={2}>
-                {video.description}
-              </Text>
-            </CardBody>
-            <CardFooter>
-              <Text color="gray.500" fontSize="sm">
-                Duration: {video.duration || 'N/A'}
-              </Text>
-            </CardFooter>
-          </Card>
-        ))}
-      </SimpleGrid>
+                    <PlayArrowIcon />
+                  </IconButton>
+                  <IconButton
+                    component={RouterLink}
+                    to={`/videos/${video.id}/edit`}
+                    size="small"
+                    color="primary"
+                  >
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleDelete(video.id)}
+                    size="small"
+                    color="error"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
     </Container>
   );
 });

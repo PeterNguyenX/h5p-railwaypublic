@@ -10,8 +10,11 @@ const path = require("path");
 const fs = require("fs");
 const VideoProcessingService = require("../services/videoProcessing");
 const ytdl = require('ytdl-core');
+const { v4: uuidv4 } = require('uuid');
 
 const s3 = new AWS.S3({ region: "us-east-1" });
+
+// Initialize video processing service
 const videoProcessor = new VideoProcessingService();
 
 // Configure multer for video upload
@@ -54,7 +57,7 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
       return res.status(400).json({ error: "No video file uploaded" });
     }
 
-    const { title, description } = req.body;
+    const { title, description, language } = req.body;
     const videoPath = req.file.path;
     const thumbnailPath = path.join(path.dirname(videoPath), `thumbnail-${Date.now()}.jpg`);
 
@@ -65,7 +68,8 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
       filePath: path.relative(__dirname, '..', videoPath),
       thumbnailPath: path.relative(__dirname, '..', thumbnailPath),
       userId: req.user.id,
-      status: 'processing'
+      status: 'processing',
+      language: language || 'en'
     });
 
     // Start video processing in the background
@@ -141,6 +145,22 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(404).json({ error: "Video not found" });
     }
 
+    // Delete video file if it exists
+    if (video.filePath) {
+      const filePath = path.join(__dirname, '..', video.filePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // Delete thumbnail if it exists
+    if (video.thumbnailPath) {
+      const thumbnailPath = path.join(__dirname, '..', video.thumbnailPath);
+      if (fs.existsSync(thumbnailPath)) {
+        fs.unlinkSync(thumbnailPath);
+      }
+    }
+
     await video.destroy();
     res.json({ message: "Video deleted successfully" });
   } catch (error) {
@@ -163,8 +183,25 @@ router.put("/:id", auth, async (req, res) => {
       return res.status(404).json({ error: "Video not found" });
     }
 
-    const { title, description, status } = req.body;
-    await video.update({ title, description, status });
+    const { 
+      title, 
+      description, 
+      status, 
+      trimStart, 
+      trimEnd, 
+      captions,
+      language
+    } = req.body;
+    
+    await video.update({ 
+      title, 
+      description, 
+      status,
+      trimStart,
+      trimEnd,
+      captions,
+      language
+    });
     
     res.json({ 
       message: "Video updated successfully",
@@ -179,7 +216,7 @@ router.put("/:id", auth, async (req, res) => {
 // Import video from YouTube
 router.post("/youtube", auth, async (req, res) => {
   try {
-    const { url } = req.body;
+    const { url, title, description, language } = req.body;
     
     if (!url) {
       return res.status(400).json({ message: 'YouTube URL is required' });
@@ -192,63 +229,101 @@ router.post("/youtube", auth, async (req, res) => {
 
     // Get video info
     const info = await ytdl.getInfo(url);
-    const videoTitle = info.videoDetails.title;
-    const videoDescription = info.videoDetails.description;
+    const videoTitle = title || info.videoDetails.title;
+    const videoDescription = description || info.videoDetails.description;
+    const thumbnailUrl = info.videoDetails.thumbnails[0].url;
+    const duration = parseInt(info.videoDetails.lengthSeconds);
+    const youtubeId = info.videoDetails.videoId;
     
     // Create video record
     const video = await Video.create({
       title: videoTitle,
       description: videoDescription,
-      status: 'processing',
+      youtubeUrl: url,
+      youtubeId: youtubeId,
+      thumbnailPath: thumbnailUrl,
+      duration: duration,
       userId: req.user.id,
+      status: 'ready',
+      language: language || 'en'
     });
 
-    // Create directories if they don't exist
-    const uploadsDir = path.join(__dirname, '../uploads');
-    const videosDir = path.join(uploadsDir, 'videos');
-    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-    if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
+    res.status(201).json({ 
+      message: "YouTube video imported successfully",
+      video: mapVideoData(video)
+    });
+  } catch (error) {
+    console.error("YouTube import error:", error);
+    res.status(500).json({ error: "Error importing YouTube video" });
+  }
+});
 
-    // Set file paths
-    const videoPath = path.join(videosDir, `${video.id}.mp4`);
-    const thumbnailPath = path.join(videosDir, `${video.id}-thumb.jpg`);
-    
-    // Download video
-    const writeStream = fs.createWriteStream(videoPath);
-    
-    ytdl(url, {
-      quality: 'highest',
-      filter: 'videoandaudio',
-    }).pipe(writeStream);
-
-    writeStream.on('finish', async () => {
-      try {
-        // Update video record with file path
-        const relativePath = path.relative(__dirname, '..', videoPath);
-        await video.update({
-          filePath: relativePath,
-          status: 'ready',
-        });
-
-        // Generate thumbnail and get duration
-        await videoProcessor.generateThumbnail(videoPath, thumbnailPath);
-        const duration = await videoProcessor.getVideoDuration(videoPath);
-
-        // Update video with thumbnail and duration
-        await video.update({
-          thumbnailPath: path.relative(__dirname, '..', thumbnailPath),
-          duration: duration,
-        });
-      } catch (error) {
-        console.error('Error processing YouTube video:', error);
-        await video.update({ status: 'error' });
+// Generate LTI link for a video
+router.post("/:id/lti", auth, async (req, res) => {
+  try {
+    const video = await Video.findOne({
+      where: { 
+        id: req.params.id,
+        userId: req.user.id
       }
     });
 
-    res.json(mapVideoData(video));
+    if (!video) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    // Generate a unique LTI link
+    const ltiId = uuidv4();
+    const ltiLink = `${process.env.APP_URL}/lti/${ltiId}`;
+    
+    await video.update({ ltiLink });
+    
+    res.json({ 
+      message: "LTI link generated successfully",
+      ltiLink
+    });
   } catch (error) {
-    console.error('Error uploading YouTube video:', error);
-    res.status(500).json({ message: 'Error uploading YouTube video' });
+    console.error("Error generating LTI link:", error);
+    res.status(500).json({ error: "Error generating LTI link" });
+  }
+});
+
+// Apply H5P template to a video
+router.post("/:id/template/:templateId", auth, async (req, res) => {
+  try {
+    const video = await Video.findOne({
+      where: { 
+        id: req.params.id,
+        userId: req.user.id
+      }
+    });
+
+    if (!video) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    const { Template } = require("../models");
+    const template = await Template.findOne({
+      where: { id: req.params.templateId }
+    });
+
+    if (!template) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    // Apply template to video
+    await video.update({ 
+      templateId: template.id,
+      h5pContent: template.h5pContent
+    });
+    
+    res.json({ 
+      message: "Template applied successfully",
+      video: mapVideoData(video)
+    });
+  } catch (error) {
+    console.error("Error applying template:", error);
+    res.status(500).json({ error: "Error applying template" });
   }
 });
 

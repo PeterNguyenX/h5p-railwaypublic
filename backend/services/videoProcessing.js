@@ -1,17 +1,10 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs').promises;
-const { createFFmpeg, fetchFile } = require('@ffmpeg/ffmpeg');
 
 class VideoProcessingService {
   constructor() {
-    this.ffmpeg = createFFmpeg({ log: true });
-  }
-
-  async initialize() {
-    if (!this.ffmpeg.isLoaded()) {
-      await this.ffmpeg.load();
-    }
+    // No initialization needed for fluent-ffmpeg
   }
 
   async generateThumbnail(videoPath, outputPath) {

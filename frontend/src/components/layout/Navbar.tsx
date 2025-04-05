@@ -1,115 +1,144 @@
 import React from 'react';
 import {
   Box,
-  Flex,
-  HStack,
   IconButton,
   Menu,
-  MenuButton,
-  MenuList,
   MenuItem,
   Button,
-  useDisclosure,
-  useColorModeValue,
   Stack,
   Select,
-} from '@chakra-ui/react';
-import { HamburgerIcon, CloseIcon } from '@chakra-ui/icons';
-import { Link as RouterLink } from 'react-router-dom';
+  AppBar,
+  Toolbar,
+  Typography,
+  useTheme,
+  useMediaQuery,
+  SelectChangeEvent,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
-import authStore from '../../stores/authStore';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 const Navbar: React.FC = observer(() => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [isOpen, setIsOpen] = React.useState(false);
   const { t, i18n } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const isLoggedIn = !!localStorage.getItem('token');
 
-  const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleLanguageChange = (event: SelectChangeEvent) => {
     i18n.changeLanguage(event.target.value);
   };
 
+  const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+    handleClose();
+  };
+
   const Links = [
-    { name: t('nav.dashboard'), path: '/dashboard' },
     { name: t('nav.upload'), path: '/upload' },
   ];
 
   const NavLink = ({ children, to }: { children: React.ReactNode; to: string }) => (
-    <RouterLink to={to}>
-      <Button variant="ghost">{children}</Button>
+    <RouterLink to={to} style={{ textDecoration: 'none' }}>
+      <Button color="inherit">{children}</Button>
     </RouterLink>
   );
 
   return (
-    <Box bg={useColorModeValue('white', 'gray.900')} px={4}>
-      <Flex h={16} alignItems="center" justifyContent="space-between">
-        <IconButton
-          size="md"
-          icon={isOpen ? <CloseIcon /> : <HamburgerIcon />}
-          aria-label="Open Menu"
-          display={{ md: 'none' }}
-          onClick={isOpen ? onClose : onOpen}
-        />
-        <HStack spacing={8} alignItems="center">
-          <Box fontWeight="bold" fontSize="xl">
-            H5P Video Platform
-          </Box>
-          <HStack as="nav" spacing={4} display={{ base: 'none', md: 'flex' }}>
+    <AppBar position="static" color="default">
+      <Toolbar>
+        {isMobile && (
+          <IconButton
+            size="large"
+            edge="start"
+            color="inherit"
+            aria-label="menu"
+            onClick={() => setIsOpen(!isOpen)}
+            sx={{ mr: 2 }}
+          >
+            {isOpen ? <CloseIcon /> : <MenuIcon />}
+          </IconButton>
+        )}
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+          H5P Video Platform
+        </Typography>
+        {!isMobile && (
+          <Stack direction="row" spacing={2} sx={{ mr: 2 }}>
             {Links.map((link) => (
               <NavLink key={link.path} to={link.path}>
                 {link.name}
               </NavLink>
             ))}
-          </HStack>
-        </HStack>
-        <Flex alignItems="center">
+          </Stack>
+        )}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Select
-            size="sm"
-            mr={4}
+            size="small"
             value={i18n.language}
             onChange={handleLanguageChange}
+            sx={{ minWidth: 100 }}
           >
-            <option value="en">English</option>
-            <option value="es">Español</option>
-            <option value="fr">Français</option>
+            <MenuItem value="en">English</MenuItem>
+            <MenuItem value="es">Español</MenuItem>
+            <MenuItem value="fr">Français</MenuItem>
           </Select>
-          {authStore.isAuthenticated ? (
-            <Menu>
-              <MenuButton
-                as={Button}
-                rounded="full"
-                variant="link"
-                cursor="pointer"
+          {isLoggedIn ? (
+            <>
+              <IconButton
+                size="large"
+                onClick={handleMenu}
+                color="inherit"
               >
-                {authStore.user?.username}
-              </MenuButton>
-              <MenuList>
-                <MenuItem as={RouterLink} to="/profile">
-                  {t('nav.profile')}
+                <AccountCircleIcon />
+              </IconButton>
+              <Menu
+                anchorEl={anchorEl}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+              >
+                <MenuItem onClick={handleLogout}>
+                  Logout
                 </MenuItem>
-                <MenuItem as={RouterLink} to="/settings">
-                  {t('nav.settings')}
-                </MenuItem>
-                <MenuItem onClick={() => authStore.logout()}>
-                  {t('auth.logout')}
-                </MenuItem>
-              </MenuList>
-            </Menu>
+              </Menu>
+            </>
           ) : (
-            <HStack spacing={4}>
-              <Button as={RouterLink} to="/login" variant="ghost">
+            <Stack direction="row" spacing={2}>
+              <Button component={RouterLink} to="/login" color="inherit">
                 {t('auth.login')}
               </Button>
-              <Button as={RouterLink} to="/register" colorScheme="brand">
+              <Button component={RouterLink} to="/register" variant="contained">
                 {t('auth.register')}
               </Button>
-            </HStack>
+            </Stack>
           )}
-        </Flex>
-      </Flex>
-
-      {isOpen ? (
-        <Box pb={4} display={{ md: 'none' }}>
-          <Stack as="nav" spacing={4}>
+        </Box>
+      </Toolbar>
+      {isOpen && isMobile && (
+        <Box sx={{ p: 2 }}>
+          <Stack spacing={2}>
             {Links.map((link) => (
               <NavLink key={link.path} to={link.path}>
                 {link.name}
@@ -117,8 +146,8 @@ const Navbar: React.FC = observer(() => {
             ))}
           </Stack>
         </Box>
-      ) : null}
-    </Box>
+      )}
+    </AppBar>
   );
 });
 

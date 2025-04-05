@@ -1,4 +1,5 @@
 import { makeAutoObservable, runInAction } from 'mobx';
+import api from '../config/api';
 
 export interface User {
   id: string;
@@ -43,20 +44,9 @@ class AuthStore {
 
   private async fetchUser() {
     try {
-      const response = await fetch('http://localhost:3001/api/auth/me', {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-        },
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Session expired. Please login again.');
-        }
-        throw new Error('Failed to fetch user data');
-      }
-      const user: User = await response.json();
+      const response = await api.get<User>('/auth/me');
       runInAction(() => {
-        this.user = user;
+        this.user = response.data;
         this.isAuthenticated = true;
       });
     } catch (error) {
@@ -70,20 +60,22 @@ class AuthStore {
     try {
       this.setLoading(true);
       this.setError(null);
-      const response = await fetch('http://localhost:3001/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      const response = await api.post<AuthResponse>('/auth/login', { email, password });
+      const { token, user } = response.data;
+      
+      localStorage.setItem('token', token);
+      runInAction(() => {
+        this.token = token;
+        this.user = user;
+        this.isAuthenticated = true;
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        let errorMessage = data.message || 'Login failed';
+    } catch (error: any) {
+      let errorMessage = 'Login failed';
+      
+      if (error.response) {
+        const data = error.response.data;
         
-        if (response.status === 400) {
+        if (error.response.status === 400) {
           if (data.missingFields) {
             const fields = Object.entries(data.missingFields)
               .filter(([_, missing]) => missing)
@@ -91,28 +83,23 @@ class AuthStore {
               .join(', ');
             errorMessage = `Missing required fields: ${fields}`;
           }
-        } else if (response.status === 401) {
+        } else if (error.response.status === 401) {
           errorMessage = 'Invalid email or password';
-        } else if (response.status === 500) {
+        } else if (error.response.status === 500) {
           errorMessage = 'Server error. Please try again later.';
+        } else if (data.message) {
+          errorMessage = data.message;
         }
-        
-        throw new Error(errorMessage);
       }
-
+      
       runInAction(() => {
-        this.token = data.token;
-        this.user = data.user;
-        this.isAuthenticated = true;
-        localStorage.setItem('token', data.token);
+        this.error = errorMessage;
       });
-    } catch (error) {
-      runInAction(() => {
-        this.error = error instanceof Error ? error.message : 'Login failed';
-      });
-      throw error;
+      throw new Error(errorMessage);
     } finally {
-      this.setLoading(false);
+      runInAction(() => {
+        this.loading = false;
+      });
     }
   }
 
@@ -120,49 +107,52 @@ class AuthStore {
     try {
       this.setLoading(true);
       this.setError(null);
-      const response = await fetch('http://localhost:3001/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, email, password }),
+      const response = await api.post<AuthResponse>('/auth/register', { 
+        username, 
+        email, 
+        password 
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        let errorMessage = data.message || 'Registration failed';
+      const { token, user } = response.data;
+      
+      localStorage.setItem('token', token);
+      runInAction(() => {
+        this.token = token;
+        this.user = user;
+        this.isAuthenticated = true;
+      });
+    } catch (error: any) {
+      let errorMessage = 'Registration failed';
+      
+      if (error.response) {
+        const data = error.response.data;
         
-        if (response.status === 400) {
+        if (error.response.status === 400) {
           if (data.missingFields) {
             const fields = Object.entries(data.missingFields)
               .filter(([_, missing]) => missing)
               .map(([field]) => field)
               .join(', ');
             errorMessage = `Missing required fields: ${fields}`;
+          } else if (data.duplicateEmail) {
+            errorMessage = 'Email already in use';
+          } else if (data.duplicateUsername) {
+            errorMessage = 'Username already in use';
           }
-        } else if (response.status === 409) {
-          errorMessage = 'Email or username already exists';
-        } else if (response.status === 500) {
+        } else if (error.response.status === 500) {
           errorMessage = 'Server error. Please try again later.';
+        } else if (data.message) {
+          errorMessage = data.message;
         }
-        
-        throw new Error(errorMessage);
       }
-
+      
       runInAction(() => {
-        this.token = data.token;
-        this.user = data.user;
-        this.isAuthenticated = true;
-        localStorage.setItem('token', data.token);
+        this.error = errorMessage;
       });
-    } catch (error) {
-      runInAction(() => {
-        this.error = error instanceof Error ? error.message : 'Registration failed';
-      });
-      throw error;
+      throw new Error(errorMessage);
     } finally {
-      this.setLoading(false);
+      runInAction(() => {
+        this.loading = false;
+      });
     }
   }
 
@@ -192,4 +182,6 @@ class AuthStore {
   }
 }
 
-export default new AuthStore(); 
+// Create and export a singleton instance
+const authStore = new AuthStore();
+export default authStore; 

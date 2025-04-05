@@ -1,17 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent, FormEvent } from 'react';
 import {
   Box,
+  Container,
+  Typography,
+  TextField,
   Button,
-  FormControl,
-  FormLabel,
-  Input,
-  VStack,
-  Heading,
-  Text,
-  useToast,
-  Link,
-  FormErrorMessage,
-} from '@chakra-ui/react';
+  Paper,
+  Alert,
+  Stack,
+} from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
@@ -22,153 +19,91 @@ const Register: React.FC = observer(() => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [usernameError, setUsernameError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [confirmPasswordError, setConfirmPasswordError] = useState('');
-  const { t } = useTranslation();
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-  const toast = useToast();
+  const { t } = useTranslation();
 
-  const validateForm = () => {
-    let isValid = true;
-    setUsernameError('');
-    setEmailError('');
-    setPasswordError('');
-    setConfirmPasswordError('');
-
-    // Username validation
-    if (!username) {
-      setUsernameError(t('auth.usernameRequired'));
-      isValid = false;
-    } else if (username.length < 3) {
-      setUsernameError(t('auth.usernameTooShort'));
-      isValid = false;
-    }
-
-    // Email validation
-    if (!email) {
-      setEmailError(t('auth.emailRequired'));
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      setEmailError(t('auth.invalidEmail'));
-      isValid = false;
-    }
-
-    // Password validation
-    if (!password) {
-      setPasswordError(t('auth.passwordRequired'));
-      isValid = false;
-    } else if (password.length < 6) {
-      setPasswordError(t('auth.passwordTooShort'));
-      isValid = false;
-    }
-
-    // Confirm password validation
-    if (!confirmPassword) {
-      setConfirmPasswordError(t('auth.confirmPasswordRequired'));
-      isValid = false;
-    } else if (password !== confirmPassword) {
-      setConfirmPasswordError(t('auth.passwordMismatch'));
-      isValid = false;
-    }
-
-    return isValid;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
+    setError('');
+
+    if (password !== confirmPassword) {
+      setError(t('auth.passwordsDoNotMatch'));
       return;
     }
 
     try {
       await authStore.register(username, email, password);
-      toast({
-        title: t('auth.registerSuccess'),
-        description: t('auth.redirectingToLogin'),
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-      navigate('/login');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : t('auth.registerError');
-      toast({
-        title: t('auth.registrationFailed'),
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed');
     }
   };
 
   return (
-    <Box maxW="md" mx="auto" mt={8} p={6} borderWidth={1} borderRadius={8} boxShadow="lg">
-      <VStack spacing={4} align="stretch">
-        <Heading textAlign="center">{t('auth.register')}</Heading>
-        <form onSubmit={handleSubmit}>
-          <VStack spacing={4}>
-            <FormControl isInvalid={!!usernameError}>
-              <FormLabel>{t('auth.username')}</FormLabel>
-              <Input
-                type="text"
+    <Container maxWidth="sm">
+      <Box sx={{ mt: 8, mb: 4 }}>
+        <Typography variant="h4" component="h1" align="center" gutterBottom>
+          {t('auth.register')}
+        </Typography>
+        <Paper sx={{ p: 4, mt: 3 }}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
+              <TextField
+                label={t('auth.username')}
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder={t('auth.usernamePlaceholder')}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+                fullWidth
+                required
               />
-              <FormErrorMessage>{usernameError}</FormErrorMessage>
-            </FormControl>
-            <FormControl isInvalid={!!emailError}>
-              <FormLabel>{t('auth.email')}</FormLabel>
-              <Input
+              <TextField
+                label={t('auth.email')}
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('auth.emailPlaceholder')}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                fullWidth
+                required
               />
-              <FormErrorMessage>{emailError}</FormErrorMessage>
-            </FormControl>
-            <FormControl isInvalid={!!passwordError}>
-              <FormLabel>{t('auth.password')}</FormLabel>
-              <Input
+              <TextField
+                label={t('auth.password')}
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('auth.passwordPlaceholder')}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                fullWidth
+                required
               />
-              <FormErrorMessage>{passwordError}</FormErrorMessage>
-            </FormControl>
-            <FormControl isInvalid={!!confirmPasswordError}>
-              <FormLabel>{t('auth.confirmPassword')}</FormLabel>
-              <Input
+              <TextField
+                label={t('auth.confirmPassword')}
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder={t('auth.confirmPasswordPlaceholder')}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
+                fullWidth
+                required
               />
-              <FormErrorMessage>{confirmPasswordError}</FormErrorMessage>
-            </FormControl>
-            <Button 
-              type="submit" 
-              colorScheme="brand" 
-              width="full"
-              isLoading={authStore.loading}
-            >
-              {t('auth.register')}
-            </Button>
-          </VStack>
-        </form>
-        <Text textAlign="center">
-          {t('auth.haveAccount')}{' '}
-          <Link as={RouterLink} to="/login" color="brand.500">
-            {t('auth.login')}
-          </Link>
-        </Text>
-      </VStack>
-    </Box>
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth
+              >
+                {t('auth.register')}
+              </Button>
+              <Typography variant="body2" align="center">
+                {t('auth.haveAccount')}{' '}
+                <RouterLink to="/login" style={{ color: 'inherit' }}>
+                  {t('auth.login')}
+                </RouterLink>
+              </Typography>
+            </Stack>
+          </form>
+        </Paper>
+      </Box>
+    </Container>
   );
 });
 

@@ -58,7 +58,29 @@
     "uploadError": "Error uploading video",
     "deleteConfirm": "Are you sure you want to delete this video?",
     "deleteSuccess": "Video deleted successfully",
-    "deleteError": "Error deleting video"
+    "deleteError": "Error deleting video",
+    "edit": "Edit Video",
+    "basicInfo": "Basic Info",
+    "updateSuccess": "Video updated successfully",
+    "updateError": "Failed to update video"
+  },
+  "videoPlayer": {
+    "play": "Play",
+    "pause": "Pause",
+    "fullscreen": "Fullscreen",
+    "timeSlider": "Time Slider",
+    "fetchError": "Failed to fetch video",
+    "notFound": "Video not found"
+  },
+  "videoUpload": {
+    "title": "Upload Video",
+    "titleLabel": "Video Title",
+    "descriptionLabel": "Video Description",
+    "selectFile": "Select Video File",
+    "uploading": "Uploading...",
+    "submit": "Upload Video",
+    "noFileError": "Please select a video file",
+    "uploadError": "Failed to upload video"
   },
   "h5p": {
     "create": "Create H5P Content",
@@ -68,14 +90,24 @@
     "delete": "Delete Content",
     "library": "Library",
     "content": "Content",
-    "settings": "Settings"
+    "settings": "Settings",
+    "timeline": "H5P Content Timeline",
+    "add": "Add H5P Content",
+    "addSuccess": "H5P content added successfully",
+    "addError": "Failed to add H5P content"
   },
   "dashboard": {
+    "title": "Dashboard",
     "welcome": "Welcome to your dashboard",
     "recentVideos": "Recent Videos",
     "totalVideos": "Total Videos",
     "processingVideos": "Videos in Processing",
-    "completedVideos": "Completed Videos"
+    "completedVideos": "Completed Videos",
+    "uploadVideo": "Upload Video",
+    "confirmDelete": "Are you sure you want to delete this video?",
+    "deleteSuccess": "Video deleted successfully",
+    "deleteError": "Failed to delete video",
+    "fetchError": "Failed to fetch videos"
   },
   "errors": {
     "required": "This field is required",
