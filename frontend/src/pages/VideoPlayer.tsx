@@ -4,7 +4,6 @@ import {
   Box,
   Container,
   IconButton,
-  Slider,
   Typography,
   styled,
   CircularProgress,
@@ -16,19 +15,20 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import { formatDuration } from '../utils/format';
 import { useTranslation } from 'react-i18next';
 import api from '../config/api';
+import './VideoPlayer.css';
 
 const VideoContainer = styled(Box)(({ theme }) => ({
   position: 'relative',
-  width: '100%',
+  inlineSize: '100%',
   backgroundColor: '#000',
   aspectRatio: '16/9',
 }));
 
 const VideoControls = styled(Box)(({ theme }) => ({
   position: 'absolute',
-  bottom: 0,
-  left: 0,
-  right: 0,
+  insetBlockEnd: 0,
+  insetInlineStart: 0,
+  insetInlineEnd: 0,
   padding: theme.spacing(2),
   background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)',
   display: 'flex',
@@ -106,12 +106,6 @@ const VideoPlayer: React.FC = () => {
     }
   };
 
-  const handleTimeChange = (_event: Event, newValue: number | number[]) => {
-    if (!videoRef.current || typeof newValue !== 'number') return;
-    videoRef.current.currentTime = newValue;
-    setCurrentTime(newValue);
-  };
-
   const handleFullscreen = () => {
     if (!containerRef.current) return;
     if (document.fullscreenElement) {
@@ -149,12 +143,13 @@ const VideoPlayer: React.FC = () => {
         </Typography>
         
         <VideoContainer ref={containerRef}>
-          <video
-            ref={videoRef}
-            src={`/api/videos/${id}/stream`}
-            style={{ width: '100%', height: '100%' }}
-            onClick={handlePlayPause}
-          />
+          <div className="video-player-container">
+            <video
+              ref={videoRef}
+              src={`/api/videos/${id}/stream`}
+              onClick={handlePlayPause}
+            />
+          </div>
           
           <VideoControls>
             <IconButton
@@ -166,24 +161,7 @@ const VideoPlayer: React.FC = () => {
               {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
             </IconButton>
 
-            <Box sx={{ flex: 1, mx: 2 }}>
-              <Slider
-                value={currentTime}
-                max={duration}
-                onChange={handleTimeChange}
-                aria-label={t('videoPlayer.timeSlider')}
-                size="small"
-                sx={{
-                  color: 'white',
-                  '& .MuiSlider-thumb': {
-                    width: 12,
-                    height: 12,
-                  },
-                }}
-              />
-            </Box>
-
-            <Typography variant="caption" sx={{ color: 'white', minWidth: 100 }}>
+            <Typography variant="caption" sx={{ color: 'white', inlineSize: 100 }}>
               {formatDuration(currentTime)} / {formatDuration(duration)}
             </Typography>
 
@@ -206,4 +184,4 @@ const VideoPlayer: React.FC = () => {
   );
 };
 
-export default VideoPlayer; 
+export default VideoPlayer;

@@ -1,4 +1,5 @@
 import React from 'react';
+import './Navbar.css';
 import {
   Box,
   IconButton,
@@ -49,11 +50,12 @@ const Navbar: React.FC = observer(() => {
   };
 
   const Links = [
+    { name: t('nav.dashboard'), path: '/dashboard' },
     { name: t('nav.upload'), path: '/upload' },
   ];
 
   const NavLink = ({ children, to }: { children: React.ReactNode; to: string }) => (
-    <RouterLink to={to} style={{ textDecoration: 'none' }}>
+    <RouterLink to={to} className="router-link">
       <Button color="inherit">{children}</Button>
     </RouterLink>
   );
@@ -90,11 +92,10 @@ const Navbar: React.FC = observer(() => {
             size="small"
             value={i18n.language}
             onChange={handleLanguageChange}
-            sx={{ minWidth: 100 }}
+            sx={{ inlineSize: 100 }}
           >
             <MenuItem value="en">English</MenuItem>
-            <MenuItem value="es">Español</MenuItem>
-            <MenuItem value="fr">Français</MenuItem>
+            <MenuItem value="vi">Vietnamese</MenuItem>
           </Select>
           {isLoggedIn ? (
             <>
@@ -151,4 +152,4 @@ const Navbar: React.FC = observer(() => {
   );
 });
 
-export default Navbar; 
+export default Navbar;

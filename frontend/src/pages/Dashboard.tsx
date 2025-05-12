@@ -8,19 +8,19 @@ import {
   CardContent,
   CardMedia,
   CardActions,
-  Button,
   IconButton,
   CircularProgress,
   Alert,
+  Dialog,
+  DialogContent,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import CloseIcon from '@mui/icons-material/Close';
 import { formatDuration } from '../utils/format';
 import api from '../config/api';
+import VideoPlayer from '../components/VideoPlayer';
 
 interface Video {
   id: string;
@@ -28,12 +28,18 @@ interface Video {
   description: string;
   thumbnailPath: string;
   duration: string;
+  youtubeUrl?: string;
+  youtubeId?: string;
+  hlsPath?: string;
+  filePath?: string;
 }
 
 const Dashboard: React.FC = observer(() => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -57,9 +63,18 @@ const Dashboard: React.FC = observer(() => {
     try {
       await api.delete(`/videos/${videoId}`);
       setVideos(videos.filter(video => video.id !== videoId));
+      setSuccess(t('dashboard.success'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete video');
     }
+  };
+
+  const handlePlayVideo = (video: Video) => {
+    setSelectedVideo(video);
+  };
+
+  const handleCloseVideo = () => {
+    setSelectedVideo(null);
   };
 
   if (loading) {
@@ -77,14 +92,6 @@ const Dashboard: React.FC = observer(() => {
           <Typography variant="h4" component="h1">
             {t('dashboard.title')}
           </Typography>
-          <Button
-            component={RouterLink}
-            to="/upload"
-            variant="contained"
-            color="primary"
-          >
-            {t('dashboard.uploadVideo')}
-          </Button>
         </Box>
 
         {error && (
@@ -96,54 +103,119 @@ const Dashboard: React.FC = observer(() => {
         <Grid container spacing={4}>
           {videos.map((video) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={video.id}>
-              <Card>
+              <Card
+                sx={{
+                  boxShadow: 3,
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  '&:hover': {
+                    boxShadow: 6,
+                  },
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  const menu = document.createElement('div');
+                  menu.style.position = 'absolute';
+                  menu.style.top = `${e.clientY}px`;
+                  menu.style.left = `${e.clientX}px`;
+                  menu.style.backgroundColor = 'white';
+                  menu.style.border = '1px solid #ccc';
+                  menu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                  menu.style.zIndex = '1000';
+                  menu.style.padding = '8px';
+                  menu.style.borderRadius = '4px';
+
+                  const editOption = document.createElement('div');
+                  editOption.textContent = t('dashboard.edit');
+                  editOption.style.padding = '8px';
+                  editOption.style.cursor = 'pointer';
+                  editOption.onclick = () => {
+                    window.location.href = `/edit/${video.id}`;
+                    document.body.removeChild(menu);
+                  };
+
+                  const deleteOption = document.createElement('div');
+                  deleteOption.textContent = t('dashboard.delete');
+                  deleteOption.style.padding = '8px';
+                  deleteOption.style.cursor = 'pointer';
+                  deleteOption.onclick = () => {
+                    handleDelete(video.id);
+                    document.body.removeChild(menu);
+                  };
+
+                  menu.appendChild(editOption);
+                  menu.appendChild(deleteOption);
+
+                  document.body.appendChild(menu);
+
+                  const handleClickOutside = (event: MouseEvent) => {
+                    if (menu && !menu.contains(event.target as Node)) {
+                      if (menu.parentNode) {
+                        document.body.removeChild(menu);
+                      }
+                      document.removeEventListener('click', handleClickOutside);
+                    }
+                  };
+
+                  document.addEventListener('click', handleClickOutside);
+                }}
+              >
                 <CardMedia
                   component="img"
-                  height="140"
+                  height="180"
                   image={video.thumbnailPath || '/placeholder-video.jpg'}
                   alt={video.title}
+                  sx={{ objectFit: 'cover' }}
                 />
-                <CardContent>
-                  <Typography variant="h6" noWrap>
+                <CardContent sx={{ p: 2 }}>
+                  <Typography variant="h6" component="div" noWrap>
                     {video.title}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" noWrap>
                     {video.description}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {formatDuration(parseFloat(video.duration))}
-                  </Typography>
                 </CardContent>
-                <CardActions>
-                  <IconButton
-                    component={RouterLink}
-                    to={`/videos/${video.id}`}
-                    size="small"
-                    color="primary"
-                  >
-                    <PlayArrowIcon />
-                  </IconButton>
-                  <IconButton
-                    component={RouterLink}
-                    to={`/videos/${video.id}/edit`}
-                    size="small"
-                    color="primary"
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => handleDelete(video.id)}
-                    size="small"
-                    color="error"
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </CardActions>
               </Card>
             </Grid>
           ))}
         </Grid>
       </Box>
+
+      <Dialog
+        open={!!selectedVideo}
+        onClose={handleCloseVideo}
+        maxWidth="lg"
+        fullWidth
+        aria-hidden="false"
+      >
+        <DialogContent sx={{ p: 0, position: 'relative' }} aria-hidden="false">
+          <IconButton
+            onClick={handleCloseVideo}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: 'white',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              },
+              zIndex: 1,
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {selectedVideo && (
+            <VideoPlayer
+              videoId={selectedVideo.id}
+              onTimeUpdate={(e) => {
+                // Handle time update if needed
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Container>
   );
 });

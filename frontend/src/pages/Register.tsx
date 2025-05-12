@@ -13,6 +13,7 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
 import authStore from '../stores/authStore';
+import './Register.css';
 
 const Register: React.FC = observer(() => {
   const [username, setUsername] = useState('');
@@ -95,7 +96,7 @@ const Register: React.FC = observer(() => {
               </Button>
               <Typography variant="body2" align="center">
                 {t('auth.haveAccount')}{' '}
-                <RouterLink to="/login" style={{ color: 'inherit' }}>
+                <RouterLink to="/login" className="inherit-color">
                   {t('auth.login')}
                 </RouterLink>
               </Typography>
@@ -107,4 +108,4 @@ const Register: React.FC = observer(() => {
   );
 });
 
-export default Register; 
+export default Register;

@@ -23,6 +23,10 @@ const Video = sequelize.define('Video', {
     type: DataTypes.STRING,
     allowNull: true // Allow null for YouTube videos
   },
+  hlsPath: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   thumbnailPath: {
     type: DataTypes.STRING,
     allowNull: true

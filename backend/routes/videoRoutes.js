@@ -1,18 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const multerS3 = require("multer-s3");
-const AWS = require("aws-sdk");
+const path = require("path");
+const fs = require("fs").promises;
 const { auth } = require("../middleware/auth");
 const { Video } = require("../models");
-const User = require("../models/User");
-const path = require("path");
-const fs = require("fs");
 const VideoProcessingService = require("../services/videoProcessing");
 const ytdl = require('ytdl-core');
 const { v4: uuidv4 } = require('uuid');
-
-const s3 = new AWS.S3({ region: "us-east-1" });
 
 // Initialize video processing service
 const videoProcessor = new VideoProcessingService();
@@ -20,18 +15,23 @@ const videoProcessor = new VideoProcessingService();
 // Configure multer for video upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadsDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    cb(null, uploadsDir);
+    const uploadsDir = path.join(__dirname, '../uploads/videos');
+    fs.mkdir(uploadsDir, { recursive: true })
+      .then(() => cb(null, uploadsDir))
+      .catch(err => cb(err));
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
+    const uniqueId = uuidv4();
+    cb(null, `${uniqueId}${path.extname(file.originalname)}`);
   }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 500 * 1024 * 1024 // 500MB limit
+  }
+});
 
 // Helper function to format duration
 const formatDuration = (seconds) => {
@@ -59,26 +59,26 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
 
     const { title, description, language } = req.body;
     const videoPath = req.file.path;
-    const thumbnailPath = path.join(path.dirname(videoPath), `thumbnail-${Date.now()}.jpg`);
 
     // Create video record in database
     const video = await Video.create({
       title: title || req.file.originalname,
       description: description || '',
-      filePath: path.relative(__dirname, '..', videoPath),
-      thumbnailPath: path.relative(__dirname, '..', thumbnailPath),
+      filePath: path.relative(process.cwd(), videoPath),
       userId: req.user.id,
       status: 'processing',
       language: language || 'en'
     });
 
-    // Start video processing in the background
-    videoProcessor.generateThumbnail(videoPath, thumbnailPath)
-      .then(async () => {
+    // Process video in the background
+    videoProcessor.processVideo(videoPath, path.join(__dirname, '../uploads/hls'))
+      .then(async ({ thumbnailPath, hlsPath }) => {
         const duration = await videoProcessor.getVideoDuration(videoPath);
         await video.update({ 
           status: 'ready',
-          duration: duration
+          duration,
+          thumbnailPath,
+          hlsPath
         });
       })
       .catch(async (error) => {
@@ -93,6 +93,83 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
   } catch (error) {
     console.error("Video upload error:", error);
     res.status(500).json({ error: "Error uploading video" });
+  }
+});
+
+// YouTube video import route
+router.post("/youtube", auth, async (req, res) => {
+  try {
+    const { title, description, youtubeUrl, language } = req.body;
+
+    // Extract video ID from URL
+    const videoIdMatch = youtubeUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+    if (!videoIdMatch) {
+      return res.status(400).json({ error: "Invalid YouTube URL" });
+    }
+    const videoId = videoIdMatch[1];
+
+    try {
+      // Get basic video info first
+      const basicInfo = await ytdl.getBasicInfo(youtubeUrl);
+      
+      // Create video record with basic info
+      const video = await Video.create({
+        title: title || basicInfo.videoDetails.title,
+        description: description || basicInfo.videoDetails.description || '',
+        youtubeUrl,
+        youtubeId: videoId,
+        thumbnailPath: basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.jpg',
+        duration: parseInt(basicInfo.videoDetails.lengthSeconds) || 0,
+        userId: req.user.id,
+        status: 'ready',
+        language: language || 'en'
+      });
+
+      console.log("Creating video with thumbnailPath:", basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.jpg');
+      console.log("YouTube video details:", {
+        title: title || basicInfo.videoDetails.title,
+        description: description || basicInfo.videoDetails.description,
+        youtubeUrl,
+        youtubeId: videoId,
+        thumbnailPath: basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.jpg',
+      });
+
+      res.status(201).json({
+        message: "YouTube video imported successfully",
+        video: mapVideoData(video)
+      });
+    } catch (ytdlError) {
+      console.error("YouTube info extraction error:", ytdlError);
+      
+      // Fallback: Create video with minimal info if ytdl fails
+      const video = await Video.create({
+        title: title || 'YouTube Video',
+        description: description || '',
+        youtubeUrl,
+        youtubeId: videoId,
+        thumbnailPath: `https://img.youtube.com/vi/${videoId}/0.jpg`,
+        userId: req.user.id,
+        status: 'ready',
+        language: language || 'en'
+      });
+
+      res.status(201).json({
+        message: "YouTube video imported with basic info",
+        video: mapVideoData(video)
+      });
+    }
+  } catch (error) {
+    console.error("YouTube import error:", {
+      message: error.message,
+      stack: error.stack,
+      youtubeUrl,
+      title,
+      description,
+    });
+    res.status(500).json({
+      error: "Error importing YouTube video",
+      details: error.message,
+    });
   }
 });
 
@@ -145,19 +222,54 @@ router.delete("/:id", auth, async (req, res) => {
       return res.status(404).json({ error: "Video not found" });
     }
 
-    // Delete video file if it exists
+    // Delete video files if they exist
     if (video.filePath) {
-      const filePath = path.join(__dirname, '..', video.filePath);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      try {
+        const filePath = path.resolve(process.cwd(), video.filePath);
+        try {
+          await fs.access(filePath);
+          await fs.unlink(filePath);
+        } catch (err) {
+          // File doesn't exist, which is fine
+          console.log('Video file not found, skipping deletion');
+        }
+      } catch (error) {
+        console.error('Error deleting video file:', error);
+        // Continue with deletion even if file deletion fails
+      }
+    }
+
+    // Delete HLS directory if it exists
+    if (video.hlsPath) {
+      try {
+        const hlsDir = path.dirname(path.resolve(process.cwd(), video.hlsPath));
+        try {
+          await fs.access(hlsDir);
+          await fs.rm(hlsDir, { recursive: true, force: true });
+        } catch (err) {
+          // Directory doesn't exist, which is fine
+          console.log('HLS directory not found, skipping deletion');
+        }
+      } catch (error) {
+        console.error('Error deleting HLS directory:', error);
+        // Continue with deletion even if directory deletion fails
       }
     }
 
     // Delete thumbnail if it exists
-    if (video.thumbnailPath) {
-      const thumbnailPath = path.join(__dirname, '..', video.thumbnailPath);
-      if (fs.existsSync(thumbnailPath)) {
-        fs.unlinkSync(thumbnailPath);
+    if (video.thumbnailPath && !video.thumbnailPath.startsWith('http')) {
+      try {
+        const thumbnailPath = path.resolve(process.cwd(), video.thumbnailPath);
+        try {
+          await fs.access(thumbnailPath);
+          await fs.unlink(thumbnailPath);
+        } catch (err) {
+          // File doesn't exist, which is fine
+          console.log('Thumbnail not found, skipping deletion');
+        }
+      } catch (error) {
+        console.error('Error deleting thumbnail:', error);
+        // Continue with deletion even if thumbnail deletion fails
       }
     }
 
@@ -202,59 +314,11 @@ router.put("/:id", auth, async (req, res) => {
       captions,
       language
     });
-    
-    res.json({ 
-      message: "Video updated successfully",
-      video: mapVideoData(video)
-    });
+
+    res.json(mapVideoData(video));
   } catch (error) {
     console.error("Error updating video:", error);
     res.status(500).json({ error: "Error updating video" });
-  }
-});
-
-// Import video from YouTube
-router.post("/youtube", auth, async (req, res) => {
-  try {
-    const { url, title, description, language } = req.body;
-    
-    if (!url) {
-      return res.status(400).json({ message: 'YouTube URL is required' });
-    }
-
-    // Validate YouTube URL
-    if (!ytdl.validateURL(url)) {
-      return res.status(400).json({ message: 'Invalid YouTube URL' });
-    }
-
-    // Get video info
-    const info = await ytdl.getInfo(url);
-    const videoTitle = title || info.videoDetails.title;
-    const videoDescription = description || info.videoDetails.description;
-    const thumbnailUrl = info.videoDetails.thumbnails[0].url;
-    const duration = parseInt(info.videoDetails.lengthSeconds);
-    const youtubeId = info.videoDetails.videoId;
-    
-    // Create video record
-    const video = await Video.create({
-      title: videoTitle,
-      description: videoDescription,
-      youtubeUrl: url,
-      youtubeId: youtubeId,
-      thumbnailPath: thumbnailUrl,
-      duration: duration,
-      userId: req.user.id,
-      status: 'ready',
-      language: language || 'en'
-    });
-
-    res.status(201).json({ 
-      message: "YouTube video imported successfully",
-      video: mapVideoData(video)
-    });
-  } catch (error) {
-    console.error("YouTube import error:", error);
-    res.status(500).json({ error: "Error importing YouTube video" });
   }
 });
 

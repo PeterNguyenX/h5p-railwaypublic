@@ -69,6 +69,7 @@ const App: React.FC = () => {
                   </PrivateRoute>
                 }
               />
+              <Route path="/edit/:id" element={<VideoEdit />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Box>
@@ -78,4 +79,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App; 
+export default App;

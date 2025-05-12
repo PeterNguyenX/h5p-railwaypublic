@@ -9,11 +9,12 @@ import {
 } from '@mui/material';
 
 interface H5PEditorProps {
+  videoId: string;
   onSave: (contentData: any) => void;
   onCancel: () => void;
 }
 
-const H5PEditor: React.FC<H5PEditorProps> = ({ onSave, onCancel }) => {
+const H5PEditor: React.FC<H5PEditorProps> = ({ videoId, onSave, onCancel }) => {
   const [contentType, setContentType] = useState('question');
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '', '']);

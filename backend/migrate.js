@@ -16,7 +16,7 @@ async function runMigrations() {
 
   try {
     // Import and run migrations
-    const migration = require('./migrations/20240321_add_video_fields');
+    const migration = require('./migrations/20240321_add_hls_path');
     await migration.up(sequelize.getQueryInterface(), Sequelize);
     console.log('Migrations completed successfully');
   } catch (error) {

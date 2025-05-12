@@ -1,0 +1,20 @@
+{
+  "nav": {
+    "upload": "Tải lên"
+  },
+  "auth": {
+    "login": "Đăng nhập",
+    "register": "Đăng ký"
+  },
+  "dashboard": {
+    "welcome": "Chào mừng bạn đến với bảng điều khiển",
+    "delete": "Xóa",
+    "edit": "Chỉnh sửa",
+    "play": "Phát",
+    "duration": "Thời lượng",
+    "rightClickOptions": "Nhấp chuột phải để chọn tùy chọn"
+  },
+  "admin": {
+    "example": "Quản trị viên"
+  }
+}

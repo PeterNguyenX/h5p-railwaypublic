@@ -5,6 +5,7 @@ import { initReactI18next } from 'react-i18next';
 import enTranslations from './locales/en.json';
 import esTranslations from './locales/es.json';
 import frTranslations from './locales/fr.json';
+import viTranslations from './locales/vi.json';
 
 i18n.use(initReactI18next).init({
   resources: {
@@ -17,12 +18,23 @@ i18n.use(initReactI18next).init({
     fr: {
       translation: frTranslations,
     },
+    vi: {
+      translation: viTranslations,
+    },
   },
-  lng: 'en', // default language
+  lng: localStorage.getItem('language') || 'en', // default language
   fallbackLng: 'en',
   interpolation: {
     escapeValue: false,
   },
+  detection: {
+    order: ['localStorage', 'navigator'],
+    caches: ['localStorage'],
+  },
 });
 
-export default i18n; 
+i18n.on('languageChanged', (lng) => {
+  localStorage.setItem('language', lng);
+});
+
+export default i18n;

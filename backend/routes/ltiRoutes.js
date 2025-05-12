@@ -83,10 +83,11 @@ router.get("/embed/:token", async (req, res) => {
           <title>${video.title}</title>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
+          <link rel="stylesheet" href="/path/to/your/styles.css">
           <script src="https://h5p.org/sites/all/modules/h5p/library/js/h5p-resizer.js" charset="UTF-8"></script>
         </head>
-        <body style="margin:0;padding:0;background:#fff;">
-          <div style="width:100%;height:100%;">
+        <body class="lti-body">
+          <div class="lti-container">
             <iframe 
               src="${process.env.FRONTEND_URL}/api/h5p/content/${video.id}" 
               width="100%" 
