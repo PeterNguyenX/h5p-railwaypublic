@@ -127,7 +127,7 @@ const Dashboard: React.FC = observer(() => {
                   menu.style.borderRadius = '4px';
 
                   const editOption = document.createElement('div');
-                  editOption.textContent = t('dashboard.edit');
+                  editOption.textContent = 'Edit';
                   editOption.style.padding = '8px';
                   editOption.style.cursor = 'pointer';
                   editOption.onclick = () => {
@@ -136,7 +136,7 @@ const Dashboard: React.FC = observer(() => {
                   };
 
                   const deleteOption = document.createElement('div');
-                  deleteOption.textContent = t('dashboard.delete');
+                  deleteOption.textContent = 'Delete';
                   deleteOption.style.padding = '8px';
                   deleteOption.style.cursor = 'pointer';
                   deleteOption.onclick = () => {
