@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -13,12 +14,23 @@ const ltiRoutes = require("./routes/ltiRoutes");
 dotenv.config();
 const app = express();
 
-// Enable CORS for development
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://103.88.123.117'
+];
+
+// Enable CORS for development and production
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? false 
-    : 'http://localhost:3000',
-  credentials: true
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());

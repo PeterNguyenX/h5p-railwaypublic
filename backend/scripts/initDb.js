@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const sequelize = require('../config/database');
 const User = require('../models/User');
 const Video = require('../models/Video');
