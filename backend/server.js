@@ -33,7 +33,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ limit: '200mb', extended: true }));
 
 // Serve static files from the uploads/videos directory
 app.use('/uploads/videos', express.static(path.join(__dirname, 'uploads/videos')));
