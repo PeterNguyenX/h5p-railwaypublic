@@ -108,7 +108,16 @@ router.post("/login", async (req, res) => {
     }
 
     // Check password
-    const isMatch = await user.validatePassword(password);
+    let isMatch;
+    try {
+      isMatch = await user.validatePassword(password);
+    } catch (err) {
+      console.error("Password validation error:", err);
+      return res.status(500).json({
+        message: "Password validation failed",
+        error: err.message,
+      });
+    }
     if (!isMatch) {
       return res.status(401).json({
         message: "Invalid email or password",
@@ -137,10 +146,11 @@ router.post("/login", async (req, res) => {
       user: userResponse,
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Login error (full):", error);
     res.status(500).json({
       message: "An error occurred during login",
       error: error.message,
+      stack: error.stack,
     });
   }
 });
