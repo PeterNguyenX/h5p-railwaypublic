@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "Errore bat gertatu da fitxategia ezabatzean.",
+    "file-not-found": "Fitxategia ez da existitzen.",
+    "s3-upload-error": "Errore bat gertatu da aldi baterako fitxategia S3ra kargatzean."
+}

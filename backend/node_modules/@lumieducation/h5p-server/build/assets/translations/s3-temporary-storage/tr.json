@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "Bu dosya silinirken bir hata oluştu.",
+    "file-not-found": "Dosya bulunamadı.",
+    "s3-upload-error": "Geçici dosya S3'e yüklenirken bir hata oluştu."
+}

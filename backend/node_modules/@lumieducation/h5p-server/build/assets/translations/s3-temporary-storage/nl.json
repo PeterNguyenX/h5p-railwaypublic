@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "Er is een fout opgetreden bij het verwijderen van dit bestand.",
+    "file-not-found": "Het bestand bestaat niet.",
+    "s3-upload-error": "Er is een fout opgetreden bij het uploaden van het tijdelijke bestand naar S3."
+}

@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "Si è verificato un errore durante l'eliminazione di questo file.",
+    "file-not-found": "Il file non esiste.",
+    "s3-upload-error": "Si è verificato un errore durante il caricamento del file temporaneo su S3."
+}

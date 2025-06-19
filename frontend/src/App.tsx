@@ -11,6 +11,10 @@ import Dashboard from './pages/Dashboard';
 import VideoUpload from './pages/VideoUpload';
 import VideoEdit from './pages/VideoEdit';
 import VideoPlayer from './pages/VideoPlayer';
+import VideoTest from './pages/VideoTest';
+import VideoDebug from './pages/VideoDebug';
+import HLSTest from './pages/HLSTest';
+import FinalTest from './pages/FinalTest';
 import NotFound from './pages/NotFound';
 import PrivateRoute from './components/PrivateRoute';
 
@@ -70,6 +74,10 @@ const App: React.FC = () => {
                 }
               />
               <Route path="/edit/:id" element={<VideoEdit />} />
+              <Route path="/test" element={<VideoTest />} />
+              <Route path="/debug" element={<VideoDebug />} />
+              <Route path="/hls-test" element={<HLSTest />} />
+              <Route path="/final" element={<FinalTest />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Box>

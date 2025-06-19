@@ -1,0 +1,12 @@
+{
+    "content-not-found": "Sadržaj kojem pokušavate pristupiti ne postoji.",
+    "deleting-content-error": "Došlo je do greške prilikom brisanja objekta sadržaja.",
+    "deleting-file-error": "Došlo je do greške prilikom brisanja datoteke {{filename}} iz objekta sadržaja.",
+    "filename-too-long": "Ime datoteke je predugo: {{filename}}",
+    "illegal-filename": "Ime datoteke {{filename}} nije dozvoljeno.",
+    "listing-content-error": "Došlo je do greške prilikom dobivanja liste objekata sadržaja",
+    "mongo-add-update-error": "Došlo je do greške prilikom dodavanja ili ažuriranja sadržaja u bazi podataka.",
+    "mongo-replace-error": "Došlo je do greške prilikom ažuriranja sadržaja u bazi podataka.",
+    "s3-upload-error": "Došlo je do greške prilikom prijenosa datoteke {{filename}} na S3.",
+    "install-library-already-installed": "Biblioteka {{ubername}} je već instalirana i ne može se ponovo instalirati."
+}

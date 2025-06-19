@@ -1,0 +1,12 @@
+{
+    "content-not-found": "The content you're trying to access does not exist.",
+    "deleting-content-error": "There was an error while deleting the content object.",
+    "deleting-file-error": "There was an error while deleting the file {{filename}} from the content object.",
+    "filename-too-long": "The filename is too long: {{filename}}",
+    "illegal-filename": "The filename {{filename}} is not allowed.",
+    "listing-content-error": "There was an error while getting the list of content objects",
+    "mongo-add-update-error": "There was an error while adding or updating content in the database.",
+    "mongo-replace-error": "There was an error while updating content in the database.",
+    "s3-upload-error": "There was an error while uploading the file {{filename}} to S3.",
+    "install-library-already-installed": "The library {{ubername}} is already installed and can't be installed again."
+}

@@ -48,6 +48,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoId, onTimeUpdate }) => {
       try {
         setLoading(true);
         const response = await api.get(`/videos/${videoId}`);
+        console.log('Video data received:', response.data);
+        console.log('Video filePath:', (response.data as any).filePath);
+        console.log('Video hlsPath:', (response.data as any).hlsPath);
+        console.log('Video youtubeUrl:', (response.data as any).youtubeUrl);
         setVideoData(response.data);
         setError(null);
       } catch (err) {
@@ -71,17 +75,92 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoId, onTimeUpdate }) => {
 
   useEffect(() => {
     if (videoRef.current && videoData?.hlsPath) {
-      const videoUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}${videoData.hlsPath}`;
+      // Construct HLS URL consistently with API base path
+      let hlsUrl;
+      if (videoData.hlsPath.startsWith('uploads/')) {
+        hlsUrl = `/api/${videoData.hlsPath}`;
+      } else if (videoData.hlsPath.startsWith('/uploads/')) {
+        hlsUrl = `/api${videoData.hlsPath}`;
+      } else {
+        hlsUrl = `/api/${videoData.hlsPath}`;
+      }
+      
+      console.log('Setting up HLS for:', videoData.title);
+      console.log('HLS URL:', hlsUrl);
+      console.log('Hls.isSupported():', Hls.isSupported());
+      console.log('Browser canPlayType HLS:', videoRef.current.canPlayType('application/vnd.apple.mpegurl'));
+      
       if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(videoUrl);
+        console.log('Using HLS.js for playback');
+        const hls = new Hls({
+          debug: true,
+          enableWorker: false
+        });
+        
+        hls.loadSource(hlsUrl);
         hls.attachMedia(videoRef.current);
+        
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('✅ HLS manifest parsed successfully');
           setDuration(videoRef.current?.duration || 0);
         });
+        
+        hls.on(Hls.Events.MANIFEST_LOADING, () => {
+          console.log('🔄 HLS manifest loading...');
+        });
+        
+        hls.on(Hls.Events.MANIFEST_LOADED, () => {
+          console.log('📥 HLS manifest loaded');
+        });
+        
+        hls.on(Hls.Events.LEVEL_LOADED, () => {
+          console.log('📊 HLS level loaded');
+        });
+        
+        hls.on(Hls.Events.FRAG_LOADING, () => {
+          console.log('🔄 HLS fragment loading...');
+        });
+        
+        hls.on(Hls.Events.FRAG_LOADED, () => {
+          console.log('📥 HLS fragment loaded');
+        });
+        
+        hls.on(Hls.Events.ERROR, (event: any, data: any) => {
+          console.error('❌ HLS error:', {
+            type: data.type,
+            details: data.details,
+            fatal: data.fatal,
+            event,
+            data
+          });
+          
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.error('Fatal network error encountered, try to recover');
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.error('Fatal media error encountered, try to recover');
+                hls.recoverMediaError();
+                break;
+              default:
+                console.error('Fatal error, cannot recover');
+                setError(`HLS playback error: ${data.details}`);
+                break;
+            }
+          }
+        });
+        
+        // Cleanup function
+        return () => {
+          hls.destroy();
+        };
       } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-        videoRef.current.src = videoUrl;
+        console.log('Using native HLS support (Safari)');
+        videoRef.current.src = hlsUrl;
       } else {
+        console.error('HLS not supported by browser');
         setError('Your browser does not support HLS playback.');
       }
     }
@@ -152,22 +231,76 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoId, onTimeUpdate }) => {
     );
   }
 
-  // Handle uploaded videos
-  const videoUrl = videoData.filePath.startsWith('/uploads/videos/')
-    ? `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}${videoData.filePath}`
-    : `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/${videoData.filePath}`;
-  console.log('Video URL:', videoUrl);
-
-  return (
-    <VideoContainer>
+  // Handle uploaded videos - prioritize HLS when available
+  let videoElement;
+  
+  if (videoData.hlsPath) {
+    // HLS video - src will be set by useEffect above
+    console.log('Using HLS playback for:', videoData.title);
+    videoElement = (
       <video
         ref={videoRef}
-        src={videoUrl}
         onTimeUpdate={onTimeUpdate}
+        onLoadStart={() => console.log('HLS Video loading started')}
+        onLoadedData={() => console.log('HLS Video data loaded')}
+        onCanPlay={() => console.log('HLS Video can play')}
+        onError={(e) => {
+          console.error('HLS Video error:', e);
+          console.error('HLS Video error target:', e.target);
+          const video = e.target as HTMLVideoElement;
+          if (video.error) {
+            console.error('HLS Video error code:', video.error.code);
+            console.error('HLS Video error message:', video.error.message);
+          }
+        }}
         controls
         crossOrigin="anonymous"
         aria-label={videoData.title}
       />
+    );
+  } else {
+    // Direct video file - fallback when HLS not available
+    let videoUrl;
+    
+    if (videoData.filePath.startsWith('uploads/')) {
+      videoUrl = `/api/${videoData.filePath}`;
+    } else if (videoData.filePath.startsWith('/uploads/')) {
+      videoUrl = `/api${videoData.filePath}`;
+    } else {
+      videoUrl = `/api/uploads/${videoData.filePath}`;
+    }
+    
+    console.log('Using direct video playback for:', videoData.title);
+    console.log('Direct Video URL:', videoUrl);
+    console.log('videoData.filePath:', videoData.filePath);
+    console.log('videoData.status:', videoData.status);
+    
+    videoElement = (
+      <video
+        ref={videoRef}
+        src={videoUrl}
+        onTimeUpdate={onTimeUpdate}
+        onLoadStart={() => console.log('Direct Video loading started')}
+        onLoadedData={() => console.log('Direct Video data loaded')}
+        onCanPlay={() => console.log('Direct Video can play')}
+        onError={(e) => {
+          console.error('Direct Video error:', e);
+          const video = e.target as HTMLVideoElement;
+          if (video.error) {
+            console.error('Direct Video error code:', video.error.code);
+            console.error('Direct Video error message:', video.error.message);
+          }
+        }}
+        controls
+        crossOrigin="anonymous"
+        aria-label={videoData.title}
+      />
+    );
+  }
+
+  return (
+    <VideoContainer>
+      {videoElement}
     </VideoContainer>
   );
 };

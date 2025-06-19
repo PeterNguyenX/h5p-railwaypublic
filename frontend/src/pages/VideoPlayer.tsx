@@ -46,6 +46,7 @@ interface Video {
   title: string;
   description: string;
   duration: string;
+  filename: string;
 }
 
 const VideoPlayer: React.FC = () => {
@@ -135,6 +136,9 @@ const VideoPlayer: React.FC = () => {
     );
   }
 
+  const { filename } = video;
+  const videoUrl = `/uploads/hls/${filename}`;
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
@@ -146,7 +150,7 @@ const VideoPlayer: React.FC = () => {
           <div className="video-player-container">
             <video
               ref={videoRef}
-              src={`/api/videos/${id}/stream`}
+              src={videoUrl}
               onClick={handlePlayPause}
             />
           </div>

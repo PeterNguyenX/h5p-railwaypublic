@@ -1,14 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Box } from '@mui/material';
 
-declare global {
-  interface Window {
-    H5P?: {
-      init: () => void;
-    };
-  }
-}
-
 interface H5PPlayerProps {
   contentId: string;
 }

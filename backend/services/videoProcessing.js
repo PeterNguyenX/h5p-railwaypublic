@@ -44,8 +44,8 @@ class VideoProcessingService {
     // Create HLS directory
     await fs.mkdir(hlsDir, { recursive: true });
 
-    // Compress video before processing
-    const compressedPath = path.join(outputDir, `${videoId}-compressed.mp4`);
+    // Compress video before processing - save inside the video directory
+    const compressedPath = path.join(hlsDir, `${videoId}.mp4`);
     await this.compressVideo(videoPath, compressedPath);
 
     // Generate thumbnail
@@ -56,9 +56,16 @@ class VideoProcessingService {
     const hlsPath = path.join(hlsDir, 'stream.m3u8');
     await this.convertToHLS(compressedPath, hlsDir);
 
+    console.log(`[VIDEO PROCESSING] Files created for ${videoId}:`);
+    console.log(`  - Original: ${videoPath}`);
+    console.log(`  - Compressed: ${compressedPath}`);
+    console.log(`  - HLS Playlist: ${hlsPath}`);
+    console.log(`  - Thumbnail: ${thumbnailPath}`);
+
     return {
       thumbnailPath: path.relative(process.cwd(), thumbnailPath),
-      hlsPath: path.relative(process.cwd(), hlsPath)
+      hlsPath: path.relative(process.cwd(), hlsPath),
+      compressedPath: path.relative(process.cwd(), compressedPath)
     };
   }
 
@@ -133,6 +140,34 @@ class VideoProcessingService {
       } catch (error) {
         console.error(`Error deleting file ${file}:`, error);
       }
+    }
+  }
+
+  /**
+   * Clean up original uploaded file after processing (optional)
+   * @param {string} originalPath - Path to original uploaded file
+   */
+  async cleanupOriginalFile(originalPath) {
+    try {
+      await fs.unlink(originalPath);
+      console.log(`[CLEANUP] Removed original file: ${originalPath}`);
+    } catch (error) {
+      console.error(`[CLEANUP] Error removing original file ${originalPath}:`, error);
+    }
+  }
+
+  /**
+   * Get the size of a file in MB
+   * @param {string} filePath - Path to the file
+   * @returns {Promise<number>} File size in MB
+   */
+  async getFileSize(filePath) {
+    try {
+      const stats = await fs.stat(filePath);
+      return (stats.size / (1024 * 1024)).toFixed(2); // Size in MB
+    } catch (error) {
+      console.error(`Error getting file size for ${filePath}:`, error);
+      return 0;
     }
   }
 }

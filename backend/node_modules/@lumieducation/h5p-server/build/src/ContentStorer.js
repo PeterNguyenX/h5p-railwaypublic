@@ -1,0 +1,452 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const path_1 = __importDefault(require("path"));
+const get_all_files_1 = require("get-all-files");
+const promises_1 = require("fs/promises");
+const fs_1 = require("fs");
+const ContentFileScanner_1 = require("./ContentFileScanner");
+const Logger_1 = __importDefault(require("./helpers/Logger"));
+const types_1 = require("./types");
+const FilenameGenerator_1 = __importDefault(require("./helpers/FilenameGenerator"));
+const SemanticsEnforcer_1 = __importDefault(require("./SemanticsEnforcer"));
+const H5pError_1 = __importDefault(require("./helpers/H5pError"));
+const log = new Logger_1.default('ContentStorer');
+/**
+ * Contains logic to store content in permanent storage. Copies files from
+ * temporary storage and deletes unused files.
+ */
+class ContentStorer {
+    contentManager;
+    temporaryFileManager;
+    constructor(contentManager, libraryManager, temporaryFileManager, options) {
+        this.contentManager = contentManager;
+        this.temporaryFileManager = temporaryFileManager;
+        log.debug('Initializing');
+        this.contentFileScanner = new ContentFileScanner_1.ContentFileScanner(libraryManager);
+        this.semanticsEnforcer = new SemanticsEnforcer_1.default(libraryManager);
+        this.fileSanitizers = options?.fileSanitizers ?? [];
+        this.malwareScanners = options?.malwareScanners ?? [];
+    }
+    fileSanitizers;
+    malwareScanners;
+    contentFileScanner;
+    semanticsEnforcer;
+    /**
+     * Saves content in the persistence system. Also copies over files from
+     * temporary storage or from other content if the content was pasted from
+     * there.
+     *
+     * Note: This method has side-effects on the parameters argument, meaning it
+     * mutates the object!
+     * @param contentId the contentId (can be undefined if previously unsaved)
+     * @param parameters the parameters of the content (= content.json)
+     * @param metadata = content of h5p.json
+     * @param mainLibraryName the library name
+     * @param user the user who wants to save the file
+     */
+    async addOrUpdateContent(contentId, parameters, metadata, mainLibraryName, user) {
+        const isUpdate = contentId !== undefined;
+        await this.semanticsEnforcer.enforceSemanticStructure(parameters, mainLibraryName);
+        // Get the list of files used in the old version of the content (if the
+        // content was saved before). This list will later be compared against
+        // the files referenced in the new params.
+        const filesInOldParams = isUpdate
+            ? await this.getFilesInParams(contentId, user)
+            : [];
+        // We check in the new params object for file references. From this we
+        // can determine which files must be copied from temporary storage into
+        // permanent storage and which files were deleted in the editor by the
+        // user.
+        const fileReferencesInNewParams = await this.contentFileScanner.scanForFiles(parameters, mainLibraryName);
+        const filesToCopyFromTemporaryStorage = await this.determineFilesToCopyFromTemporaryStorage(fileReferencesInNewParams, filesInOldParams);
+        // Store the content in persistent storage / update the content there.
+        const newContentId = await this.contentManager.createOrUpdateContent(metadata, parameters, user, contentId);
+        // All files added to the piece of content during the editor session are
+        // only stored in temporary storage. We need to copy them over from
+        // there. In some edge cases this might involve changing the paths of
+        // the filenames in the parameters, so we set the dirty flag
+        // accordingly.
+        let dirty = await this.copyFilesFromTemporaryStorage(filesToCopyFromTemporaryStorage, user, newContentId, isUpdate
+        // We only delete the temporary file when this is an update. If new
+        // content is stored, the temporary files might still be needed,
+        // e.g. if the user accidentally presses save twice. They will be
+        // deleted through the regular expiration mechanism at some point.
+        );
+        // We copy over files that were pasted from another piece of content.
+        // This might requires changing the paths in the parameters, so we have
+        // to update them by setting the dirty flag.
+        dirty =
+            (await this.copyFilesFromPasteSource(fileReferencesInNewParams, user, newContentId)) || dirty;
+        // If any paths to files were changed before (dirty === true), we have
+        // to save the content once more. TODO: In the future we might want to
+        // avoid updating content right after it was saved.
+        if (dirty) {
+            await this.contentManager.createOrUpdateContent(metadata, parameters, user, newContentId);
+        }
+        // If this is an content update, we might have to delete files from
+        // storage that were deleted by the user. (Files that were referenced in
+        // the old params but aren't referenced in the new params anymore were
+        // deleted by the user in the editor client and must be deleted from
+        // storage.)
+        if (contentId !== undefined) {
+            // we compare against the old content id, as we can check that way
+            // if the content was saved previously
+            await this.deleteUnusedOldFiles(newContentId, filesInOldParams, fileReferencesInNewParams.map((f) => f.filePath));
+        }
+        return newContentId;
+    }
+    /**
+     * Adds content from a H5P package (in a temporary directory) to the system.
+     * @deprecated The method should not be used as it anymore, as there might
+     * be issues with invalid filenames!
+     * @param packageDirectory The absolute path containing the package (the
+     * directory containing h5p.json)
+     * @param user The user who is adding the package.
+     * @param contentId (optional) The content id to use for the package
+     * @returns The id of the content that was created (the one passed to the
+     * method or a new id if there was none).
+     */
+    async copyFromDirectoryToStorage(metadata, packageDirectory, user, contentId) {
+        log.info(`copying content from directory ${packageDirectory}`);
+        const packageDirectoryLength = packageDirectory.length + 1;
+        const parameters = JSON.parse(await (0, promises_1.readFile)(path_1.default.join(packageDirectory, 'content', 'content.json'), 'utf-8'));
+        const otherContentFiles = (await (0, get_all_files_1.getAllFiles)(path_1.default.join(packageDirectory, 'content')).toArray()).filter((file) => file.substr(packageDirectoryLength) !== 'content.json');
+        const newContentId = await this.contentManager.createOrUpdateContent(metadata, parameters, user, contentId);
+        const contentPath = path_1.default.join(packageDirectory, 'content');
+        const contentPathLength = contentPath.length + 1;
+        try {
+            await Promise.all(otherContentFiles.map(async (file) => {
+                try {
+                    await this.scanForMalware(file);
+                }
+                catch (error) {
+                    if (error instanceof H5pError_1.default &&
+                        error.errorId === 'upload-malware-found') {
+                        try {
+                            // The file will be removed later anyway, but to
+                            // be sure we remove it here.
+                            await (0, promises_1.rm)(file, { force: true });
+                        }
+                        catch (error) {
+                            log.error(`Could not delete file ${file} with malware: ${error}. Whole package will be deleted anyway.`);
+                        }
+                    }
+                    throw error;
+                }
+                await this.sanitizeFile(file);
+                const readStream = (0, fs_1.createReadStream)(file);
+                const localPath = file.substr(contentPathLength);
+                log.debug(`adding ${file} to ${packageDirectory}`);
+                return this.contentManager.addContentFile(newContentId, localPath, readStream, user);
+            }));
+        }
+        catch (error) {
+            log.error(error);
+            await this.contentManager.deleteContent(newContentId, user);
+            throw error;
+        }
+        return { id: newContentId, metadata, parameters };
+    }
+    /**
+     * Scans through the parameters of the content and copies all referenced
+     * files into temporary storage.
+     * @param packageDirectory
+     * @param user
+     * @returns the metadata and parameters of the content
+     */
+    async copyFromDirectoryToTemporary(metadata, packageDirectory, user) {
+        const parameters = JSON.parse(await (0, promises_1.readFile)(path_1.default.join(packageDirectory, 'content', 'content.json'), 'utf-8'));
+        const fileReferencesInParams = await this.contentFileScanner.scanForFiles(parameters, metadata.preloadedDependencies.find((l) => l.machineName === metadata.mainLibrary));
+        const filePathToNewFilenameMap = new Map();
+        for (const reference of fileReferencesInParams) {
+            const filepath = path_1.default.join(packageDirectory, 'content', reference.filePath);
+            let newFilename = filePathToNewFilenameMap.get(filepath);
+            if (newFilename) {
+                reference.context.params.path = `${newFilename}#tmp`;
+                continue;
+            }
+            // If the file referenced in the parameters isn't included in the
+            // package, we first check if the path is actually a URL and if not,
+            // we delete the reference.
+            try {
+                await (0, promises_1.access)(filepath);
+            }
+            catch {
+                if (!this.isUrl(reference.context.params.path, reference.mimeType)) {
+                    reference.context.params.path = '';
+                }
+                continue;
+            }
+            // Check for malware
+            try {
+                await this.scanForMalware(filepath);
+            }
+            catch (error) {
+                if (error instanceof H5pError_1.default &&
+                    error.errorId === 'upload-malware-found') {
+                    try {
+                        log.debug('Deleting file with malware:', filepath);
+                        // The file will be removed later anyway, but to be sure
+                        // we remove it here, too
+                        await (0, promises_1.rm)(filepath, { force: true });
+                    }
+                    catch (error) {
+                        log.error(`Could not delete file ${filepath} with malware: ${error}. Whole upload will be rejected anyway.`);
+                    }
+                }
+                // We throw the error to stop the upload process. Files of the
+                // content that were already added to the temporary storage
+                // won't be directly deleted, but will be deleted by the garbage
+                // collector.
+                throw error;
+            }
+            // We sanitize the file before copying it to temporary storage. This
+            // prevents possible malicious code from being injected into
+            // content.
+            await this.sanitizeFile(filepath);
+            const readStream = (0, fs_1.createReadStream)(filepath);
+            newFilename = await this.temporaryFileManager.addFile(reference.filePath, readStream, user);
+            reference.context.params.path = `${newFilename}#tmp`;
+            filePathToNewFilenameMap.set(filepath, newFilename);
+        }
+        return { metadata, parameters };
+    }
+    /**
+     * Sanitizes potentially dangerous content from the file at the path using
+     * the sanitizers provided in the options. Only does something if the
+     * implementation provides sanitizers
+     * @param filepath
+     * @throws H5pError if the file could not be sanitized or there was some
+     * kind of error
+     */
+    async sanitizeFile(filepath) {
+        for (const sanitizer of this.fileSanitizers) {
+            try {
+                log.debug('Sanitizing file', filepath, 'with sanitizer', sanitizer.name);
+                // Must be run in sequence and can't be parallelized.
+                // eslint-disable-next-line no-await-in-loop
+                const result = await sanitizer.sanitize(filepath);
+                if (result === types_1.FileSanitizerResult.Sanitized) {
+                    log.debug('Sanitized file', filepath, 'with sanitizer', sanitizer.name);
+                }
+            }
+            catch {
+                throw new H5pError_1.default('upload-validation-error', {}, 400);
+            }
+        }
+    }
+    async scanForMalware(filepath) {
+        const malwareScanResults = await Promise.all(this.malwareScanners.map(async (scanner) => {
+            return {
+                ...(await scanner.scan(filepath)),
+                scannerName: scanner.name
+            };
+        }));
+        const positiveMalwareScanResults = malwareScanResults.filter((result) => result.result === types_1.MalwareScanResult.MalwareFound);
+        if (positiveMalwareScanResults.length > 0) {
+            for (const result of positiveMalwareScanResults) {
+                log.info(`Malware found in file ${filepath} by scanner ${result.scannerName}: ${result.viruses}.`);
+            }
+            // TODO: log to audit log
+            throw new H5pError_1.default('upload-malware-found', {}, 400);
+        }
+    }
+    /**
+     * Looks through the file references and check if any of them originate from
+     * a copy & paste operation. (Can be detected by checking if the path is
+     * relative.) If there are copy & pasted files, these files will be copied
+     * over to the new contentId and the references will be updated accordingly.
+     * @param fileReferencesInParams The file references found in the parameters
+     * @param user the user who wants to save the content
+     * @param contentId the content the files will be attached to
+     * @returns true if file reference were changed and the changed parameters
+     * must be saved
+     */
+    async copyFilesFromPasteSource(fileReferencesInParams, user, contentId) {
+        let changedSomething = false;
+        for (const ref of fileReferencesInParams) {
+            // Check for relative paths
+            log.debug(`Checking if file ${ref.filePath} is a relative path.`);
+            const matches = ref.filePath.match(/^\.\.\/(content\/)?([\w\-._]+)\/([\w\-./_]+)$/);
+            if (!matches || matches.length === 0) {
+                continue;
+            }
+            const sourceContentId = matches[2];
+            const sourceFilename = matches[3];
+            log.debug(`Copying pasted file ${sourceFilename} from ${sourceContentId}.`);
+            // If something goes wrong we simply remove the file from the
+            // reference.
+            try {
+                // We check for the unlikely case that the content file does not
+                // exist in the system anymore.
+                if (!(await this.contentManager.contentFileExists(sourceContentId, sourceFilename))) {
+                    log.error(`The file ${sourceFilename} does not exist in contentId ${contentId} when pasting. This should not happen. Silently ignoring this and removing the file reference...`);
+                    throw new Error('pasted file not found');
+                }
+                const sourceFileStream = await this.contentManager.getContentFileStream(sourceContentId, sourceFilename, user);
+                // the filename might already be in use in the piece of content,
+                // so we generate a new one.
+                const pastedFilename = await this.getUniqueFilename(contentId, sourceFilename);
+                await this.contentManager.addContentFile(contentId, pastedFilename, sourceFileStream, user);
+                // We have to replace the relative path with the path of the
+                // just saved file
+                ref.context.params.path = pastedFilename;
+                changedSomething = true;
+            }
+            catch (error) {
+                // If something went wrong, we remove the reference to the file
+                // from the params (except if it is actually a URL).
+                log.error(`Could not copy file ${sourceFilename} from ${sourceContentId}: ${error}. Removing the reference in the pasted content.`);
+                if (!this.isUrl(ref.context.params.path, ref.mimeType)) {
+                    ref.context.params.path = '';
+                    changedSomething = true;
+                }
+            }
+        }
+        return changedSomething;
+    }
+    /**
+     * Copies files from temporary storage into permanent storage
+     * @param files the list of filenames to copy
+     * @param user the user who is saving the content
+     * @param contentId the content id of the object
+     * @param deleteTemporaryFiles true if temporary files should be deleted
+     * after copying
+     * @returns true if paths were updated in the parameters and the content
+     * parameters must be saved again
+     */
+    async copyFilesFromTemporaryStorage(files, user, contentId, deleteTemporaryFiles) {
+        let dirty = false;
+        for (const fileToCopy of files) {
+            let readable;
+            let removeReferenceIfNotUrl = false;
+            if (await this.temporaryFileManager.fileExists(fileToCopy.filePath, user)) {
+                try {
+                    readable = await this.temporaryFileManager.getFileStream(fileToCopy.filePath, user);
+                }
+                catch (error) {
+                    // We just log this error and continue.
+                    log.error(`Temporary file ${fileToCopy} does not exist or is not accessible to user: ${error}`);
+                    removeReferenceIfNotUrl = true;
+                }
+                try {
+                    if (readable !== undefined) {
+                        log.debug(`Adding temporary file ${fileToCopy.filePath} to content id ${contentId}`);
+                        await this.contentManager.addContentFile(contentId, fileToCopy.filePath, readable, user);
+                        if (deleteTemporaryFiles) {
+                            await this.temporaryFileManager.deleteFile(fileToCopy.filePath, user);
+                        }
+                    }
+                }
+                catch (error) {
+                    log.error(`There was an error while copying temporary file ${fileToCopy} to content ${contentId}: ${error.message}. Ignoring and continuing.`);
+                    removeReferenceIfNotUrl = true;
+                }
+                finally {
+                    if (readable?.close) {
+                        readable.close();
+                    }
+                }
+            }
+            else {
+                log.error(`There was an error while copying temporary file ${fileToCopy} to content ${contentId}: The file does not exist in temporary storage. Ignoring and continuing.`);
+                removeReferenceIfNotUrl = true;
+            }
+            if (removeReferenceIfNotUrl) {
+                // We check if the path points to a malformed URL and remove it
+                // if this is not the case.
+                if (!this.isUrl(fileToCopy.context.params.path, fileToCopy.mimeType)) {
+                    fileToCopy.context.params.path = '';
+                    dirty = true;
+                }
+            }
+        }
+        return dirty;
+    }
+    /**
+     * Removes old files by comparing the two lists and removing those files that
+     * are not present in newFiles anymore.
+     * @param contentId
+     * @param oldFiles
+     * @param newFiles
+     */
+    async deleteUnusedOldFiles(contentId, oldFiles, newFiles) {
+        for (const file of oldFiles) {
+            if (!newFiles.some((f) => f === file)) {
+                log.debug(`Deleting unnecessary file ${file} from ${contentId}`);
+                try {
+                    await this.contentManager.deleteContentFile(contentId, file);
+                }
+                catch (error) {
+                    log.error(`Could not delete unused content file: ${error}`);
+                }
+            }
+        }
+    }
+    /**
+     * Returns a list of files that must be copied to permanent storage and
+     * modifies the path of these files in the fileReferencesInNewParams object!
+     * NOTE: Mind the side effect on fileReferencesInNewParams!
+     * @param fileReferencesInNewParams
+     * @returns the list of files to copy
+     */
+    async determineFilesToCopyFromTemporaryStorage(fileReferencesInNewParams, oldFiles) {
+        const filesToCopyFromTemporaryStorage = [];
+        const hashSet = new Set();
+        for (const ref of fileReferencesInNewParams) {
+            // We mark the file to be copied over from temporary storage if the
+            // file has a temporary marker.
+            if (ref.temporary) {
+                // We only save temporary file for later copying, however, if
+                // the there isn't already a file with the exact name. This
+                // might be the case if the user presses "save" twice.
+                if (!hashSet.has(ref.filePath) &&
+                    !oldFiles.some((f) => f === ref.filePath)) {
+                    filesToCopyFromTemporaryStorage.push(ref);
+                }
+                // remove temporary file marker from parameters
+                ref.context.params.path = ref.filePath;
+                hashSet.add(ref.filePath);
+            }
+        }
+        return filesToCopyFromTemporaryStorage;
+    }
+    /**
+     * Retrieves a list of files in the parameters of a content object.
+     * @param contentId
+     * @param user
+     * @returns the list of files
+     */
+    async getFilesInParams(contentId, user) {
+        const oldParams = await this.contentManager.getContentParameters(contentId, user);
+        const oldMetadata = await this.contentManager.getContentMetadata(contentId, user);
+        return (await this.contentFileScanner.scanForFiles(oldParams, oldMetadata.preloadedDependencies.find((dep) => dep.machineName === oldMetadata.mainLibrary))).map((fi) => fi.filePath);
+    }
+    /**
+     * Generates a unique filename. Removes short-ids that were added to filenames
+     * @param contentId the content object for which the file is about to be saved
+     * @param filename the filename on which to base the unique filename on
+     * @returns a unique filename (within the content object)
+     */
+    getUniqueFilename = (contentId, filename) => (0, FilenameGenerator_1.default)(filename, this.contentManager.sanitizeFilename, async (filenameToCheck) => this.contentManager.contentFileExists(contentId, filenameToCheck));
+    /**
+     * Checks if a path to a file is broken, if it is actually a URL without a
+     * protocol.
+     * @param brokenPath the path to check
+     * @param mimetype (optional) the mimetype of the file
+     */
+    isUrl(brokenPath, mimetype) {
+        return (
+        // Check if a path is a URL without a protocol prefix, like
+        // youtu.be/XXX
+        /^[^./]+?\.[^./]+\/.+$/.test(brokenPath) ||
+            // The H5P editor produces this non-standard mime-type, so we can
+            // use it to detect URLs.
+            (mimetype && mimetype.toLowerCase() === 'video/youtube'));
+    }
+}
+exports.default = ContentStorer;
+//# sourceMappingURL=ContentStorer.js.map

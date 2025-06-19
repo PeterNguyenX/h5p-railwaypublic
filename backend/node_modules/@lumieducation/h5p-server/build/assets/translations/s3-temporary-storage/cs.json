@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "Při mazání tohoto souboru došlo k chybě.",
+    "file-not-found": "Soubor neexistuje.",
+    "s3-upload-error": "Při nahrávání dočasného souboru na S3 došlo k chybě."
+}

@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "There was an error while deleting this file.",
+    "file-not-found": "The file does not exist.",
+    "s3-upload-error": "There was an error uploading the temporary file to S3."
+}

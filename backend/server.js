@@ -4,12 +4,14 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
 const fs = require("fs");
+const H5PExpress = require('@lumieducation/h5p-express');
 const authRoutes = require("./routes/authRoutes");
 const videoRoutes = require("./routes/videoRoutes");
 const h5pRoutes = require("./routes/h5pRoutes");
 const templateRoutes = require("./routes/templateRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const ltiRoutes = require("./routes/ltiRoutes");
+const h5pService = require("./services/h5pService");
 
 dotenv.config();
 const app = express();
@@ -36,8 +38,45 @@ app.use(cors({
 app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ limit: '200mb', extended: true }));
 
-// Serve static files from the uploads/videos directory
-app.use('/uploads/videos', express.static(path.join(__dirname, 'uploads/videos')));
+// Initialize H5P service
+async function initializeH5P() {
+  try {
+    await h5pService.initialize();
+    
+    // Add H5P express middleware
+    const h5pEditor = h5pService.getH5PEditor();
+    const h5pPlayer = h5pService.getH5PPlayer();
+    
+    if (h5pEditor && h5pPlayer) {
+      // Serve H5P core files
+      app.use('/api/h5p/core', express.static(path.join(__dirname, 'node_modules/@lumieducation/h5p-server/build/assets')));
+      app.use('/api/h5p/editor', express.static(path.join(__dirname, 'node_modules/@lumieducation/h5p-server/build/assets')));
+      
+      // H5P editor and player routes will be handled by our custom routes
+      console.log('H5P middleware initialized successfully');
+    }
+  } catch (error) {
+    console.error('Failed to initialize H5P:', error);
+    console.log('Continuing with mock H5P service');
+  }
+}
+
+// Initialize H5P on startup
+initializeH5P();
+
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Also serve uploads under /api for consistency with frontend API calls
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.m3u8')) {
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    }
+    if (filePath.endsWith('.ts')) {
+      res.setHeader('Content-Type', 'video/mp2t');
+    }
+  }
+}));
 
 // API routes
 app.use("/api/auth", authRoutes);

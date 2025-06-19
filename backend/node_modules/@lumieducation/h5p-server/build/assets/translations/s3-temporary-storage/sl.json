@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "Pri brisanju te datoteke je prišlo do napake.",
+    "file-not-found": "Datoteka ne obstaja.",
+    "s3-upload-error": "Pri nalaganju začasne datoteke v S3 je prišlo do napake."
+}

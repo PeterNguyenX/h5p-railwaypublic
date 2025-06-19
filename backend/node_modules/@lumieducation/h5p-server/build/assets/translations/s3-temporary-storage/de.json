@@ -1,0 +1,5 @@
+{
+    "deleting-file-error": "Es ist beim Löschen der Datei ein Fehler aufgetreten.",
+    "file-not-found": "Diese Datei existiert nicht.",
+    "s3-upload-error": "Es ist ein Fehler beim Hochladen der temporären Datei nach S3 aufgetreten."
+}

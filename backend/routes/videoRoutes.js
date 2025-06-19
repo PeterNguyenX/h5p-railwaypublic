@@ -13,6 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 const videoProcessor = new VideoProcessingService();
 
 // Configure multer for video upload
+const sanitize = (name) => name.replace(/[^a-zA-Z0-9-_\.]/g, '_');
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadsDir = path.join(__dirname, '../uploads/videos');
@@ -20,9 +21,24 @@ const storage = multer.diskStorage({
       .then(() => cb(null, uploadsDir))
       .catch(err => cb(err));
   },
-  filename: function (req, file, cb) {
-    const uniqueId = uuidv4();
-    cb(null, `${uniqueId}${path.extname(file.originalname)}`);
+  filename: async function (req, file, cb) {
+    try {
+      let baseName = req.body.title ? sanitize(req.body.title) : path.parse(file.originalname).name;
+      let ext = path.extname(file.originalname);
+      let finalName = `${baseName}${ext}`;
+      const uploadsDir = path.join(__dirname, '../uploads/videos');
+      const filePath = path.join(uploadsDir, finalName);
+      try {
+        await fs.access(filePath);
+        // File exists
+        return cb(new Error('A video with this name already exists. Please choose a different title.'));
+      } catch {
+        // File does not exist, safe to use
+        return cb(null, finalName);
+      }
+    } catch (err) {
+      return cb(err);
+    }
   }
 });
 
@@ -53,12 +69,23 @@ const mapVideoData = (video) => {
 // Video upload route
 router.post("/upload", auth, upload.single("video"), async (req, res) => {
   try {
+    console.log("[UPLOAD] Incoming upload request");
     if (!req.file) {
+      console.error("[UPLOAD] No video file uploaded");
       return res.status(400).json({ error: "No video file uploaded" });
     }
+    console.log(`[UPLOAD] File received: ${req.file.originalname} -> ${req.file.path}`);
 
     const { title, description, language } = req.body;
     const videoPath = req.file.path;
+
+    // Check if file exists after upload
+    try {
+      await fs.access(videoPath);
+      console.log(`[UPLOAD] File saved at: ${videoPath}`);
+    } catch (err) {
+      console.error(`[UPLOAD] File not found after upload: ${videoPath}`);
+    }
 
     // Create video record in database
     const video = await Video.create({
@@ -72,17 +99,32 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
 
     // Process video in the background
     videoProcessor.processVideo(videoPath, path.join(__dirname, '../uploads/hls'))
-      .then(async ({ thumbnailPath, hlsPath }) => {
+      .then(async ({ thumbnailPath, hlsPath, compressedPath }) => {
         const duration = await videoProcessor.getVideoDuration(videoPath);
+        
+        // Get file sizes for logging
+        const originalSize = await videoProcessor.getFileSize(videoPath);
+        const compressedSize = await videoProcessor.getFileSize(path.join(__dirname, '..', compressedPath));
+        
+        console.log(`[UPLOAD] Video processing complete:`);
+        console.log(`  - Original size: ${originalSize} MB`);
+        console.log(`  - Compressed size: ${compressedSize} MB`);
+        console.log(`  - Compression ratio: ${((compressedSize/originalSize) * 100).toFixed(1)}%`);
+        
         await video.update({ 
           status: 'ready',
           duration,
           thumbnailPath,
           hlsPath
         });
+        
+        // Optionally clean up original file to save space (uncomment if desired)
+        // await videoProcessor.cleanupOriginalFile(videoPath);
+        
+        console.log(`[UPLOAD] Video processing complete for: ${videoPath}`);
       })
       .catch(async (error) => {
-        console.error('Error processing video:', error);
+        console.error('[UPLOAD] Error processing video:', error);
         await video.update({ status: 'error' });
       });
 
@@ -91,7 +133,12 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
       video: mapVideoData(video)
     });
   } catch (error) {
-    console.error("Video upload error:", error);
+    // If Multer duplicate error, send user-friendly message
+    if (error.message && error.message.includes('already exists')) {
+      console.error("[UPLOAD] Duplicate filename error");
+      return res.status(409).json({ error: error.message });
+    }
+    console.error("[UPLOAD] Video upload error:", error);
     res.status(500).json({ error: "Error uploading video" });
   }
 });
