@@ -80,7 +80,8 @@
     "uploading": "Uploading...",
     "submit": "Upload Video",
     "noFileError": "Please select a video file",
-    "uploadError": "Failed to upload video"
+    "uploadError": "Failed to upload video",
+    "duplicateError": "A video with this name already exists. Please choose a different title."
   },
   "h5p": {
     "create": "Create H5P Content",
@@ -116,4 +117,4 @@
     "serverError": "Server error",
     "networkError": "Network error"
   }
-} 
+}

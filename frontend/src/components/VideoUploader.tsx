@@ -2,14 +2,19 @@ import { useState } from "react";
 import { Button, Container, Typography } from "@mui/material";
 import axios from "axios";
 
-const VideoUploader = () => {
+interface VideoUploaderProps {
+    onUpload: (videoId: string) => void;
+}
+
+const VideoUploader: React.FC<VideoUploaderProps> = ({ onUpload }) => {
     const [file, setFile] = useState<File | null>(null);
 
     const handleUpload = async () => {
         if (!file) return;
         const formData = new FormData();
         formData.append("video", file);
-        await axios.post("/api/videos/upload", formData);
+        const response = await axios.post<{ videoId: string }>("/api/videos/upload", formData);
+        onUpload(response.data.videoId);
     };
 
     return (

@@ -129,5 +129,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+app.use('/h5p/libraries', express.static(path.join(__dirname, 'h5p-libraries')));
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

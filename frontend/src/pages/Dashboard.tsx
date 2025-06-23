@@ -13,6 +13,10 @@ import {
   Alert,
   Dialog,
   DialogContent,
+  DialogTitle,
+  Button,
+  TextField,
+  Snackbar,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -40,6 +44,11 @@ const Dashboard: React.FC = observer(() => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [ltiDialogOpen, setLtiDialogOpen] = useState(false);
+  const [ltiLink, setLtiLink] = useState<string | null>(null);
+  const [ltiError, setLtiError] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [snackbarMsg, setSnackbarMsg] = useState<string | null>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -113,7 +122,7 @@ const Dashboard: React.FC = observer(() => {
                     boxShadow: 6,
                   },
                 }}
-                onContextMenu={(e) => {
+                onContextMenu={async (e) => {
                   e.preventDefault();
                   const menu = document.createElement('div');
                   menu.style.position = 'absolute';
@@ -144,8 +153,53 @@ const Dashboard: React.FC = observer(() => {
                     document.body.removeChild(menu);
                   };
 
+                  const exportOption = document.createElement('div');
+                  exportOption.textContent = 'Export LTI';
+                  exportOption.style.padding = '8px';
+                  exportOption.style.cursor = 'pointer';
+                  exportOption.onclick = async () => {
+                    setLtiError(null);
+                    setLtiLink(null);
+                    setDownloadUrl(null);
+                    try {
+                      const res = await api.get<{ ltiLink: string }>(`/lti/generate/${video.id}`);
+                      setLtiLink(res.data.ltiLink);
+                      setLtiDialogOpen(true);
+                    } catch (err: any) {
+                      setLtiError(err.response?.data?.error || 'Failed to generate LTI link');
+                      setLtiDialogOpen(true);
+                    }
+                    document.body.removeChild(menu);
+                  };
+
+                  const downloadOption = document.createElement('div');
+                  downloadOption.textContent = 'Download';
+                  downloadOption.style.padding = '8px';
+                  downloadOption.style.cursor = 'pointer';
+                  downloadOption.onclick = () => {
+                    // Fix: handle filePath for download and use backend port
+                    let downloadPath = video.filePath || '';
+                    if (downloadPath.startsWith('uploads/')) {
+                      downloadPath = '/' + downloadPath;
+                    } else if (downloadPath.startsWith('backend/uploads/')) {
+                      downloadPath = '/' + downloadPath.replace('backend/', '');
+                    } else if (!downloadPath.startsWith('/uploads/')) {
+                      downloadPath = '/uploads/videos/' + downloadPath;
+                    }
+                    setDownloadUrl(downloadPath);
+                    setSnackbarMsg('Download started');
+                    const backendUrl = `http://localhost:3001${downloadPath}`;
+                    const win = window.open(backendUrl, '_blank');
+                    setTimeout(() => {
+                      window.history.back();
+                    }, 1000);
+                    document.body.removeChild(menu);
+                  };
+
                   menu.appendChild(editOption);
                   menu.appendChild(deleteOption);
+                  menu.appendChild(exportOption);
+                  menu.appendChild(downloadOption);
 
                   document.body.appendChild(menu);
 
@@ -216,6 +270,32 @@ const Dashboard: React.FC = observer(() => {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={ltiDialogOpen} onClose={() => setLtiDialogOpen(false)}>
+        <DialogTitle>Export LTI Link</DialogTitle>
+        <DialogContent>
+          {ltiError && <Alert severity="error">{ltiError}</Alert>}
+          {ltiLink && (
+            <>
+              <TextField
+                label="LTI Link"
+                value={ltiLink}
+                fullWidth
+                InputProps={{ readOnly: true }}
+                onFocus={e => e.target.select()}
+                sx={{ mb: 2 }}
+              />
+              <Button onClick={() => navigator.clipboard.writeText(ltiLink)} variant="outlined">Copy</Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Snackbar
+        open={!!snackbarMsg}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarMsg(null)}
+        message={snackbarMsg}
+      />
     </Container>
   );
 });

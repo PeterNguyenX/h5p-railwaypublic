@@ -105,9 +105,13 @@ const VideoUpload: React.FC = () => {
       setTimeout(() => setSuccess(null), 3000);
 
       navigate('/dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload error:', err);
-      setError(err instanceof Error ? err.message : t('videoUpload.uploadError'));
+      if (err.response && err.response.status === 409) {
+        setError(t('videoUpload.duplicateError'));
+      } else {
+        setError(err instanceof Error ? err.message : t('videoUpload.uploadError'));
+      }
     } finally {
       setUploading(false);
     }

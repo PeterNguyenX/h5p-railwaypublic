@@ -1,0 +1,16 @@
+.lti-export-block {
+  margin-top: 24px;
+}
+.lti-link-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lti-link-input {
+  width: 80%;
+}
+.lti-link-error {
+  color: red;
+  margin-top: 8px;
+}

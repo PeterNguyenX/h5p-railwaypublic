@@ -17,6 +17,7 @@
     "@ffmpeg/util": "^0.12.2",
     "@lumieducation/h5p-express": "^10.0.4",
     "@lumieducation/h5p-server": "^10.0.4",
+    "adm-zip": "^0.5.16",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
