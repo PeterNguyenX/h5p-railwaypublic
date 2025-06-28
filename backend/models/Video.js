@@ -40,11 +40,11 @@ const Video = sequelize.define('Video', {
     defaultValue: 'processing'
   },
   h5pContent: {
-    type: DataTypes.JSONB,
+    type: DataTypes.JSON,
     allowNull: true
   },
   metadata: {
-    type: DataTypes.JSONB,
+    type: DataTypes.JSON,
     allowNull: true
   },
   // New fields for YouTube integration
@@ -70,7 +70,7 @@ const Video = sequelize.define('Video', {
     allowNull: true
   },
   captions: {
-    type: DataTypes.JSONB,
+    type: DataTypes.JSON,
     allowNull: true
   },
   // New field for LTI integration

@@ -2,12 +2,16 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const { Video } = require("../models");
+const { auth } = require("../middleware/auth");
 
 // Generate LTI link for a video
-router.get("/generate/:videoId", async (req, res) => {
+router.get("/generate/:videoId", auth, async (req, res) => {
   try {
     const video = await Video.findOne({
-      where: { id: req.params.videoId }
+      where: { 
+        id: req.params.videoId,
+        userId: req.user.id  // Only allow users to generate LTI links for their own videos
+      }
     });
 
     if (!video) {

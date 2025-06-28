@@ -23,7 +23,7 @@ const Template = sequelize.define('Template', {
     allowNull: true
   },
   h5pContent: {
-    type: DataTypes.JSONB,
+    type: DataTypes.JSON,
     allowNull: false
   },
   category: {

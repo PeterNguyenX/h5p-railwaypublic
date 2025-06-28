@@ -5,6 +5,7 @@ const fs = require("fs");
 const { auth } = require("../middleware/auth");
 const h5pService = require("../services/h5pService");
 const { Video } = require("../models");
+const { Op } = require("sequelize");
 const axios = require('axios');
 const AdmZip = require('adm-zip');
 const { H5PEditor, H5PPlayer, LibraryAdministration } = require('h5p-nodejs-library');
@@ -44,7 +45,7 @@ router.get("/content/:contentId", async (req, res) => {
 });
 
 // Get H5P content for a video
-router.get("/video/:videoId", auth, async (req, res) => {
+router.get("/video/:videoId/content", auth, async (req, res) => {
   try {
     const contents = await h5pService.getVideoContent(req.params.videoId);
     res.json(contents);
@@ -95,7 +96,52 @@ router.post("/video/:videoId", auth, async (req, res) => {
   }
 });
 
-// Update time-based H5P content
+// Update H5P content
+router.put("/content/:contentId", auth, async (req, res) => {
+  try {
+    const { contentData, timestamp } = req.body;
+    const contentId = req.params.contentId;
+    
+    // Update the H5P content
+    const content = await h5pService.updateContent(contentId, contentData);
+    
+    // Update the timestamp in the video's H5P content array
+    const video = await Video.findOne({
+      where: {
+        h5pContent: {
+          [Op.or]: [
+            { [Op.like]: `%"contentId":"${contentId}"%` },
+            { [Op.like]: `%"contentId":${contentId}%` }
+          ]
+        }
+      }
+    });
+
+    if (video) {
+      let h5pContent = Array.isArray(video.h5pContent) ? video.h5pContent : [];
+      
+      // Find and update the timestamp for this content
+      const contentIndex = h5pContent.findIndex(item => 
+        item.contentId === contentId || item.contentId === parseInt(contentId)
+      );
+      
+      if (contentIndex !== -1) {
+        h5pContent[contentIndex].timestamp = timestamp;
+        await video.update({ h5pContent });
+      }
+    }
+
+    res.json({
+      message: "H5P content updated successfully",
+      content,
+    });
+  } catch (error) {
+    console.error("Error updating H5P content:", error);
+    res.status(500).json({ error: "Error updating H5P content" });
+  }
+});
+
+// Update time-based H5P content (legacy route)
 router.put("/:contentId", auth, async (req, res) => {
   try {
     const { contentData, timestamp } = req.body;
@@ -116,7 +162,7 @@ router.put("/:contentId", auth, async (req, res) => {
 });
 
 // Delete H5P content
-router.delete("/:contentId", auth, async (req, res) => {
+router.delete("/content/:contentId", auth, async (req, res) => {
   try {
     await h5pService.deleteContent(req.params.contentId);
     res.json({ message: "H5P content deleted successfully" });
@@ -160,7 +206,7 @@ router.post("/content", auth, async (req, res) => {
 router.get("/content/:id", auth, async (req, res) => {
   try {
     const contentId = req.params.id;
-    const content = await h5p.loadContent(contentId);
+    const content = await h5pService.loadContent(contentId);
     res.json(content);
   } catch (err) {
     res.status(404).json({ error: "Content not found" });
@@ -206,6 +252,53 @@ router.post('/library', async (req, res) => {
     res.json({ success: true, message: 'Library installed successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Export video with H5P content as .h5p file
+router.post("/video/:videoId/export", auth, async (req, res) => {
+  try {
+    const { Video } = require("../models");
+    const video = await Video.findOne({
+      where: {
+        id: req.params.videoId,
+        userId: req.user.id,
+      },
+    });
+
+    if (!video) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    // Get H5P content for this video
+    const h5pContents = await h5pService.getVideoContent(req.params.videoId);
+
+    // Create H5P package
+    const h5pPackage = await h5pService.createH5PPackage(video, h5pContents);
+
+    // Generate filename based on original video filename
+    let filename = 'video.h5p';
+    if (video.filePath) {
+      // Extract filename from filePath and replace extension with .h5p
+      const path = require('path');
+      const originalName = path.basename(video.filePath, path.extname(video.filePath));
+      const sanitizedName = originalName.replace(/[^a-zA-Z0-9\-_]/g, '-');
+      filename = `${sanitizedName}.h5p`;
+    } else if (video.title) {
+      // Fallback to title if no filePath
+      const sanitizedTitle = video.title.replace(/[^a-zA-Z0-9\-_]/g, '-').substring(0, 50);
+      filename = `${sanitizedTitle}.h5p`;
+    }
+
+    // Set headers for file download
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    // Send the package
+    res.send(h5pPackage);
+  } catch (error) {
+    console.error("Error exporting H5P package:", error);
+    res.status(500).json({ error: "Error exporting H5P package" });
   }
 });
 

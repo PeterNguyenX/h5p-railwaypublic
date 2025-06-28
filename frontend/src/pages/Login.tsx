@@ -9,7 +9,7 @@ import {
   Alert,
   Stack,
 } from '@mui/material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
 import authStore from '../stores/authStore';
@@ -20,6 +20,7 @@ const Login: React.FC = observer(() => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -28,7 +29,9 @@ const Login: React.FC = observer(() => {
 
     try {
       await authStore.login(email, password);
-      navigate('/dashboard');
+      // Redirect to the originally intended page or dashboard
+      const redirectTo = (location.state as any)?.from?.pathname || '/dashboard';
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     }

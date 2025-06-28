@@ -11,13 +11,17 @@ const h5pRoutes = require("./routes/h5pRoutes");
 const templateRoutes = require("./routes/templateRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const ltiRoutes = require("./routes/ltiRoutes");
+const wordpressRoutes = require("./routes/wordpressRoutes");
 const h5pService = require("./services/h5pService");
+const thumbnailFallbackMiddleware = require("./middleware/thumbnailFallback");
 
 dotenv.config();
 const app = express();
 
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:8888',
   'http://103.88.123.117'
 ];
 
@@ -66,7 +70,32 @@ initializeH5P();
 
 // Serve static files from the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-// Also serve uploads under /api for consistency with frontend API calls
+
+// Serve static files from public directory (for default assets)
+app.use('/api', express.static(path.join(__dirname, 'public')));
+
+// Custom thumbnail handler with fallback
+app.get('/api/uploads/**/thumbnail.jpg', (req, res) => {
+  const requestedPath = req.path.replace('/api/uploads/', '');
+  const thumbnailPath = path.join(__dirname, 'uploads', requestedPath);
+  
+  // Check if thumbnail exists
+  fs.access(thumbnailPath, fs.constants.F_OK, (err) => {
+    if (err) {
+      // File doesn't exist, serve default thumbnail
+      console.log(`Thumbnail not found: ${thumbnailPath}, serving default`);
+      const defaultThumbnailPath = path.join(__dirname, 'public/default-thumbnail.svg');
+      res.setHeader('Content-Type', 'image/svg+xml');
+      res.sendFile(defaultThumbnailPath);
+    } else {
+      // File exists, serve it
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.sendFile(thumbnailPath);
+    }
+  });
+});
+
+// Apply thumbnail fallback middleware before serving uploads
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.m3u8')) {
@@ -85,6 +114,7 @@ app.use("/api/h5p", h5pRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/lti", ltiRoutes);
+app.use("/api/wordpress", wordpressRoutes);
 
 // Video streaming endpoint
 app.get("/video/:videoPath", (req, res) => {

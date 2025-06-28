@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Your existing MySQL database
+  mysql:
+    image: mysql:8.0
+    container_name: itp-h5p-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wordpress_db
+      MYSQL_USER: wordpress_user
+      MYSQL_PASSWORD: your_secure_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./create_wordpress_db.sql:/docker-entrypoint-initdb.d/create_wordpress_db.sql
+
+  # WordPress
+  wordpress:
+    image: wordpress:latest
+    container_name: itp-h5p-wordpress
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wordpress_user
+      WORDPRESS_DB_PASSWORD: your_secure_password
+      WORDPRESS_DB_NAME: wordpress_db
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./h5p:/var/www/html/wp-content/plugins/h5p
+      - ./h5p-content:/var/www/html/wp-content/uploads/h5p-content
+      - ./h5p-libraries:/var/www/html/wp-content/uploads/h5p-libraries
+    depends_on:
+      - mysql
+
+  # Your existing Node.js backend
+  backend:
+    build: ./backend
+    container_name: itp-h5p-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=mysql
+      - DB_USER=wordpress_user
+      - DB_PASSWORD=your_secure_password
+      - DB_NAME=wordpress_db
+    volumes:
+      - ./backend:/app
+      - ./h5p-content:/app/h5p-content
+      - ./h5p-libraries:/app/h5p-libraries
+    depends_on:
+      - mysql
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: itp-h5p-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/build:/usr/share/nginx/html
+    depends_on:
+      - wordpress
+      - backend
+
+volumes:
+  mysql_data:
+  wordpress_data:

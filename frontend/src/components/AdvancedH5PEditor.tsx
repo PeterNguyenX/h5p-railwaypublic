@@ -30,6 +30,8 @@ interface AdvancedH5PEditorProps {
   onSave: (contentData: any) => void;
   contentId?: string;
   videoId: string;
+  preselectedLibrary?: string; // Add support for pre-selecting library
+  currentVideoTime?: number; // Add support for current video time
 }
 
 interface H5PLibrary {
@@ -45,7 +47,9 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
   onClose,
   onSave,
   contentId,
-  videoId
+  videoId,
+  preselectedLibrary,
+  currentVideoTime
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +57,7 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
   const [selectedLibrary, setSelectedLibrary] = useState<string>('');
   const [step, setStep] = useState<'select' | 'edit'>('select');
   const [contentData, setContentData] = useState<any>({});
+  const [timestamp, setTimestamp] = useState<number>(0);
 
   // Multiple Choice specific state
   const [question, setQuestion] = useState('');
@@ -69,8 +74,22 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
   useEffect(() => {
     if (open) {
       loadLibraries();
+      
+      // Set initial timestamp from current video time
+      if (currentVideoTime !== undefined) {
+        setTimestamp(Math.floor(currentVideoTime));
+      }
+      
+      // Load existing content if contentId is provided
+      if (contentId) {
+        loadExistingContent(contentId);
+      } else if (preselectedLibrary) {
+        // Auto-select library if preselected for new content
+        setSelectedLibrary(preselectedLibrary);
+        setStep('edit');
+      }
     }
-  }, [open]);
+  }, [open, preselectedLibrary, currentVideoTime, contentId]);
 
   const loadLibraries = async () => {
     try {
@@ -84,6 +103,63 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
     } catch (err: any) {
       console.error('Error loading H5P libraries:', err);
       setError(err.message || 'Failed to load H5P libraries');
+      setLoading(false);
+    }
+  };
+
+  const loadExistingContent = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await api.get(`/h5p/content/${id}`);
+      const content: any = response.data;
+      
+      // Set the library and go to edit step
+      setSelectedLibrary(content.library);
+      setStep('edit');
+      
+      // Set timestamp from existing content
+      if (content.timestamp !== undefined) {
+        setTimestamp(content.timestamp);
+      }
+      
+      // Populate form fields based on content type and params
+      if (content.params) {
+        switch (content.library) {
+          case 'H5P.MultiChoice':
+            if (content.params.question) {
+              setQuestion(content.params.question);
+            }
+            if (content.params.answers && Array.isArray(content.params.answers)) {
+              const answerTexts = content.params.answers.map((answer: any) => answer.text || '');
+              const correctIndex = content.params.answers.findIndex((answer: any) => answer.correct);
+              setOptions([...answerTexts, '', '', '', ''].slice(0, 4)); // Ensure 4 options
+              setCorrectAnswer(correctIndex >= 0 ? correctIndex : 0);
+            }
+            break;
+          
+          case 'H5P.TrueFalse':
+            if (content.params.question) {
+              setStatement(content.params.question);
+            }
+            if (content.params.correct !== undefined) {
+              setIsTrue(content.params.correct === 'true' || content.params.correct === true);
+            }
+            break;
+          
+          case 'H5P.Blanks':
+            if (content.params.text) {
+              setBlankText(content.params.text);
+            }
+            break;
+        }
+      }
+      
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Error loading H5P content:', err);
+      setError(err.message || 'Failed to load H5P content');
       setLoading(false);
     }
   };
@@ -226,9 +302,12 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
           title: question || statement || 'H5P Content',
           license: 'U',
           extraTitle: question || statement || 'H5P Content'
-        }
+        },
+        timestamp: timestamp, // Include the timestamp
+        ...(contentId && { id: contentId }) // Include ID when editing existing content
       };
 
+      console.log('Saving H5P content:', contentData);
       onSave(contentData);
       handleClose();
     } catch (err: any) {
@@ -411,7 +490,7 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
       <DialogTitle>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Typography variant="h6">
-            {step === 'select' ? 'H5P Content Creator' : 'Edit Content'}
+            {step === 'select' ? 'H5P Content Creator' : contentId ? 'Edit H5P Content' : 'Create H5P Content'}
           </Typography>
           <IconButton onClick={handleClose}>
             <CloseIcon />
@@ -441,6 +520,33 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
             {step === 'edit' && (
               <>
                 {renderContentEditor()}
+                
+                {/* Timestamp Configuration */}
+                <Box sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Video Timing
+                  </Typography>
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <TextField
+                      type="number"
+                      label="Show at time (seconds)"
+                      value={timestamp}
+                      onChange={(e) => setTimestamp(Number(e.target.value))}
+                      inputProps={{ min: 0, step: 1 }}
+                      helperText="Enter the video timestamp when this interaction should appear"
+                      sx={{ width: 200 }}
+                    />
+                    {currentVideoTime !== undefined && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setTimestamp(Math.floor(currentVideoTime))}
+                      >
+                        Use Current Time ({Math.floor(currentVideoTime)}s)
+                      </Button>
+                    )}
+                  </Stack>
+                </Box>
                 
                 <Divider sx={{ my: 3 }} />
                 

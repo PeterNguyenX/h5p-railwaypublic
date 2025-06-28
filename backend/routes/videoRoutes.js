@@ -59,9 +59,24 @@ const formatDuration = (seconds) => {
 
 // Helper function to map video data
 const mapVideoData = (video) => {
+  let thumbnailPath = video.thumbnailPath;
+  
+  // Ensure we always have a valid thumbnail path
+  if (!thumbnailPath || thumbnailPath === '') {
+    thumbnailPath = '/default-thumbnail.svg';
+  } else if (thumbnailPath === '/default-thumbnail.svg') {
+    // Already set to default, keep as is
+    thumbnailPath = '/default-thumbnail.svg';
+  } else {
+    // Convert relative path to API accessible path
+    if (!thumbnailPath.startsWith('/api/') && !thumbnailPath.startsWith('/')) {
+      thumbnailPath = `/uploads/${thumbnailPath.replace(/^uploads\//, '')}`;
+    }
+  }
+  
   return {
     ...video.toJSON(),
-    thumbnailPath: video.thumbnailPath || '/default-thumbnail.jpg',
+    thumbnailPath,
     duration: formatDuration(video.duration)
   };
 };
@@ -110,11 +125,23 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
         console.log(`  - Original size: ${originalSize} MB`);
         console.log(`  - Compressed size: ${compressedSize} MB`);
         console.log(`  - Compression ratio: ${((compressedSize/originalSize) * 100).toFixed(1)}%`);
+        console.log(`  - Thumbnail path: ${thumbnailPath}`);
+        
+        // Verify thumbnail exists before updating database
+        let finalThumbnailPath = thumbnailPath;
+        try {
+          const fullThumbnailPath = path.join(__dirname, '..', thumbnailPath);
+          await fs.access(fullThumbnailPath);
+          console.log(`[UPLOAD] Thumbnail verified: ${fullThumbnailPath}`);
+        } catch (error) {
+          console.error(`[UPLOAD] Thumbnail not found, using default: ${thumbnailPath}`);
+          finalThumbnailPath = '/default-thumbnail.svg';
+        }
         
         await video.update({ 
           status: 'ready',
           duration,
-          thumbnailPath,
+          thumbnailPath: finalThumbnailPath,
           hlsPath
         });
         
@@ -125,7 +152,10 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
       })
       .catch(async (error) => {
         console.error('[UPLOAD] Error processing video:', error);
-        await video.update({ status: 'error' });
+        await video.update({ 
+          status: 'error',
+          thumbnailPath: '/default-thumbnail.svg' // Ensure we always have a thumbnail
+        });
       });
 
     res.status(201).json({ 
@@ -165,20 +195,20 @@ router.post("/youtube", auth, async (req, res) => {
         description: description || basicInfo.videoDetails.description || '',
         youtubeUrl,
         youtubeId: videoId,
-        thumbnailPath: basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.jpg',
+        thumbnailPath: basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.svg',
         duration: parseInt(basicInfo.videoDetails.lengthSeconds) || 0,
         userId: req.user.id,
         status: 'ready',
         language: language || 'en'
       });
 
-      console.log("Creating video with thumbnailPath:", basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.jpg');
+      console.log("Creating video with thumbnailPath:", basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.svg');
       console.log("YouTube video details:", {
         title: title || basicInfo.videoDetails.title,
         description: description || basicInfo.videoDetails.description,
         youtubeUrl,
         youtubeId: videoId,
-        thumbnailPath: basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.jpg',
+        thumbnailPath: basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.svg',
       });
 
       res.status(201).json({

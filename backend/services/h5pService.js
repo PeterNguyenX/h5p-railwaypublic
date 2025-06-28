@@ -39,7 +39,10 @@ class H5PService {
         id: contentId,
         library: contentData.library,
         params: contentData.params,
-        metadata: contentData.metadata || {},
+        metadata: contentData.metadata || {
+          title: contentData.metadata?.title || 'H5P Content',
+          license: 'U'
+        },
         videoId,
         timestamp,
         createdAt: new Date().toISOString()
@@ -47,10 +50,13 @@ class H5PService {
 
       this.contentStorage.set(contentId, content);
 
-      console.log('Created H5P content:', { contentId, videoId, timestamp });
+      console.log('Created H5P content:', { contentId, videoId, timestamp, library: contentData.library });
       return {
         id: contentId,
         content: contentData,
+        library: contentData.library,
+        params: contentData.params,
+        metadata: content.metadata,
         videoId,
         timestamp
       };
@@ -96,6 +102,67 @@ class H5PService {
     }
   }
 
+  async updateContent(contentId, contentData) {
+    if (!this.initialized) {
+      throw new Error('H5P service not initialized');
+    }
+
+    try {
+      const existingContent = this.contentStorage.get(contentId);
+      if (!existingContent) {
+        throw new Error('Content not found');
+      }
+
+      const updatedContent = {
+        ...existingContent,
+        library: contentData.library,
+        params: contentData.params,
+        metadata: contentData.metadata || existingContent.metadata || {},
+        updatedAt: new Date().toISOString()
+      };
+
+      this.contentStorage.set(contentId, updatedContent);
+
+      console.log('Updated H5P content:', { contentId, contentData });
+      return {
+        id: contentId,
+        library: updatedContent.library,
+        params: updatedContent.params,
+        metadata: updatedContent.metadata,
+        timestamp: existingContent.timestamp
+      };
+    } catch (error) {
+      console.error('Error updating H5P content:', error);
+      throw error;
+    }
+  }
+
+  async loadContent(contentId) {
+    if (!this.initialized) {
+      throw new Error('H5P service not initialized');
+    }
+
+    try {
+      const content = this.contentStorage.get(contentId);
+      if (!content) {
+        throw new Error('Content not found');
+      }
+
+      console.log('Loading H5P content:', contentId);
+      return {
+        id: contentId,
+        library: content.library,
+        params: content.params,
+        metadata: content.metadata,
+        timestamp: content.timestamp,
+        title: content.metadata?.title || 'H5P Content'
+      };
+    } catch (error) {
+      console.error('Error loading H5P content:', error);
+      throw error;
+    }
+  }
+
   async getVideoContent(videoId) {
     if (!this.initialized) {
       throw new Error('H5P service not initialized');
@@ -103,9 +170,18 @@ class H5PService {
 
     try {
       const contents = Array.from(this.contentStorage.values())
-        .filter(content => content.videoId === videoId);
+        .filter(content => content.videoId === videoId)
+        .map(content => ({
+          id: content.id,
+          library: content.library,
+          params: content.params,
+          metadata: content.metadata,
+          timestamp: content.timestamp,
+          title: content.metadata?.title || 'H5P Content',
+          status: 'active'
+        }));
       
-      console.log('Getting H5P content for video:', videoId);
+      console.log('Getting H5P content for video:', videoId, 'Found:', contents.length);
       return contents;
     } catch (error) {
       console.error('Error getting H5P content:', error);
@@ -279,6 +355,128 @@ class H5PService {
   getH5PPlayer() {
     return null; // For compatibility
   }
+
+  async createH5PPackage(video, h5pContents) {
+    if (!this.initialized) {
+      throw new Error('H5P service not initialized');
+    }
+
+    try {
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip();
+
+      // Create h5p.json manifest
+      const h5pManifest = {
+        title: video.title || `Interactive Video ${video.id}`,
+        language: 'en',
+        mainLibrary: 'H5P.InteractiveVideo',
+        embedTypes: ['div'],
+        license: 'U',
+        extraTitle: video.title || `Interactive Video ${video.id}`,
+        preloadedDependencies: [
+          {
+            machineName: 'H5P.InteractiveVideo',
+            majorVersion: 1,
+            minorVersion: 24
+          }
+        ]
+      };
+
+      // Add h5p.json to zip
+      zip.addFile('h5p.json', Buffer.from(JSON.stringify(h5pManifest, null, 2)));
+
+      // Create content.json with interactive video structure
+      const contentJson = {
+        interactiveVideo: {
+          video: {
+            startScreenOptions: {
+              title: video.title || 'Interactive Video',
+              hideStartTitle: false
+            },
+            textTracks: {
+              videoTrack: [
+                {
+                  label: 'Video',
+                  kind: 'subtitles',
+                  srcLang: 'en'
+                }
+              ]
+            },
+            files: [
+              {
+                path: `videos/${video.filename || 'video.mp4'}`,
+                mime: 'video/mp4',
+                copyright: {
+                  license: 'U'
+                }
+              }
+            ]
+          },
+          assets: {
+            interactions: h5pContents.map((content, index) => ({
+              x: 10 + (index * 10), // Distribute horizontally
+              y: 10 + (index * 5),  // Distribute vertically  
+              width: 10,
+              height: 10,
+              duration: {
+                from: content.timestamp || 0,
+                to: (content.timestamp || 0) + 10
+              },
+              pause: true,
+              displayType: 'button',
+              buttonOnMobile: false,
+              adaptivity: {
+                correct: {
+                  allowOptOut: false,
+                  message: ''
+                },
+                wrong: {
+                  allowOptOut: false,
+                  message: ''
+                },
+                requireCompletion: false
+              },
+              label: content.metadata?.title || `Interaction ${index + 1}`,
+              action: {
+                library: content.library,
+                params: content.params,
+                subContentId: content.id,
+                metadata: content.metadata || {}
+              }
+            })),
+            bookmarks: [],
+            endscreens: []
+          },
+          summary: {
+            task: {
+              library: 'H5P.Summary 1.10',
+              params: {
+                intro: 'Choose the correct statement.',
+                summaries: []
+              },
+              subContentId: 'summary'
+            },
+            displayAt: 3
+          }
+        }
+      };
+
+      // Add content/content.json to zip
+      zip.addFile('content/content.json', Buffer.from(JSON.stringify(contentJson, null, 2)));
+
+      // Add video file if it exists
+      if (video.filePath && await fs.pathExists(video.filePath)) {
+        const videoBuffer = await fs.readFile(video.filePath);
+        zip.addFile(`content/videos/${video.filename || 'video.mp4'}`, videoBuffer);
+      }
+
+      // Generate and return the zip buffer
+      return zip.toBuffer();
+    } catch (error) {
+      console.error('Error creating H5P package:', error);
+      throw error;
+    }
+  }
 }
 
-module.exports = new H5PService(); 
+module.exports = new H5PService();

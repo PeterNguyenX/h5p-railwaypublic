@@ -5,8 +5,15 @@
   "main": "index.js",
   "scripts": {
     "start": "concurrently \"cd backend && npm start\" \"cd frontend && npm start\"",
+    "start:with-wp": "docker-compose up -d && npm start",
+    "start:mamp": "cd backend && cp .env.mamp .env && cd .. && npm start",
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "setup-wordpress": "./setup-wordpress.sh",
+    "setup-wordpress-mamp": "./setup-wordpress-mamp.sh",
     "build": "cd frontend && npm run build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -19,9 +26,12 @@
   "license": "ISC",
   "devDependencies": {
     "@types/hls.js": "^0.13.3",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "react-scripts": "5.0.1"
   },
   "dependencies": {
-    "hls.js": "^1.6.2"
+    "hls.js": "^1.6.2",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   }
 }

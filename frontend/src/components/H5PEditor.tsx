@@ -1,12 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  Box,
-  Button,
-  TextField,
-  MenuItem,
-  Stack,
-  Paper,
-} from '@mui/material';
+import React, { useEffect, useRef } from 'react';
 
 declare global {
   interface Window {
@@ -24,10 +16,6 @@ export interface H5PEditorProps {
 
 const H5PEditor: React.FC<H5PEditorProps> = ({ videoId, onSave, onCancel }) => {
   const editorRef = useRef<HTMLDivElement>(null);
-  const [contentType, setContentType] = useState('question');
-  const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState(['', '', '']);
-  const [correctAnswer, setCorrectAnswer] = useState(0);
 
   useEffect(() => {
     // Dynamically load H5P scripts and styles if not already loaded
@@ -81,87 +69,12 @@ const H5PEditor: React.FC<H5PEditorProps> = ({ videoId, onSave, onCancel }) => {
     loadH5PLibraries();
   }, [videoId]);
 
-  const handleSave = () => {
-    // TODO: Get H5P data from editor instance
-    const h5pData = {}; // Replace with actual data
-    onSave(h5pData);
-  };
-
-  const handleOptionChange = (index: number, value: string) => {
-    const newOptions = [...options];
-    newOptions[index] = value;
-    setOptions(newOptions);
-  };
-
   return (
-    <Paper sx={{ p: 3 }}>
-      <Stack spacing={3}>
-        <TextField
-          select
-          label="Content Type"
-          value={contentType}
-          onChange={(e) => setContentType(e.target.value)}
-          fullWidth
-        >
-          <MenuItem value="question">Multiple Choice Question</MenuItem>
-          <MenuItem value="interactive-video">Interactive Video</MenuItem>
-          <MenuItem value="presentation">Presentation</MenuItem>
-        </TextField>
-
-        <TextField
-          label="Question"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Enter your question..."
-          multiline
-          rows={3}
-          fullWidth
-        />
-
-        {contentType === 'question' && (
-          <>
-            {options.map((option, index) => (
-              <TextField
-                key={index}
-                label={`Option ${index + 1}`}
-                value={option}
-                onChange={(e) => handleOptionChange(index, e.target.value)}
-                placeholder={`Enter option ${index + 1}`}
-                fullWidth
-              />
-            ))}
-
-            <TextField
-              select
-              label="Correct Answer"
-              value={correctAnswer}
-              onChange={(e) => setCorrectAnswer(Number(e.target.value))}
-              fullWidth
-            >
-              {options.map((_, index) => (
-                <MenuItem key={index} value={index}>
-                  Option {index + 1}
-                </MenuItem>
-              ))}
-            </TextField>
-          </>
-        )}
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-          <Button variant="outlined" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={handleSave}>
-            Save
-          </Button>
-        </Box>
-
-        <div ref={editorRef} id="h5p-editor-container"></div>
-        <Button variant="contained" onClick={handleSave}>
-          Save H5P
-        </Button>
-      </Stack>
-    </Paper>
+    <div>
+      <div ref={editorRef} id="h5p-editor-container"></div>
+      <button onClick={onCancel}>Cancel</button>
+      <button onClick={() => onSave({})}>Save H5P</button>
+    </div>
   );
 };
 

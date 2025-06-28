@@ -9,17 +9,29 @@ class VideoProcessingService {
 
   async generateThumbnail(videoPath, outputPath) {
     console.log(`Generating thumbnail for video: ${videoPath}, output: ${outputPath}`);
+    
+    // Ensure output directory exists
+    const outputDir = path.dirname(outputPath);
+    await fs.mkdir(outputDir, { recursive: true });
+    
     return new Promise((resolve, reject) => {
       ffmpeg(videoPath)
         .screenshots({
           timestamps: ['00:00:01'], // Take thumbnail from first second
           filename: path.basename(outputPath),
-          folder: path.dirname(outputPath),
+          folder: outputDir,
           size: '640x360' // 16:9 aspect ratio
         })
-        .on('end', () => {
-          console.log(`Thumbnail generated successfully: ${outputPath}`);
-          resolve();
+        .on('end', async () => {
+          try {
+            // Verify the thumbnail was actually created
+            await fs.access(outputPath);
+            console.log(`Thumbnail generated successfully: ${outputPath}`);
+            resolve();
+          } catch (error) {
+            console.error(`Thumbnail file not found after generation: ${outputPath}`);
+            reject(new Error(`Thumbnail generation failed - file not created: ${outputPath}`));
+          }
         })
         .on('error', (error) => {
           console.error(`Error generating thumbnail for video: ${videoPath}`, error);

@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
 import CloseIcon from '@mui/icons-material/Close';
 import { formatDuration } from '../utils/format';
+import { getThumbnailUrl, handleThumbnailError } from '../utils/thumbnailUtils';
 import api from '../config/api';
 import VideoPlayer from '../components/VideoPlayer';
 
@@ -141,7 +142,13 @@ const Dashboard: React.FC = observer(() => {
                   editOption.style.cursor = 'pointer';
                   editOption.onclick = () => {
                     window.location.href = `/edit/${video.id}`;
-                    document.body.removeChild(menu);
+                    if (menu && menu.parentNode) {
+                      try {
+                        document.body.removeChild(menu);
+                      } catch (e) {
+                        console.log('Menu already removed');
+                      }
+                    }
                   };
 
                   const deleteOption = document.createElement('div');
@@ -150,7 +157,13 @@ const Dashboard: React.FC = observer(() => {
                   deleteOption.style.cursor = 'pointer';
                   deleteOption.onclick = () => {
                     handleDelete(video.id);
-                    document.body.removeChild(menu);
+                    if (menu && menu.parentNode) {
+                      try {
+                        document.body.removeChild(menu);
+                      } catch (e) {
+                        console.log('Menu already removed');
+                      }
+                    }
                   };
 
                   const exportOption = document.createElement('div');
@@ -169,31 +182,66 @@ const Dashboard: React.FC = observer(() => {
                       setLtiError(err.response?.data?.error || 'Failed to generate LTI link');
                       setLtiDialogOpen(true);
                     }
-                    document.body.removeChild(menu);
+                    if (menu && menu.parentNode) {
+                      try {
+                        document.body.removeChild(menu);
+                      } catch (e) {
+                        console.log('Menu already removed');
+                      }
+                    }
                   };
 
                   const downloadOption = document.createElement('div');
-                  downloadOption.textContent = 'Download';
+                  downloadOption.textContent = 'Export .h5p File';
                   downloadOption.style.padding = '8px';
                   downloadOption.style.cursor = 'pointer';
-                  downloadOption.onclick = () => {
-                    // Fix: handle filePath for download and use backend port
-                    let downloadPath = video.filePath || '';
-                    if (downloadPath.startsWith('uploads/')) {
-                      downloadPath = '/' + downloadPath;
-                    } else if (downloadPath.startsWith('backend/uploads/')) {
-                      downloadPath = '/' + downloadPath.replace('backend/', '');
-                    } else if (!downloadPath.startsWith('/uploads/')) {
-                      downloadPath = '/uploads/videos/' + downloadPath;
+                  downloadOption.onclick = async () => {
+                    try {
+                      // Export video with H5P content as .h5p file
+                      const response = await api.post(`/h5p/video/${video.id}/export`, {}, {
+                        responseType: 'blob'
+                      });
+                      
+                      // Create download link with descriptive filename
+                      const blob = new Blob([response.data as any], { type: 'application/zip' });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      
+                      // Generate filename based on original video filename
+                      let filename = 'video.h5p';
+                      if (video.filePath) {
+                        // Extract filename from filePath and replace extension with .h5p
+                        const pathParts = video.filePath.split('/');
+                        const fullFileName = pathParts[pathParts.length - 1];
+                        const nameWithoutExt = fullFileName.replace(/\.[^/.]+$/, '');
+                        const sanitizedName = nameWithoutExt.replace(/[^a-zA-Z0-9\-_]/g, '-');
+                        filename = `${sanitizedName}.h5p`;
+                      } else if (video.title) {
+                        // Fallback to title if no filePath
+                        const sanitizedTitle = video.title.replace(/[^a-zA-Z0-9\-_]/g, '-').substring(0, 50);
+                        filename = `${sanitizedTitle}.h5p`;
+                      }
+                      link.download = filename;
+                      
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+                      
+                      setSnackbarMsg('H5P export started successfully');
+                    } catch (error: any) {
+                      console.error('Error exporting H5P:', error);
+                      setSnackbarMsg('Failed to export H5P file');
                     }
-                    setDownloadUrl(downloadPath);
-                    setSnackbarMsg('Download started');
-                    const backendUrl = `http://localhost:3001${downloadPath}`;
-                    const win = window.open(backendUrl, '_blank');
-                    setTimeout(() => {
-                      window.history.back();
-                    }, 1000);
-                    document.body.removeChild(menu);
+                    // Safe menu removal
+                    if (menu && menu.parentNode) {
+                      try {
+                        document.body.removeChild(menu);
+                      } catch (e) {
+                        console.log('Menu already removed');
+                      }
+                    }
                   };
 
                   menu.appendChild(editOption);
@@ -206,7 +254,11 @@ const Dashboard: React.FC = observer(() => {
                   const handleClickOutside = (event: MouseEvent) => {
                     if (menu && !menu.contains(event.target as Node)) {
                       if (menu.parentNode) {
-                        document.body.removeChild(menu);
+                        try {
+                          document.body.removeChild(menu);
+                        } catch (e) {
+                          console.log('Menu already removed');
+                        }
                       }
                       document.removeEventListener('click', handleClickOutside);
                     }
@@ -218,9 +270,10 @@ const Dashboard: React.FC = observer(() => {
                 <CardMedia
                   component="img"
                   height="180"
-                  image={video.thumbnailPath || '/placeholder-video.jpg'}
+                  image={getThumbnailUrl(video.thumbnailPath)}
                   alt={video.title}
                   sx={{ objectFit: 'cover' }}
+                  onError={handleThumbnailError}
                 />
                 <CardContent sx={{ p: 2 }}>
                   <Typography variant="h6" component="div" noWrap>
