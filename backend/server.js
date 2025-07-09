@@ -107,6 +107,15 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }));
 
+// Health check endpoint for deployment
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
@@ -151,11 +160,16 @@ app.get("/video/:videoPath", (req, res) => {
 
 // Serve static files from the React app in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, "../frontend/build")));
+  // Serve React build files
+  app.use(express.static(path.join(__dirname, 'public/frontend')));
   
-  // The "catchall" handler: for any request that doesn't match one above, send back index.html
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../frontend/build/index.html"));
+  // Handle React routing - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api/')) {
+      res.sendFile(path.join(__dirname, 'public/frontend/index.html'));
+    } else {
+      res.status(404).json({ error: 'API endpoint not found' });
+    }
   });
 }
 
