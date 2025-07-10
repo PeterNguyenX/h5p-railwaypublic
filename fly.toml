@@ -7,6 +7,7 @@ app = 'h5p-interactive-video'
 primary_region = 'sjc'
 
 [build]
+  dockerfile = "./Dockerfile"
 
 [deploy]
   release_command = 'npm run migrate:prod'
@@ -19,14 +20,9 @@ primary_region = 'sjc'
   app = 'npm start'
 
 [[mounts]]
-  source = 'h5p_uploads'
-  destination = '/app/uploads'
-  initial_size = '5gb'
-
-[[mounts]]
-  source = 'h5p_content'
-  destination = '/app/h5p-content'
-  initial_size = '1gb'
+  source = 'h5p_data'
+  destination = '/app/data'
+  initial_size = '10gb'
 
 [http_service]
   internal_port = 3001

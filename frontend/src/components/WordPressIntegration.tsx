@@ -44,6 +44,10 @@ const StyledIframe = styled('iframe')({
 });
 
 const WordPressIntegration: React.FC = () => {
+  // Environment-based URLs
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+  const WORDPRESS_URL = process.env.REACT_APP_WORDPRESS_URL || 'http://localhost:8888/h5p-wp';
+
   const [posts, setPosts] = useState<WordPressPost[]>([]);
   const [h5pContent, setH5pContent] = useState<H5PContent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,7 +55,7 @@ const WordPressIntegration: React.FC = () => {
   const [createPostDialog, setCreatePostDialog] = useState(false);
   const [newPost, setNewPost] = useState({ title: '', content: '' });
   const [showEmbeddedView, setShowEmbeddedView] = useState(false);
-  const [embeddedUrl, setEmbeddedUrl] = useState('http://localhost:3001/api/wordpress/wp-admin/');
+  const [embeddedUrl, setEmbeddedUrl] = useState(`${API_URL}/wordpress/wp-admin/`);
 
   // Fetch WordPress posts
   const fetchPosts = async () => {
@@ -60,7 +64,7 @@ const WordPressIntegration: React.FC = () => {
       // Note: This requires WordPress REST API to be enabled
       // Try WordPress REST API endpoint
       try {
-        const response = await axios.get<WordPressPost[]>('http://localhost:8888/h5p-wp/wp-json/wp/v2/posts');
+        const response = await axios.get<WordPressPost[]>(`${WORDPRESS_URL}/wp-json/wp/v2/posts`);
         setPosts(response.data);
       } catch (restError: any) {
         console.log('WordPress REST API not available:', restError.message);
@@ -192,21 +196,21 @@ const WordPressIntegration: React.FC = () => {
                   <Button 
                     size="small" 
                     variant={embeddedUrl.includes('wp-admin/') && !embeddedUrl.includes('page=') ? "contained" : "outlined"}
-                    onClick={() => setEmbeddedUrl('http://localhost:3001/api/wordpress/wp-admin/')}
+                    onClick={() => setEmbeddedUrl(`${API_URL}/wordpress/wp-admin/`)}
                   >
                     Dashboard
                   </Button>
                   <Button 
                     size="small" 
                     variant={embeddedUrl.includes('plugins.php') ? "contained" : "outlined"}
-                    onClick={() => setEmbeddedUrl('http://localhost:3001/api/wordpress/wp-admin/plugins.php')}
+                    onClick={() => setEmbeddedUrl(`${API_URL}/wordpress/wp-admin/plugins.php`)}
                   >
                     Plugins
                   </Button>
                   <Button 
                     size="small" 
-                    variant={embeddedUrl === 'http://localhost:3001/api/wordpress/' ? "contained" : "outlined"}
-                    onClick={() => setEmbeddedUrl('http://localhost:3001/api/wordpress/')}
+                    variant={embeddedUrl === `${API_URL}/wordpress/` ? "contained" : "outlined"}
+                    onClick={() => setEmbeddedUrl(`${API_URL}/wordpress/`)}
                   >
                     Site
                   </Button>

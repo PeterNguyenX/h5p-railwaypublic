@@ -21,12 +21,14 @@ FROM node:18-alpine AS production
 
 WORKDIR /app
 
-# Install system dependencies for video processing
+# Install system dependencies for video processing and native modules
 RUN apk add --no-cache \
     ffmpeg \
     python3 \
     make \
-    g++
+    g++ \
+    libc6-compat \
+    gcompat
 
 # Copy backend package files
 COPY backend/package*.json ./
@@ -40,8 +42,15 @@ COPY backend/ ./
 # Copy built frontend to backend public directory
 COPY --from=frontend-build /app/frontend/build ./public/frontend
 
-# Create necessary directories
-RUN mkdir -p uploads/videos uploads/hls h5p-content h5p-temp h5p-libraries
+# Copy startup script
+COPY start.sh ./
+RUN chmod +x start.sh
+
+# Create directories for file storage and set up volume structure
+RUN mkdir -p data/uploads/videos data/uploads/hls data/h5p-content data/h5p-temp data/h5p-libraries
+
+# Create symbolic links to the mounted volume (will be created at runtime)
+RUN mkdir -p uploads h5p-content h5p-temp h5p-libraries
 
 # Set proper permissions
 RUN chown -R node:node /app
@@ -55,4 +64,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3001/api/health || exit 1
 
 # Start the application
-CMD ["npm", "start"]
+CMD ["./start.sh"]
