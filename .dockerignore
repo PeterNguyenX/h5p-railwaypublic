@@ -37,7 +37,7 @@ coverage/
 # Build outputs
 build/
 dist/
-frontend/build/
+# frontend/build/  # Commented out - we need this for pre-built frontend
 
 # Database
 *.sqlite
