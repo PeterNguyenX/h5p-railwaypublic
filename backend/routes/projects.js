@@ -4,12 +4,13 @@ const router = express.Router();
 const { auth } = require('../middleware/auth');
 const Project = require('../models/Project');
 
-// Public route for health check (no auth required)
+// Public route for health check (no auth required, no database dependency)
 router.get('/health', (req, res) => {
   res.json({
-    status: 'ok',
+    status: 'healthy',
     timestamp: new Date().toISOString(),
-    message: 'Projects API is up and running'
+    message: 'Projects API is up and running',
+    service: 'h5p-interactive-video-platform'
   });
 });
 

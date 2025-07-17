@@ -1,4 +1,8 @@
 require('dotenv').config();
+console.log('🚀 Starting H5P Interactive Video Platform...');
+console.log('Environment:', process.env.NODE_ENV || 'development');
+console.log('Port:', process.env.PORT || 3001);
+
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -111,12 +115,14 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }));
 
-// Basic health check endpoint
+// Basic health check endpoint (no database dependency)
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    message: 'Server is running'
+    message: 'Server is running',
+    environment: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3001
   });
 });
 
