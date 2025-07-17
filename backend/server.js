@@ -122,7 +122,24 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     message: 'Server is running',
     environment: process.env.NODE_ENV || 'development',
-    port: process.env.PORT || 3001
+    port: process.env.PORT || 3001,
+    hasDatabase: !!process.env.DATABASE_URL,
+    hasJWT: !!process.env.JWT_SECRET,
+    hasSession: !!process.env.SESSION_SECRET
+  });
+});
+
+// Simple root health check for Railway
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'H5P Platform is running' });
+});
+
+// Root route
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'H5P Interactive Video Platform API',
+    status: 'running',
+    health: '/api/health'
   });
 });
 
@@ -234,12 +251,21 @@ async function testDatabaseConnection() {
 
 // Start the server after testing database connection
 const PORT = process.env.PORT || 3001;
+
+console.log('🔧 Environment check:');
+console.log('- NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('- DATABASE_URL:', process.env.DATABASE_URL ? 'set' : 'NOT SET');
+console.log('- JWT_SECRET:', process.env.JWT_SECRET ? 'set' : 'NOT SET');
+console.log('- SESSION_SECRET:', process.env.SESSION_SECRET ? 'set' : 'NOT SET');
+
 testDatabaseConnection().then(dbConnected => {
   // Always start the server even if DB connection fails (for resilience in production)
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
     console.log(`🗄️ Database connection: ${dbConnected ? 'SUCCESS' : 'FAILED'}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🔗 Projects health: http://localhost:${PORT}/api/projects/health`);
     
     if (!dbConnected && process.env.NODE_ENV === 'production') {
       console.warn('⚠️ WARNING: Server started with database connection issues!');
@@ -247,5 +273,18 @@ testDatabaseConnection().then(dbConnected => {
     }
   }).on('error', (err) => {
     console.error('❌ Failed to start server:', err);
+    process.exit(1);
   });
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('🛑 Received SIGTERM, shutting down gracefully');
+    server.close(() => {
+      console.log('✅ Server closed');
+      process.exit(0);
+    });
+  });
+}).catch(err => {
+  console.error('❌ Fatal error during startup:', err);
+  process.exit(1);
 });
