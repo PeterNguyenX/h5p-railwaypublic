@@ -474,4 +474,135 @@ If your build succeeds but deployment fails, this usually means:
    ```
 
 2. **Look for specific error messages** like:
- 
+
+## 🎯 **Railway Health Check Requirements - Detailed Breakdown**
+
+Railway monitors your app's health by making HTTP requests to `/api/projects/health`. Here's exactly what needs to happen for it to pass:
+
+### **✅ Health Check Success Criteria:**
+
+1. **HTTP Response Code**: Must return `200 OK`
+2. **Response Time**: Must respond within Railway's timeout (usually 30-60 seconds)
+3. **Response Format**: Should return valid JSON (our endpoint does this)
+4. **Container Running**: App container must be running and listening on the correct port
+5. **Network Accessible**: Health endpoint must be reachable from Railway's health checker
+
+### **🔍 Current Health Check Endpoints:**
+
+Your app now has **3 health check endpoints** (added for debugging):
+
+**1. `/health` (Simple)**
+```json
+{ "status": "ok", "message": "H5P Platform is running" }
+```
+
+**2. `/api/health` (Detailed)**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-07-17T...",
+  "message": "Server is running",
+  "environment": "production",
+  "port": 3001,
+  "hasDatabase": true,
+  "hasJWT": true,
+  "hasSession": true
+}
+```
+
+**3. `/api/projects/health` (What Railway Checks)**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-07-17T...",
+  "message": "Projects API is up and running",
+  "service": "h5p-interactive-video-platform"
+}
+```
+
+### **⚠️ Why Health Check Currently Fails:**
+
+**Most Likely Causes (in order):**
+
+1. **Missing DATABASE_URL** → App crashes during database initialization
+2. **Missing JWT_SECRET** → Express middleware fails to initialize
+3. **Missing SESSION_SECRET** → Session middleware fails
+4. **Port Binding Issues** → App doesn't listen on Railway's assigned port
+5. **Startup Errors** → Application crashes before reaching health endpoint
+
+### **🚀 Minimum Requirements to Pass Health Check:**
+
+**Required Environment Variables:**
+```bash
+NODE_ENV=production                    # Tells app it's in production
+DATABASE_URL=postgresql://...          # Auto-provided when you add PostgreSQL
+JWT_SECRET=your32characterstring       # Required for JWT middleware
+SESSION_SECRET=your32characterstring   # Required for session middleware
+PORT=3001                             # Auto-provided by Railway
+```
+
+**Required Services:**
+- PostgreSQL database added to Railway project
+- Container successfully starts and binds to port
+
+### **🔧 Step-by-Step Health Check Success:**
+
+**Step 1: App Startup Sequence**
+```
+1. Container starts
+2. Node.js loads environment variables
+3. Express server initializes
+4. Database connection attempts
+5. Middleware loads (CORS, JWT, Sessions)
+6. Routes register (including /api/projects/health)
+7. Server binds to PORT and starts listening
+8. Health endpoint becomes available
+```
+
+**Step 2: Railway Health Check**
+```
+1. Railway waits ~30 seconds after container start
+2. Makes HTTP GET request to /api/projects/health
+3. Expects 200 OK response within timeout
+4. If successful → marks as healthy ✅
+5. If fails → retries, then marks as unhealthy ❌
+```
+
+### **🔍 How to Verify Health Check Requirements:**
+
+**Check 1: Environment Variables**
+- Railway Dashboard → Variables tab
+- Must have: `NODE_ENV`, `JWT_SECRET`, `SESSION_SECRET`
+- Auto-added: `DATABASE_URL`, `PORT`
+
+**Check 2: Database Service**
+- Railway Dashboard → should see PostgreSQL service
+- Variables tab → should show `DATABASE_URL`
+
+**Check 3: Startup Logs**
+- Deployments → Latest deployment → View Logs
+- Look for: "Server running on port XXXX"
+- Look for: "Database connection: SUCCESS"
+
+**Check 4: Manual Health Check**
+- Visit: `https://your-app.railway.app/api/projects/health`
+- Should return JSON with `"status": "healthy"`
+
+### **🎯 Expected Success Timeline:**
+
+Once you add the missing environment variables:
+- **0-30 seconds**: Container starts, app initializes
+- **30-60 seconds**: Railway begins health checks
+- **60-90 seconds**: Health check passes, app marked as healthy
+- **90+ seconds**: App is live and accessible
+
+### **💡 Pro Tip: Test Health Check Manually**
+
+After fixing environment variables, test these URLs:
+1. `https://your-app.railway.app/` (should show API info)
+2. `https://your-app.railway.app/health` (simple check)
+3. `https://your-app.railway.app/api/projects/health` (Railway's check)
+
+If any of these fail to load, the health check will also fail.
+
+## Add Environment Variables Now
