@@ -27,3 +27,22 @@ build/
 dist/
 coverage/
 .nyc_output/
+
+# Additional files to reduce image size
+frontend/src/
+frontend/public/
+frontend/node_modules/
+*.md
+*.pdf
+.git/
+.github/
+nginx/
+h5p-hub-client/
+h5p-libraries/
+context/
+Dockerfile.*
+!Dockerfile
+start*.sh
+!start-railway.sh
+deploy*.sh
+*.backup

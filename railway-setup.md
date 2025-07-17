@@ -349,3 +349,137 @@ itp-h5p/
 3. **Set up custom domain** (optional): Configure a custom domain in Railway settings
 
 Your H5P Interactive Video Platform is now ready for Railway deployment! 🚀
+
+## Public Access & Sharing Your Railway Website
+
+### **Getting Your Public URL**
+
+After successful Railway deployment:
+
+1. **Go to Railway Dashboard** → Your Project
+2. **Click "Deployments" tab**
+3. **Copy your public URL** - looks like:
+   ```
+   https://h5p-railwaypublic-production.railway.app
+   ```
+
+### **How People Visit Your Website**
+
+✅ **Anyone can visit** your website by going to your Railway URL  
+✅ **No signup required** - it's publicly accessible  
+✅ **Works on any device** - mobile, tablet, desktop  
+✅ **HTTPS enabled** - secure by default  
+
+### **Sharing Your H5P Platform**
+
+**Direct Access:**
+- Share your Railway URL with students, colleagues, or anyone
+- They can create H5P content, upload videos, and use all features
+- No installation needed - works in any web browser
+
+**Example URLs:**
+- Main site: `https://your-app.railway.app`
+- Health check: `https://your-app.railway.app/health`
+- API: `https://your-app.railway.app/api/`
+
+### **Custom Domain (Optional)**
+
+You can also set up a custom domain:
+
+1. **Buy a domain** (like `myh5pplatform.com`)
+2. **In Railway Dashboard** → Settings → Domains
+3. **Add your custom domain**
+4. **Update DNS settings** as instructed by Railway
+5. **Your site will be available** at your custom domain
+
+### **Usage Examples**
+
+Once deployed, people can:
+- 📹 **Upload and process videos**
+- 🎯 **Create interactive H5P content**
+- 📚 **Build educational materials**
+- 🔗 **Share content with others**
+- 💾 **Save their work in the database**
+
+## ⚠️ **Deployment Failed After Successful Build**
+
+If your build succeeds but deployment fails, this usually means:
+
+### **Common Deployment Failure Causes:**
+
+1. **Container Start Issues**:
+   - Application crashes on startup
+   - Port binding problems
+   - Missing environment variables
+   - Database connection failures
+
+2. **Health Check Failures**:
+   - App doesn't respond on the expected port
+   - Startup takes too long (timeout)
+   - Application crashes immediately
+
+### **How to Debug Deployment Failures:**
+
+1. **Check Railway Logs**:
+   ```
+   Railway Dashboard → Your Project → Deployments → Click Failed Deployment → View Logs
+   ```
+
+2. **Look for specific error messages** like:
+   - `ECONNREFUSED` (database connection issues)
+   - `Port already in use`
+   - `Cannot find module`
+   - `Application crashed`
+   - `Health check failed`
+
+3. **Common Solutions**:
+
+   **Missing Database:**
+   - Add PostgreSQL service in Railway
+   - Ensure `DATABASE_URL` is set
+
+   **Missing Environment Variables:**
+   ```
+   NODE_ENV=production
+   JWT_SECRET=your_secret_here
+   SESSION_SECRET=your_session_secret_here
+   ```
+
+   **Port Issues:**
+   - Railway should auto-set `PORT` variable
+   - Check that your app uses `process.env.PORT`
+
+   **Startup Script Issues:**
+   - Verify `start-railway.sh` is executable
+   - Check that `node server.js` works from `/app/backend`
+
+### **Quick Fix Steps:**
+
+1. **Add PostgreSQL Database** (if not done):
+   - Railway Dashboard → New → Database → PostgreSQL
+
+2. **Set Required Environment Variables**:
+   - Go to Variables tab
+   - Add `JWT_SECRET` and `SESSION_SECRET`
+
+3. **Check Dockerfile Path**:
+   - Ensure Railway is using `Dockerfile` (not `Dockerfile.railway`)
+   - Or update Settings → Build to use correct Dockerfile
+
+4. **Force Redeploy**:
+   - Make a small change and push to GitHub
+   - Or trigger manual deploy in Railway
+
+### **Alternative: Use Railway CLI for Better Debugging**
+
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login and check logs
+railway login
+railway logs
+
+# Or deploy directly
+railway up
+```
