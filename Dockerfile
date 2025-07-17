@@ -1,43 +1,29 @@
-# Railway deployment - optimized for under 4GB
+# Railway deployment - using pre-built frontend
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Install only essential system deps (no build tools)
+# Install only essential system deps
 RUN apk add --no-cache bash curl
 
-# First, build frontend efficiently
-COPY frontend/package*.json ./frontend/
-WORKDIR /app/frontend
-RUN npm ci --silent
-COPY frontend/src/ ./src/
-COPY frontend/public/ ./public/
-COPY frontend/tsconfig.json ./
-COPY frontend/.env* ./
-RUN npm run build
-
 # Setup backend
-WORKDIR /app
 COPY backend/package*.json ./backend/
 WORKDIR /app/backend
-RUN npm ci --silent
+RUN npm ci --production --silent
 
 # Copy backend source
 COPY backend/ ./
 
-# Copy built frontend to backend
-RUN mkdir -p public && cp -r ../frontend/build/* public/
+# Copy pre-built frontend to backend public directory
+RUN mkdir -p public
+COPY frontend/build/ ./public/
 
 # Create minimal directories
 RUN mkdir -p uploads h5p-content h5p-temp
 
-# Cleanup to reduce size - remove frontend files and caches
-WORKDIR /app
-RUN rm -rf frontend
+# Cleanup to reduce size
 RUN rm -rf /root/.npm /tmp/* /var/cache/apk/*
 RUN npm cache clean --force
-
-WORKDIR /app/backend
 
 EXPOSE 3001
 
