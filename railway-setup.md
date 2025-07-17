@@ -606,3 +606,65 @@ After fixing environment variables, test these URLs:
 If any of these fail to load, the health check will also fail.
 
 ## Add Environment Variables Now
+
+## 🚨 **URGENT UPDATE: Database Issue Identified & Fixed**
+
+**Latest Error Analysis**: The app is crashing because:
+1. ❌ **DATABASE_URL: Not set** (Railway PostgreSQL not added)
+2. ❌ **App tries to use SQLite fallback** but `sqlite3` package not installed
+3. ❌ **Missing JWT_SECRET and SESSION_SECRET**
+
+### **✅ IMMEDIATE FIX APPLIED:**
+- Updated database config to handle missing DATABASE_URL gracefully
+- App will now start even without database (for debugging)
+- Better error messages pointing to Railway PostgreSQL setup
+
+### **🚀 CRITICAL ACTIONS NEEDED IN RAILWAY DASHBOARD:**
+
+**Step 1: Add PostgreSQL Database** (This will fix the main crash)
+1. Go to your Railway project dashboard
+2. Click the **"+" button** (or "New")
+3. Select **"Database"** → **"PostgreSQL"**
+4. Railway automatically sets `DATABASE_URL` environment variable
+
+**Step 2: Add Missing Environment Variables**
+1. Go to **"Variables"** tab in your Railway project
+2. Click **"New Variable"** and add each of these:
+
+```
+NODE_ENV=production
+JWT_SECRET=supersecretjwtkeythatisatleast32characterslong123456
+SESSION_SECRET=supersecuresessionkeythatisatleast32characterslong123
+```
+
+### **🔍 What Will Happen After Adding These:**
+
+**Expected Startup Log (Success):**
+```
+🚀 Starting H5P Interactive Video Platform...
+Environment: production
+Port: 3001
+Database connection info:
+- DATABASE_URL: Set (masked)
+🔧 Environment check:
+- DATABASE_URL: set
+- JWT_SECRET: set
+- SESSION_SECRET: set
+✅ Database connection has been established successfully.
+🚀 Server running on port 3001
+```
+
+**Health Check Should Then Pass:**
+- Railway will retry health check at `/api/projects/health`
+- Should return: `{"status":"healthy","message":"Projects API is up and running"}`
+- App will become publicly accessible
+
+### **⏱️ Timeline After Adding Database & Variables:**
+- **0-30 seconds**: Railway triggers redeploy
+- **30-60 seconds**: New container starts with proper config
+- **60-90 seconds**: Health check passes
+- **90+ seconds**: App is live! 🎉
+
+**The core issue was the missing PostgreSQL database in Railway. This is now the final step!**
+
+## Final Step: Add PostgreSQL Database
