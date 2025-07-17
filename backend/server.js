@@ -197,6 +197,45 @@ app.get("/video/:videoPath", (req, res) => {
 });
 
 // Serve static files from the React app in production
+const frontendBuildPath = path.join(__dirname, 'public');
+console.log('🎯 Frontend build path:', frontendBuildPath);
+
+// Check if frontend build exists
+if (fs.existsSync(frontendBuildPath)) {
+  console.log('✅ Frontend build directory found, serving React app');
+  
+  // Serve static files (CSS, JS, images)
+  app.use(express.static(frontendBuildPath));
+  
+  // Catch all handler: send back React's index.html file for any non-API routes
+  app.get('*', (req, res) => {
+    // Don't interfere with API routes
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    
+    console.log(`📄 Serving React app for route: ${req.path}`);
+    res.sendFile(path.join(frontendBuildPath, 'index.html'));
+  });
+} else {
+  console.log('⚠️ Frontend build directory not found at:', frontendBuildPath);
+  console.log('💡 Only API endpoints will be available');
+  
+  // Fallback for missing frontend
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    
+    res.json({
+      message: 'H5P Interactive Video Platform',
+      status: 'API Only - Frontend not found',
+      info: 'Frontend build files are missing. Only API endpoints are available.',
+      api_docs: '/api/health',
+      frontend_expected_at: frontendBuildPath
+    });
+  });
+}
 if (process.env.NODE_ENV === 'production') {
   console.log('Serving frontend in production mode');
   // Serve React build files
