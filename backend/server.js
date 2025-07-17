@@ -240,11 +240,21 @@ app.use('/api/*', (req, res) => {
 // Test database connection before starting server
 async function testDatabaseConnection() {
   try {
+    // Check if we have an invalid database configuration
+    if (sequelize._isInvalid) {
+      console.log('⚠️ No valid database configuration found');
+      console.log('💡 App will start but database features will be disabled');
+      console.log('💡 Add PostgreSQL database in Railway Dashboard to enable full functionality');
+      return false;
+    }
+    
     await sequelize.authenticate();
     console.log('✅ Database connection has been established successfully.');
     return true;
   } catch (error) {
-    console.error('❌ Unable to connect to the database:', error);
+    console.error('❌ Unable to connect to the database:', error.message);
+    console.log('💡 This is likely because DATABASE_URL is not set');
+    console.log('💡 Add PostgreSQL database in Railway Dashboard');
     return false;
   }
 }
