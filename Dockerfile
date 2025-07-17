@@ -9,17 +9,18 @@ RUN apk add --no-cache bash curl
 # First, build frontend efficiently
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
-RUN npm ci --production --silent
+RUN npm ci --silent
 COPY frontend/src/ ./src/
 COPY frontend/public/ ./public/
-COPY frontend/tsconfig.json frontend/package.json ./
+COPY frontend/tsconfig.json ./
+COPY frontend/.env* ./
 RUN npm run build
 
 # Setup backend
 WORKDIR /app
 COPY backend/package*.json ./backend/
 WORKDIR /app/backend
-RUN npm ci --production --silent
+RUN npm ci --silent
 
 # Copy backend source
 COPY backend/ ./
