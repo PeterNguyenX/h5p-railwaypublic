@@ -1,24 +1,42 @@
-# Ultra-minimal Railway deployment - guaranteed under 2GB
+# Railway deployment - optimized for under 4GB
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy only backend package.json and install production deps
-COPY backend/package*.json ./
-RUN npm ci --production --silent --no-optional
+# Install only essential system deps (no build tools)
+RUN apk add --no-cache bash curl
+
+# First, build frontend efficiently
+COPY frontend/package*.json ./frontend/
+WORKDIR /app/frontend
+RUN npm ci --production --silent
+COPY frontend/src/ ./src/
+COPY frontend/public/ ./public/
+COPY frontend/tsconfig.json frontend/package.json ./
+RUN npm run build
+
+# Setup backend
+WORKDIR /app
+COPY backend/package*.json ./backend/
+WORKDIR /app/backend
+RUN npm ci --production --silent
 
 # Copy backend source
 COPY backend/ ./
 
-# Copy pre-built frontend 
-COPY frontend/build/ ./public/
+# Copy built frontend to backend
+RUN mkdir -p public && cp -r ../frontend/build/* public/
 
 # Create minimal directories
 RUN mkdir -p uploads h5p-content h5p-temp
 
-# Aggressive cleanup to minimize size
-RUN rm -rf /root/.npm /tmp/* /var/cache/apk/* /usr/local/lib/node_modules/npm/docs
+# Cleanup to reduce size - remove frontend files and caches
+WORKDIR /app
+RUN rm -rf frontend
+RUN rm -rf /root/.npm /tmp/* /var/cache/apk/*
 RUN npm cache clean --force
+
+WORKDIR /app/backend
 
 EXPOSE 3001
 
