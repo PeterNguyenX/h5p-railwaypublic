@@ -483,3 +483,47 @@ railway logs
 # Or deploy directly
 railway up
 ```
+
+### **Error: "Image size exceeded limit of 4.0 GB"**
+
+Railway's free tier has a **4GB Docker image limit**. If your image is too large:
+
+**Solutions:**
+
+1. **Use Optimized Dockerfile** ✅:
+   - We've created `Dockerfile.small` with minimal dependencies
+   - Builds frontend locally, copies build files only
+   - Removes unnecessary system packages
+
+2. **Build Frontend Locally** (Recommended):
+   ```bash
+   # Build frontend locally before deployment
+   cd frontend
+   npm run build
+   cd ..
+   git add .
+   git commit -m "Add frontend build"
+   git push origin main
+   ```
+
+3. **Image Size Optimization**:
+   - ✅ Use `node:18-alpine` (smaller base image)
+   - ✅ Install only production dependencies (`npm ci --production`)
+   - ✅ Remove build tools after installation
+   - ✅ Clean npm cache
+   - ✅ Exclude unnecessary files via `.railwayignore`
+
+4. **What Was Removed to Save Space**:
+   - ❌ FFmpeg (video processing - can add back if needed)
+   - ❌ PostgreSQL client tools
+   - ❌ Python3, make, g++ build tools
+   - ❌ Frontend source files (only build output copied)
+   - ❌ Development dependencies
+
+5. **Alternative: Upgrade Railway Plan**:
+   - Railway Pro plan has higher limits
+   - But optimization should work for free tier
+
+**Expected Results:**
+- Original image: ~4.2GB ❌
+- Optimized image: ~1.5GB ✅
