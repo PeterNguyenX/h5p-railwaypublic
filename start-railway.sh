@@ -6,6 +6,9 @@ echo "Starting H5P Interactive Video Platform..."
 # Set default port for Railway
 export PORT=${PORT:-3001}
 
+# Navigate to backend directory
+cd /app/backend
+
 # Create necessary directories
 mkdir -p uploads/videos uploads/hls h5p-content h5p-temp h5p-libraries
 

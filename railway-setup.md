@@ -156,6 +156,64 @@ railway open
 railway connect postgresql
 ```
 
+## Railway Deployment Errors & Quick Fixes
+
+### **Error: "Failed to deploy from source"**
+
+**Most Common Causes:**
+
+1. **Railway not using Dockerfile**: 
+   - Ensure `railway.json` specifies `"builder": "DOCKERFILE"`
+   - Set `"dockerfilePath": "Dockerfile.railway"`
+
+2. **Missing Node.js scripts**:
+   - Verify root `package.json` has `"start"` and `"build"` scripts
+   - Check that frontend/backend have their own package.json files
+
+3. **Build process failing**:
+   - Frontend build errors (missing dependencies)
+   - Backend dependencies not installing correctly
+   - Path issues in Dockerfile
+
+**Quick Fix Steps:**
+
+1. **Check Railway.json Configuration** ✅:
+   ```json
+   {
+     "$schema": "https://railway.app/railway.schema.json",
+     "build": {
+       "builder": "DOCKERFILE",
+       "dockerfilePath": "Dockerfile.railway"
+     },
+     "deploy": {
+       "startCommand": "./start-railway.sh"
+     }
+   }
+   ```
+
+2. **Verify Files Exist** ✅:
+   - `Dockerfile.railway`
+   - `start-railway.sh` (executable)
+   - `railway.json`
+   - `.railwayignore`
+
+3. **Check in Railway Dashboard**:
+   - Go to Settings → Build & Deploy
+   - Ensure "Build method" is set to "Dockerfile"
+   - Check that "Dockerfile path" is `Dockerfile.railway`
+
+4. **Force Rebuild**:
+   - Push a small change to GitHub
+   - Or trigger manual deploy in Railway dashboard
+
+### **Error: "Build failed" or "Container failed to start"**
+
+**Solutions:**
+- Check Railway build logs for specific error messages
+- Verify all package.json dependencies are correct
+- Ensure frontend builds successfully locally
+- Check that environment variables are set
+
 ## Pre-Deployment Checklist
 
 Before deploying, ensure you have:
