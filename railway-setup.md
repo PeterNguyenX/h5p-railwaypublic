@@ -569,13 +569,51 @@ Railway's free tier has a **4GB Docker image limit**. ✅ **This has been resolv
 
 This error occurred when the Dockerfile tried to copy `frontend/build/` but it didn't exist in the git repository.
 
-**✅ Root Cause**: `frontend/build/` was in `.gitignore` and wasn't pushed to the repository.
+**✅ Root Cause**: Multiple issues were blocking access to frontend build files:
+1. `frontend/build/` was in `.gitignore` and wasn't pushed to the repository
+2. `.dockerignore` was excluding `frontend/build/` from Docker build context
 
 **✅ Solution Implemented**:
 1. Built frontend locally: `cd frontend && npm run build`
 2. Removed `/build` from `frontend/.gitignore` 
-3. Committed the build files to git: `git add frontend/build/`
-4. Switched to simpler Dockerfile that copies pre-built files
-5. Pushed changes to trigger new deployment
+3. **Commented out `frontend/build/` in `.dockerignore`** (Critical fix!)
+4. Committed the build files to git: `git add frontend/build/`
+5. Switched to simpler Dockerfile that copies pre-built files
+6. Pushed changes to trigger new deployment
 
 **✅ Result**: Railway can now access the built frontend files from the repository.
+
+**⚠️ Important**: If you encounter this error, always check both `.gitignore` AND `.dockerignore` files!
+
+### **Error: "Docker build context excludes required files"**
+
+If Railway can't find files that exist in your repository:
+
+**Common Causes:**
+1. **`.dockerignore` excludes needed files**
+2. **File paths don't match in Dockerfile**
+3. **Files not committed to git**
+
+**Quick Fix:**
+1. **Check `.dockerignore`** for excluded directories:
+   ```bash
+   # Look for lines like:
+   frontend/build/
+   build/
+   dist/
+   ```
+
+2. **Comment out exclusions** for needed files:
+   ```ignore
+   # frontend/build/  # Commented out - needed for deployment
+   ```
+
+3. **Verify files in git**:
+   ```bash
+   git ls-files | grep frontend/build
+   ```
+
+4. **Test Docker build locally**:
+   ```bash
+   docker build -t test-build .
+   ```
