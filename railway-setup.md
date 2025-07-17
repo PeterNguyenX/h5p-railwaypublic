@@ -214,6 +214,90 @@ railway connect postgresql
 - Ensure frontend builds successfully locally
 - Check that environment variables are set
 
+### **Error: "Repository is empty"**
+
+This error occurs when Railway can't access your GitHub repository content.
+
+**Solutions:**
+
+1. **Verify Repository Selection in Railway**:
+   - Go to Railway Dashboard
+   - Delete current project if it exists
+   - Click "New Project" → "Deploy from GitHub repo"
+   - **Carefully select**: `nhvlinter/itp-h5p` (your exact repo name)
+   - **Select branch**: `main` (not master)
+
+2. **Check GitHub Repository Access**:
+   - Ensure the repository is **public** (or Railway has permission)
+   - Verify the repository actually contains files
+   - Go to: https://github.com/nhvlinter/itp-h5p to confirm
+
+3. **Reconnect GitHub Integration**:
+   - In Railway: Settings → Integrations
+   - Disconnect and reconnect GitHub
+   - Try deploying again
+
+4. **Alternative: Use Railway CLI**:
+   ```bash
+   npm install -g @railway/cli
+   railway login
+   railway link  # Link to existing project
+   railway up    # Deploy from local files
+   ```
+
+5. **Force Repository Refresh**:
+   - Make a small change to any file
+   - Commit and push to GitHub
+   - This triggers Railway to recheck the repository
+
+**Repository Status Verification**:
+- Repository: `nhvlinter/itp-h5p` ✅
+- Branch: `main` ✅ 
+- Visibility: Public ✅
+- Size: ~276MB ✅
+- Files: 60+ files including Dockerfile, package.json ✅
+
+### **Error: "Not the repository owner" / "Repository access denied"**
+
+If you're not the owner of the repository, you need to create your own copy:
+
+**Solution: Create Your Own Repository**
+
+1. **Create New GitHub Repository**:
+   - Go to GitHub.com → New repository
+   - Name: `h5p-interactive-video` (or your choice)
+   - Visibility: **Public** ✅
+   - Don't initialize with README/gitignore
+
+2. **Update Git Remote**:
+   ```bash
+   # Remove old remote
+   git remote remove origin
+   
+   # Add your new repository (replace with your details)
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+3. **Use Your Repository in Railway**:
+   - In Railway: Select YOUR repository
+   - Repository: `YOUR_USERNAME/YOUR_REPO_NAME`
+   - Branch: `main`
+
+**Example for username 'PeterNguyenX':**
+```bash
+git remote remove origin
+git remote add origin https://github.com/PeterNguyenX/h5p-railwaypublic.git
+git push -u origin main
+```
+
+**Your Repository Details:**
+- Repository: `PeterNguyenX/h5p-railwaypublic` ✅
+- URL: https://github.com/PeterNguyenX/h5p-railwaypublic
+- Branch: `main` ✅
+- Visibility: Public ✅
+
 ## Pre-Deployment Checklist
 
 Before deploying, ensure you have:
