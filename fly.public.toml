@@ -1,0 +1,25 @@
+# fly.public.toml - Configuration for public web interface without volumes
+app = 'h5p-public'
+primary_region = 'sjc'
+
+[build]
+  dockerfile = './Dockerfile.public'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3001'
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "10s"
+    grace_period = "120s"
+    method = "GET"
+    path = "/api/health"
+    protocol = "http"

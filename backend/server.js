@@ -12,8 +12,10 @@ const templateRoutes = require("./routes/templateRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const ltiRoutes = require("./routes/ltiRoutes");
 const wordpressRoutes = require("./routes/wordpressRoutes");
+const projectsRoutes = require("./routes/projects");
 const h5pService = require("./services/h5pService");
 const thumbnailFallbackMiddleware = require("./middleware/thumbnailFallback");
+const sequelize = require('./config/database');
 
 dotenv.config();
 const app = express();
@@ -22,7 +24,9 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:8888',
-  'http://103.88.123.117'
+  'http://103.88.123.117',
+  /\.railway\.app$/,  // Allow all Railway.app subdomains
+  /\.up\.railway\.app$/  // Allow Railway preview deployments
 ];
 
 // Enable CORS for development and production
@@ -107,12 +111,22 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }));
 
-// Health check endpoint for deployment
+// Basic health check endpoint
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy',
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    message: 'Server is running'
+  });
+});
+
+// Public information endpoint (no authentication required)
+app.get('/api/public/info', (req, res) => {
+  res.json({
+    name: 'H5P Interactive Video Platform',
+    description: 'Create, edit, and share interactive H5P content',
+    version: '1.0.0',
+    public_access: true
   });
 });
 
@@ -124,6 +138,7 @@ app.use("/api/templates", templateRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/lti", ltiRoutes);
 app.use("/api/wordpress", wordpressRoutes);
+app.use("/api/projects", projectsRoutes);
 
 // Video streaming endpoint
 app.get("/video/:videoPath", (req, res) => {
@@ -160,20 +175,71 @@ app.get("/video/:videoPath", (req, res) => {
 
 // Serve static files from the React app in production
 if (process.env.NODE_ENV === 'production') {
+  console.log('Serving frontend in production mode');
   // Serve React build files
-  app.use(express.static(path.join(__dirname, 'public/frontend')));
+  app.use(express.static(path.join(__dirname, '../frontend/build')));
   
   // Handle React routing - serve index.html for all non-API routes
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/')) {
-      res.sendFile(path.join(__dirname, 'public/frontend/index.html'));
+      console.log(`Serving frontend for path: ${req.path}`);
+      res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
     } else {
       res.status(404).json({ error: 'API endpoint not found' });
     }
   });
+} else {
+  console.log('Development mode: not serving frontend');
 }
 
 app.use('/h5p/libraries', express.static(path.join(__dirname, 'h5p-libraries')));
 
+// Remove 'browsing-topics' from Permissions-Policy header
+app.use((req, res, next) => {
+  res.removeHeader('Permissions-Policy');
+  next();
+});
+
+// Add global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    error: 'Server error', 
+    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message 
+  });
+});
+
+// Add a catch-all route for API routes not found
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found', path: req.path });
+});
+
+// Test database connection before starting server
+async function testDatabaseConnection() {
+  try {
+    await sequelize.authenticate();
+    console.log('✅ Database connection has been established successfully.');
+    return true;
+  } catch (error) {
+    console.error('❌ Unable to connect to the database:', error);
+    return false;
+  }
+}
+
+// Start the server after testing database connection
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+testDatabaseConnection().then(dbConnected => {
+  // Always start the server even if DB connection fails (for resilience in production)
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🗄️ Database connection: ${dbConnected ? 'SUCCESS' : 'FAILED'}`);
+    
+    if (!dbConnected && process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ WARNING: Server started with database connection issues!');
+      console.warn('API endpoints requiring database access may fail.');
+    }
+  }).on('error', (err) => {
+    console.error('❌ Failed to start server:', err);
+  });
+});

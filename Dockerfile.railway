@@ -1,0 +1,45 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    postgresql-client \
+    ffmpeg \
+    python3 \
+    make \
+    g++ \
+    curl
+
+# First, build frontend
+COPY frontend/package*.json ./frontend/
+WORKDIR /app/frontend
+RUN npm ci --only=production
+COPY frontend/ ./
+RUN npm run build
+
+# Then setup backend
+WORKDIR /app
+COPY backend/package*.json ./
+RUN npm ci --only=production
+
+# Copy backend files
+COPY backend/ ./
+
+# Copy built frontend to backend public directory
+RUN mkdir -p public/frontend && cp -r frontend/build/* public/frontend/
+
+# Create necessary directories
+RUN mkdir -p uploads/videos uploads/hls h5p-content h5p-temp h5p-libraries
+
+# Copy startup script
+COPY start-railway.sh ./
+RUN chmod +x start-railway.sh
+
+# Set proper permissions
+RUN chown -R node:node /app
+USER node
+
+EXPOSE 3001
+
+CMD ["./start-railway.sh"]

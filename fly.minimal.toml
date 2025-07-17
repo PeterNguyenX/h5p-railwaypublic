@@ -1,0 +1,34 @@
+# fly.toml super minimal configuration
+app = "h5p-minimal"
+primary_region = 'sjc'
+
+[build]
+  dockerfile = "./Dockerfile.minimal"
+
+[env]
+  PORT = "3000"
+
+[processes]
+  app = "node minimal.js"
+
+# No mounts needed for minimal test
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '10s'
+    timeout = '2s'
+    grace_period = '5s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512

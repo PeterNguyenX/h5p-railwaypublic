@@ -1,7 +1,7 @@
 // Project model
 // Fields: id (UUID), user_id (UUID), title (String), thumbnail_url (String), created_at (Timestamp)
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const sequelize = require('../config/database');
 
 const Project = sequelize.define('Project', {
   id: {

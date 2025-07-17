@@ -1,7 +1,7 @@
 // LtiLink model
 // Fields: id (UUID), project_id (UUID), token (String), created_at (Timestamp)
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const sequelize = require('../config/database');
 
 const LtiLink = sequelize.define('LtiLink', {
   id: {

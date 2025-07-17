@@ -1,7 +1,7 @@
 // H5PContent model
 // Fields: id (UUID), project_id (UUID), json_data (JSON), created_at (Timestamp)
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
+const sequelize = require('../config/database');
 
 const H5PContent = sequelize.define('H5PContent', {
   id: {

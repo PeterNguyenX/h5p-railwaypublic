@@ -1,16 +1,16 @@
-# fly.toml app configuration file generated for h5p-interactive-video on 2025-07-09T13:24:53+07:00
+# fly.toml app configuration file generated for h5p-minimal on 2025-07-13T23:39:06+07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'h5p-interactive-video'
+app = 'h5p-minimal'
 primary_region = 'sjc'
 
 [build]
-  dockerfile = "./Dockerfile"
+  dockerfile = './Dockerfile'
 
-[deploy]
-  release_command = 'npm run migrate:prod'
+# [deploy]
+#   release_command = 'npm run migrate:prod'
 
 [env]
   NODE_ENV = 'production'
@@ -35,11 +35,11 @@ primary_region = 'sjc'
   [[http_service.checks]]
     interval = '30s'
     timeout = '5s'
-    grace_period = '10s'
+    grace_period = '30s'
     method = 'GET'
-    path = '/api/health'
+    path = '/api/projects/health'
 
 [[vm]]
   cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 1024
+  memory_mb = 2048

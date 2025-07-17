@@ -1,0 +1,18 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Create a minimal package.json
+RUN echo '{"name":"h5p-standalone","version":"1.0.0","main":"standalone-server.js"}' > package.json
+
+# Install minimal dependencies
+RUN npm install express cors
+
+# Copy our standalone server file
+COPY standalone-server.js .
+
+# Expose the port
+EXPOSE 3001
+
+# Start server
+CMD ["node", "standalone-server.js"]

@@ -7,6 +7,7 @@ import ProjectCard from '../components/ProjectCard';
 const Home: React.FC = () => {
   const { t } = useTranslation();
   const [projects, setProjects] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -14,9 +15,27 @@ const Home: React.FC = () => {
     fetch('/api/projects', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
-      .then(res => res.json())
-      .then(setProjects);
+      .then(res => {
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setProjects(data);
+        } else {
+          setError('Unexpected API response.');
+          setProjects([]);
+        }
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to load projects.');
+        setProjects([]);
+      });
   }, []);
+
+  const handleCreateProject = () => {
+    navigate('/create');
+  };
 
   return (
     <Container maxWidth="lg">
@@ -57,11 +76,16 @@ const Home: React.FC = () => {
         </Typography>
         <Button
           variant="contained"
-          onClick={() => navigate('/create')}
+          onClick={handleCreateProject}
           sx={{ mb: 4 }}
         >
           Create New Project
         </Button>
+        {error && (
+          <Typography color="error" align="center" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+        )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
           {projects.map(project => (
             <ProjectCard

@@ -1,0 +1,24 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+
+# Install minimal dependencies
+RUN npm install express cors dotenv
+
+# Copy simplified server
+COPY simplified-server.js ./
+
+# Create a public directory for static assets
+RUN mkdir -p public
+
+# Create default thumbnail as a fallback
+RUN echo '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150"><rect width="200" height="150" fill="#f0f0f0"/><text x="50%" y="50%" font-family="Arial" font-size="14" text-anchor="middle" dominant-baseline="middle" fill="#666">Thumbnail</text></svg>' > ./public/default-thumbnail.svg
+
+# Expose port
+EXPOSE 3001
+
+# Start server
+CMD ["node", "simplified-server.js"]

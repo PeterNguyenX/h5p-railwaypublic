@@ -1,7 +1,23 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// List of public paths that don't require authentication
+const PUBLIC_PATHS = [
+  '/',      // Main web interface
+  '/projects', // Projects list page
+  '/view'   // For viewing specific projects
+];
+
 const auth = async (req, res, next) => {
+  // Check if the path is public
+  const currentPath = req.path;
+  // For non-API main interface routes, bypass authentication
+  if (PUBLIC_PATHS.some(publicPath => currentPath.startsWith(publicPath)) && !req.path.startsWith('/api')) {
+    console.log(`Public access granted for path: ${currentPath}`);
+    req.user = { id: null, isPublic: true };
+    return next();
+  }
+
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
@@ -27,6 +43,12 @@ const auth = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Auth error:', error.message);
+    // Return an empty projects array when not authenticated instead of error for API projects route
+    if (req.path === '/') {
+      console.log('Unauthenticated access to projects route - returning empty array');
+      req.user = { id: null }; // Set a dummy user with null id
+      return next();
+    }
     res.status(401).json({ error: 'Please authenticate.' });
   }
 };
@@ -44,4 +66,4 @@ const adminAuth = async (req, res, next) => {
   }
 };
 
-module.exports = { auth, adminAuth }; 
+module.exports = { auth, adminAuth };
