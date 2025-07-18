@@ -196,7 +196,7 @@ app.get("/video/:videoPath", (req, res) => {
   stream.pipe(res);
 });
 
-// Serve static files from the React app in production
+// Serve static files from the React app build
 const frontendBuildPath = path.join(__dirname, 'public');
 console.log('🎯 Frontend build path:', frontendBuildPath);
 
@@ -219,39 +219,45 @@ if (fs.existsSync(frontendBuildPath)) {
   });
 } else {
   console.log('⚠️ Frontend build directory not found at:', frontendBuildPath);
-  console.log('💡 Only API endpoints will be available');
+  console.log('💡 Trying fallback location...');
   
-  // Fallback for missing frontend
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'API endpoint not found' });
-    }
+  // Fallback to check ../frontend/build
+  const fallbackBuildPath = path.join(__dirname, '../frontend/build');
+  if (fs.existsSync(fallbackBuildPath)) {
+    console.log('✅ Found frontend build at fallback location:', fallbackBuildPath);
     
-    res.json({
-      message: 'H5P Interactive Video Platform',
-      status: 'API Only - Frontend not found',
-      info: 'Frontend build files are missing. Only API endpoints are available.',
-      api_docs: '/api/health',
-      frontend_expected_at: frontendBuildPath
+    // Serve static files from fallback location
+    app.use(express.static(fallbackBuildPath));
+    
+    // Handle React routing for fallback location
+    app.get('*', (req, res) => {
+      if (!req.path.startsWith('/api/')) {
+        console.log(`📄 Serving React app from fallback for route: ${req.path}`);
+        res.sendFile(path.join(fallbackBuildPath, 'index.html'));
+      } else {
+        res.status(404).json({ error: 'API endpoint not found' });
+      }
     });
-  });
-}
-if (process.env.NODE_ENV === 'production') {
-  console.log('Serving frontend in production mode');
-  // Serve React build files
-  app.use(express.static(path.join(__dirname, '../frontend/build')));
-  
-  // Handle React routing - serve index.html for all non-API routes
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-      console.log(`Serving frontend for path: ${req.path}`);
-      res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
-    } else {
-      res.status(404).json({ error: 'API endpoint not found' });
-    }
-  });
-} else {
-  console.log('Development mode: not serving frontend');
+  } else {
+    console.log('⚠️ No frontend build found at either location');
+    console.log('💡 Only API endpoints will be available');
+    
+    // Fallback for completely missing frontend
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+      }
+      
+      res.json({
+        message: 'H5P Interactive Video Platform',
+        status: 'API Only - Frontend not found',
+        info: 'Frontend build files are missing. Only API endpoints are available.',
+        api_docs: '/api/health',
+        frontend_expected_at: frontendBuildPath,
+        fallback_checked: fallbackBuildPath
+      });
+    });
+  }
 }
 
 app.use('/h5p/libraries', express.static(path.join(__dirname, 'h5p-libraries')));
