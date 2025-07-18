@@ -134,14 +134,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'H5P Platform is running' });
 });
 
-// Root route
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'H5P Interactive Video Platform API',
-    status: 'running',
-    health: '/api/health'
-  });
-});
+// Remove the root route handler - let the React app handle it
+// The catch-all handler below will serve the React app for the root route
 
 // Public information endpoint (no authentication required)
 app.get('/api/public/info', (req, res) => {

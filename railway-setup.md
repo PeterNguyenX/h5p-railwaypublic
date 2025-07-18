@@ -2,6 +2,34 @@
 
 This guide walks you through deploying the H5P Interactive Video Platform to Railway, a free hosting service that's simpler than Fly.io.
 
+## ✅ Current Status (Updated - December 2024)
+
+**Last Updated:** Fixed static file serving and React build location issues
+
+### 🎯 Deployment Status
+- ✅ **Railway Project**: `itp-h5p-production` 
+- ✅ **Build Success**: Docker image under 4GB, builds successfully
+- ✅ **Code Fixes Applied**: Removed duplicate static file serving, moved React build files
+- 🔄 **Deployment**: Latest changes pushed, waiting for Railway deployment
+
+### 🔧 Recent Fixes Applied
+1. **Database Config**: Fixed to handle missing `DATABASE_URL` gracefully
+2. **Static Files**: Fixed duplicate/conflicting static file serving code
+3. **React Build Location**: Moved React build files from `backend/public/frontend/` to `backend/public/`
+4. **Health Checks**: Added `/api/health` and `/api/status` endpoints
+5. **Logging**: Enhanced startup logs for debugging
+
+### 🚨 Previous Issue (FIXED)
+The app was only showing minimal API JSON at the root URL due to:
+- Duplicate static file serving code causing conflicts
+- React build files in wrong location (`backend/public/frontend/` instead of `backend/public/`)
+
+### 📋 Next Steps
+1. **Verify Deployment**: Check if Railway has deployed the latest fixes
+2. **Test Full App**: Confirm React frontend loads at root URL
+3. **Add Database**: Add PostgreSQL and environment variables for full functionality
+4. **Final Testing**: Ensure all features work properly
+
 ## Prerequisites
 
 1. A GitHub account
