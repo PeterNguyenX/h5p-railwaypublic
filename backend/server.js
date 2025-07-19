@@ -77,14 +77,32 @@ async function initializeH5P() {
 // Initialize H5P on startup
 initializeH5P();
 
-// Serve static files from the uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Serve static files from public directory (for default assets)
+// Serve static files from public directory (for default assets like default-thumbnail.svg)
 app.use('/api', express.static(path.join(__dirname, 'public')));
 
-// Custom thumbnail handler with fallback
-app.get('/api/uploads/**/thumbnail.jpg', (req, res) => {
+// Serve static files from the uploads directory with proper headers
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.m3u8')) {
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    }
+    if (filePath.endsWith('.ts')) {
+      res.setHeader('Content-Type', 'video/mp2t');
+    }
+    if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    }
+    if (filePath.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    }
+  }
+}));
+
+// Serve uploads directory directly (for legacy paths)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Enhanced thumbnail fallback middleware for missing thumbnails
+app.use('/api/uploads/**/*thumbnail.jpg', (req, res, next) => {
   const requestedPath = req.path.replace('/api/uploads/', '');
   const thumbnailPath = path.join(__dirname, 'uploads', requestedPath);
   
@@ -97,24 +115,11 @@ app.get('/api/uploads/**/thumbnail.jpg', (req, res) => {
       res.setHeader('Content-Type', 'image/svg+xml');
       res.sendFile(defaultThumbnailPath);
     } else {
-      // File exists, serve it
-      res.setHeader('Content-Type', 'image/jpeg');
-      res.sendFile(thumbnailPath);
+      // File exists, continue to static middleware
+      next();
     }
   });
 });
-
-// Apply thumbnail fallback middleware before serving uploads
-app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.m3u8')) {
-      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-    }
-    if (filePath.endsWith('.ts')) {
-      res.setHeader('Content-Type', 'video/mp2t');
-    }
-  }
-}));
 
 // Basic health check endpoint (no database dependency)
 app.get('/api/health', (req, res) => {
@@ -156,6 +161,7 @@ app.use("/api/templates", templateRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/lti", ltiRoutes);
 app.use("/api/projects", projectsRoutes);
+app.use("/api/admin", require('./routes/adminRoutes'));
 
 // Video streaming endpoint
 app.get("/video/:videoPath", (req, res) => {

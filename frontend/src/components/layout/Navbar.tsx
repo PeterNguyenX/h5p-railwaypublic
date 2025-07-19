@@ -14,13 +14,16 @@ import {
   useTheme,
   useMediaQuery,
   SelectChangeEvent,
+  Divider,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import authStore from '../../stores/authStore';
 
 const Navbar: React.FC = observer(() => {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -46,7 +49,7 @@ const Navbar: React.FC = observer(() => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    authStore.logout();
     navigate('/login');
     handleClose();
   };
@@ -55,6 +58,11 @@ const Navbar: React.FC = observer(() => {
     { name: t('nav.dashboard'), path: '/dashboard' },
     { name: t('nav.upload'), path: '/upload' },
   ];
+
+  // Add admin link if user is admin
+  if (authStore.user && (authStore.user as any).role === 'admin') {
+    Links.push({ name: 'Admin', path: '/admin' });
+  }
 
   const NavLink = ({ children, to }: { children: React.ReactNode; to: string }) => (
     <RouterLink to={to} className="router-link">
@@ -122,6 +130,27 @@ const Navbar: React.FC = observer(() => {
                 open={Boolean(anchorEl)}
                 onClose={handleClose}
               >
+                {authStore.user && (
+                  <>
+                    <MenuItem disabled>
+                      <Box>
+                        <Typography variant="body2" fontWeight="bold">
+                          {authStore.user.username}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {(authStore.user as any).role === 'admin' ? 'Administrator' : 'User'}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                    <Divider />
+                  </>
+                )}
+                {authStore.user && (authStore.user as any).role === 'admin' && (
+                  <MenuItem onClick={() => { navigate('/admin'); handleClose(); }}>
+                    <AdminPanelSettingsIcon sx={{ mr: 1 }} />
+                    Admin Dashboard
+                  </MenuItem>
+                )}
                 <MenuItem onClick={handleLogout}>
                   Logout
                 </MenuItem>

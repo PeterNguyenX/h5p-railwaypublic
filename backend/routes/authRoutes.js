@@ -65,6 +65,7 @@ router.post("/register", async (req, res) => {
       id: user.id,
       username: user.username,
       email: user.email,
+      role: user.role,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -136,6 +137,7 @@ router.post("/login", async (req, res) => {
       id: user.id,
       username: user.username,
       email: user.email,
+      role: user.role,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

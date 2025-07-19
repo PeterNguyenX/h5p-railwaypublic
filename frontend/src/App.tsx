@@ -15,6 +15,7 @@ import VideoTest from './pages/VideoTest';
 import VideoDebug from './pages/VideoDebug';
 import HLSTest from './pages/HLSTest';
 import FinalTest from './pages/FinalTest';
+import AdminDashboard from './pages/AdminDashboard';
 import NotFound from './pages/NotFound';
 import PrivateRoute from './components/PrivateRoute';
 
@@ -70,6 +71,14 @@ const App: React.FC = () => {
                 element={
                   <PrivateRoute>
                     <VideoPlayer />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute>
+                    <AdminDashboard />
                   </PrivateRoute>
                 }
               />
