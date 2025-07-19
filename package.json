@@ -10,6 +10,7 @@
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "railway:build": "npm install && cd frontend && npm install && npm run build && cd ../backend && npm install",
     "railway:start": "cd backend && node server.js",
+    "railway:migrate": "cd backend && node scripts/initDb.js",
     "setup-wordpress": "./setup-wordpress.sh",
     "setup-wordpress-mamp": "./setup-wordpress-mamp.sh",
     "docker:up": "docker-compose up -d",

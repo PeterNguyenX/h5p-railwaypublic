@@ -289,6 +289,16 @@ async function testDatabaseConnection() {
     
     await sequelize.authenticate();
     console.log('✅ Database connection has been established successfully.');
+    
+    // Auto-initialize database tables if they don't exist
+    try {
+      await sequelize.sync({ alter: false });
+      console.log('✅ Database tables verified/created successfully.');
+    } catch (syncError) {
+      console.warn('⚠️ Database sync warning:', syncError.message);
+      console.log('💡 Database will work but some features may be limited');
+    }
+    
     return true;
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error.message);
