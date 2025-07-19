@@ -16,7 +16,7 @@ import authStore from '../stores/authStore';
 import './Login.css';
 
 const Login: React.FC = observer(() => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ const Login: React.FC = observer(() => {
     setError('');
 
     try {
-      await authStore.login(email, password);
+      await authStore.login(username, password);
       // Redirect to the originally intended page or dashboard
       const redirectTo = (location.state as any)?.from?.pathname || '/dashboard';
       navigate(redirectTo, { replace: true });
@@ -52,10 +52,10 @@ const Login: React.FC = observer(() => {
                 </Alert>
               )}
               <TextField
-                label={t('auth.email')}
-                type="email"
-                value={email}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                label={t('auth.username')}
+                type="text"
+                value={username}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
                 fullWidth
                 required
               />

@@ -9,8 +9,8 @@ class UserStore {
         makeAutoObservable(this);
     }
 
-    async login(email: string, password: string) {
-        const res = await axios.post<{ token: string }>("/api/auth/login", { email, password });
+    async login(username: string, password: string) {
+        const res = await axios.post<{ token: string }>("/api/auth/login", { username, password });
         this.token = res.data.token;
         localStorage.setItem("token", res.data.token);
     }

@@ -56,11 +56,11 @@ class AuthStore {
     }
   }
 
-  async login(email: string, password: string) {
+  async login(username: string, password: string) {
     try {
       this.setLoading(true);
       this.setError(null);
-      const response = await api.post<AuthResponse>('/auth/login', { email, password });
+      const response = await api.post<AuthResponse>('/auth/login', { username, password });
       const { token, user } = response.data;
       
       localStorage.setItem('token', token);
@@ -84,7 +84,7 @@ class AuthStore {
             errorMessage = `Missing required fields: ${fields}`;
           }
         } else if (error.response.status === 401) {
-          errorMessage = 'Invalid email or password';
+          errorMessage = 'Invalid username or password';
         } else if (error.response.status === 500) {
           errorMessage = 'Server error. Please try again later.';
         } else if (data.message) {

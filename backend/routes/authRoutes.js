@@ -86,24 +86,24 @@ router.post("/register", async (req, res) => {
 // Login
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
     // Validate input
-    if (!email || !password) {
+    if (!username || !password) {
       return res.status(400).json({
-        message: "Email and password are required",
+        message: "Username and password are required",
         missingFields: {
-          email: !email,
+          username: !username,
           password: !password,
         },
       });
     }
 
     // Find user
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ where: { username } });
     if (!user) {
       return res.status(401).json({
-        message: "Invalid email or password",
+        message: "Invalid username or password",
       });
     }
 
@@ -120,7 +120,7 @@ router.post("/login", async (req, res) => {
     }
     if (!isMatch) {
       return res.status(401).json({
-        message: "Invalid email or password",
+        message: "Invalid username or password",
       });
     }
 

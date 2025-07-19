@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { observer } from 'mobx-react-lite';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -28,8 +28,10 @@ const Navbar: React.FC = observer(() => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const location = useLocation();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const isLoggedIn = !!localStorage.getItem('token');
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
   const handleLanguageChange = (event: SelectChangeEvent) => {
     i18n.changeLanguage(event.target.value);
@@ -125,7 +127,7 @@ const Navbar: React.FC = observer(() => {
                 </MenuItem>
               </Menu>
             </>
-          ) : (
+          ) : !isAuthPage ? (
             <Stack direction="row" spacing={2}>
               <Button component={RouterLink} to="/login" color="inherit">
                 {t('auth.login')}
@@ -134,7 +136,7 @@ const Navbar: React.FC = observer(() => {
                 {t('auth.register')}
               </Button>
             </Stack>
-          )}
+          ) : null}
         </Box>
       </Toolbar>
       {isOpen && isMobile && (
