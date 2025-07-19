@@ -29,6 +29,8 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:8888',
   'http://103.88.123.117',
+  'https://h5p-hoclieutuongtac-production.up.railway.app',
+  'https://hoclieutuongtac2.com',
   /\.railway\.app$/,  // Allow all Railway.app subdomains
   /\.up\.railway\.app$/  // Allow Railway preview deployments
 ];
