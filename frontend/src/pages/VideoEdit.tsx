@@ -40,7 +40,6 @@ import { useParams } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import VideoPlayer from '../components/VideoPlayer';
 import AdvancedH5PEditor from '../components/AdvancedH5PEditor';
-import WordPressIntegration from '../components/WordPressIntegration';
 import api from '../config/api';
 
 const VideoEdit: React.FC = observer(() => {
@@ -416,44 +415,6 @@ const VideoEdit: React.FC = observer(() => {
               </Grid>
             ))}
           </Grid>
-
-          {/* Empty State */}
-          {h5pContents.length === 0 && (
-            <Box
-              sx={{
-                minHeight: 200,
-                border: '2px dashed #ccc',
-                borderRadius: 2,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: '#f9f9f9',
-                mt: 2
-              }}
-            >
-              <Stack alignItems="center" spacing={2}>
-                <InteractiveIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
-                <Typography variant="h6" color="text.secondary">
-                  No interactive content created yet
-                </Typography>
-                <Typography variant="body2" color="text.secondary" textAlign="center">
-                  Choose from the libraries above to create engaging interactive video content
-                </Typography>
-              </Stack>
-            </Box>
-          )}
-        </Paper>
-
-        {/* WordPress Integration Section */}
-        <Paper sx={{ p: 3, mt: 4 }}>
-          <Typography variant="h6" gutterBottom>
-            WordPress Integration
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Manage and publish your video content through WordPress. Access the WordPress admin panel,
-            create posts, and integrate your H5P content with your WordPress site.
-          </Typography>
-          <WordPressIntegration />
         </Paper>
 
         {/* Advanced H5P Editor Dialog */}

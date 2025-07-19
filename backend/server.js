@@ -15,7 +15,6 @@ const h5pRoutes = require("./routes/h5pRoutes");
 const templateRoutes = require("./routes/templateRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const ltiRoutes = require("./routes/ltiRoutes");
-const wordpressRoutes = require("./routes/wordpressRoutes");
 const projectsRoutes = require("./routes/projects");
 const h5pService = require("./services/h5pService");
 const thumbnailFallbackMiddleware = require("./middleware/thumbnailFallback");
@@ -156,7 +155,6 @@ app.use("/api/h5p", h5pRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/lti", ltiRoutes);
-app.use("/api/wordpress", wordpressRoutes);
 app.use("/api/projects", projectsRoutes);
 
 // Video streaming endpoint

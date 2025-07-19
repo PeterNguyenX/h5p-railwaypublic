@@ -17,7 +17,6 @@ import HLSTest from './pages/HLSTest';
 import FinalTest from './pages/FinalTest';
 import NotFound from './pages/NotFound';
 import PrivateRoute from './components/PrivateRoute';
-import WordPressIntegration from './components/WordPressIntegration';
 
 const theme = createTheme({
   palette: {
@@ -79,14 +78,6 @@ const App: React.FC = () => {
               <Route path="/debug" element={<VideoDebug />} />
               <Route path="/hls-test" element={<HLSTest />} />
               <Route path="/final" element={<FinalTest />} />
-              <Route 
-                path="/wordpress" 
-                element={
-                  <PrivateRoute>
-                    <WordPressIntegration />
-                  </PrivateRoute>
-                } 
-              />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Box>
