@@ -309,6 +309,46 @@ app.get("/api/temp-fix-videos/:secret", async (req, res) => {
   }
 });
 
+// Temporary simple user endpoint for debugging
+app.get("/api/auth/me-simple", async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+    
+    const jwt = require('jsonwebtoken');
+    const { User } = require('./models');
+    
+    console.log('Token received:', token.substring(0, 50) + '...');
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+    console.log('JWT decoded:', decoded);
+    
+    const userId = decoded.userId || decoded.id;
+    console.log('Looking for user ID:', userId);
+    
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ['password'] }
+    });
+    
+    console.log('User found:', user ? user.username : 'null');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found in database' });
+    }
+    
+    res.json(user);
+    
+  } catch (error) {
+    console.error('Simple /me error:', error);
+    res.status(500).json({ 
+      error: 'Authentication error',
+      details: error.message 
+    });
+  }
+});
+
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
