@@ -283,6 +283,24 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found', path: req.path });
 });
 
+// Temporary debug route to test auth
+app.get("/api/debug/test-auth", async (req, res) => {
+  try {
+    const User = require('./models/User');
+    const userCount = await User.count();
+    res.json({ 
+      message: "Auth test working", 
+      userCount,
+      timestamp: new Date().toISOString() 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: "Auth test failed", 
+      message: error.message 
+    });
+  }
+});
+
 // Test database connection before starting server
 async function testDatabaseConnection() {
   try {
