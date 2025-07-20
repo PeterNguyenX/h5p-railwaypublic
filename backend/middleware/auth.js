@@ -26,7 +26,9 @@ const auth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+    console.log('JWT decoded payload:', decoded);
     const userId = decoded.userId || decoded.id; // Handle both userId and id fields
+    console.log('Extracted user ID:', userId);
     
     if (!userId) {
       throw new Error('Invalid token format');
@@ -34,9 +36,18 @@ const auth = async (req, res, next) => {
 
     const user = await User.findOne({ where: { id: userId } });
 
-    if (!user || !user.isActive) {
-      throw new Error('User not found or inactive');
+    if (!user) {
+      console.error(`User not found for ID: ${userId}`);
+      throw new Error('User not found');
     }
+    
+    if (!user.isActive) {
+      console.error(`User ${userId} is inactive`);
+      throw new Error('User inactive');
+    }
+    
+    console.log(`Auth successful for user: ${user.username} (${user.id}), role: ${user.role}`);
+    
 
     req.user = user;
     req.token = token;
