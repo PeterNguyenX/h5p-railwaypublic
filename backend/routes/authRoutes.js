@@ -188,4 +188,36 @@ router.get("/me", auth, async (req, res) => {
   }
 });
 
+// Temporary admin promotion endpoint (for debugging)
+router.post("/make-admin", async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ error: "Username required" });
+    }
+
+    // Find user and promote to admin
+    const user = await User.findOne({ where: { username } });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await user.update({ role: 'admin' });
+
+    res.json({
+      message: `User ${username} promoted to admin`,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error("Error promoting user:", error);
+    res.status(500).json({ error: "Error promoting user" });
+  }
+});
+
 module.exports = router;
