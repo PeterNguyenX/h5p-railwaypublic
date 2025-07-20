@@ -159,6 +159,81 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "Test route working", timestamp: new Date().toISOString() });
 });
 
+// Temporary video patch endpoint (direct in server.js)
+app.post("/api/temp-fix-videos", async (req, res) => {
+  try {
+    const { secret } = req.body;
+    
+    if (secret !== 'fix-videos-now-2025') {
+      return res.status(403).json({ error: 'Invalid secret' });
+    }
+    
+    console.log('Starting video patch...');
+    
+    const { Video, User } = require('./models');
+    
+    // Get all videos with null userId
+    const videosWithoutUser = await Video.findAll({
+      where: {
+        userId: null
+      }
+    });
+    
+    console.log(`Found ${videosWithoutUser.length} videos without userId`);
+    
+    if (videosWithoutUser.length === 0) {
+      return res.json({ 
+        message: 'No videos to patch', 
+        fixed: 0,
+        total: 0
+      });
+    }
+    
+    // Get the admin user
+    const adminUser = await User.findOne({
+      where: {
+        role: 'admin'
+      },
+      order: [['createdAt', 'ASC']]
+    });
+    
+    if (!adminUser) {
+      return res.status(404).json({ error: 'No admin user found' });
+    }
+    
+    console.log(`Assigning videos to admin user: ${adminUser.username} (${adminUser.id})`);
+    
+    // Update all videos without userId to belong to admin
+    const [updatedCount] = await Video.update(
+      { userId: adminUser.id },
+      {
+        where: {
+          userId: null
+        }
+      }
+    );
+    
+    console.log(`Updated ${updatedCount} videos to belong to admin user`);
+    
+    res.json({
+      message: `Successfully patched ${updatedCount} videos`,
+      fixed: updatedCount,
+      total: videosWithoutUser.length,
+      assignedTo: {
+        id: adminUser.id,
+        username: adminUser.username
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error patching videos:', error);
+    res.status(500).json({ 
+      error: 'Error patching videos',
+      details: error.message 
+    });
+  }
+});
+
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
