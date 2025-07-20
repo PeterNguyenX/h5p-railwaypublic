@@ -417,4 +417,62 @@ router.post('/promote-to-admin', async (req, res) => {
   }
 });
 
+// Fix video user associations - assign videos with null userId to admin
+router.post('/fix-video-users', auth, isAdmin, async (req, res) => {
+  try {
+    console.log('Starting video user fix...');
+    
+    // Get all videos with null userId
+    const videosWithoutUser = await Video.findAll({
+      where: {
+        userId: null
+      }
+    });
+    
+    console.log(`Found ${videosWithoutUser.length} videos without userId`);
+    
+    if (videosWithoutUser.length === 0) {
+      return res.json({ 
+        message: 'No videos to fix', 
+        fixed: 0,
+        total: 0
+      });
+    }
+    
+    // Get the current admin user (the one making the request)
+    const adminUser = req.user;
+    
+    console.log(`Assigning videos to admin user: ${adminUser.username} (${adminUser.id})`);
+    
+    // Update all videos without userId to belong to current admin
+    const [updatedCount] = await Video.update(
+      { userId: adminUser.id },
+      {
+        where: {
+          userId: null
+        }
+      }
+    );
+    
+    console.log(`Updated ${updatedCount} videos to belong to admin user`);
+    
+    res.json({
+      message: `Successfully fixed ${updatedCount} videos`,
+      fixed: updatedCount,
+      total: videosWithoutUser.length,
+      assignedTo: {
+        id: adminUser.id,
+        username: adminUser.username
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fixing video users:', error);
+    res.status(500).json({ 
+      error: 'Error fixing video users',
+      details: error.message 
+    });
+  }
+});
+
 module.exports = router;
