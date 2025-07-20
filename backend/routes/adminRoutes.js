@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { User, Video, H5PContent } = require('../models');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/admin');
 const { Op } = require('sequelize');
 
