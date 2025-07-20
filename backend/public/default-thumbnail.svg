@@ -1,7 +1,0 @@
-<svg width="320" height="180" xmlns="http://www.w3.org/2000/svg">
-  <rect width="320" height="180" fill="#f0f0f0"/>
-  <rect x="10" y="10" width="300" height="160" fill="#e0e0e0" stroke="#ccc" stroke-width="1"/>
-  <circle cx="160" cy="90" r="30" fill="#999"/>
-  <polygon points="150,75 150,105 175,90" fill="white"/>
-  <text x="160" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666">Video Thumbnail</text>
-</svg>
