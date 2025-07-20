@@ -131,7 +131,8 @@ app.get('/api/health', (req, res) => {
     port: process.env.PORT || 3001,
     hasDatabase: !!process.env.DATABASE_URL,
     hasJWT: !!process.env.JWT_SECRET,
-    hasSession: !!process.env.SESSION_SECRET
+    hasSession: !!process.env.SESSION_SECRET,
+    version: '1.0.1' // Added version to force refresh
   });
 });
 
