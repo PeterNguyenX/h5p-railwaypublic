@@ -160,7 +160,7 @@ app.get("/api/test", (req, res) => {
 });
 
 // API routes
-app.use("/api/auth", require('./routes/authRoutes.working'));
+app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/h5p", h5pRoutes);
 app.use("/api/templates", templateRoutes);
