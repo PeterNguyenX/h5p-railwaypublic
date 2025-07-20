@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { User, Video, H5PContent } = require('../models');
 const auth = require('../middleware/auth');
-const adminMiddleware = require('../middleware/admin');
+const { isAdmin } = require('../middleware/admin');
 const { Op } = require('sequelize');
 
 // Get admin dashboard statistics
-router.get('/stats', auth, adminMiddleware.isAdmin, async (req, res) => {
+router.get('/stats', auth, isAdmin, async (req, res) => {
   try {
     const totalUsers = await User.count();
     const totalVideos = await Video.count();
@@ -56,7 +56,7 @@ router.get('/stats', auth, adminMiddleware.isAdmin, async (req, res) => {
 });
 
 // Get all users (with pagination)
-router.get('/users', auth, adminMiddleware.isAdmin, async (req, res) => {
+router.get('/users', auth, isAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
@@ -92,7 +92,7 @@ router.get('/users', auth, adminMiddleware.isAdmin, async (req, res) => {
 });
 
 // Update user role
-router.put('/users/:id/role', auth, adminMiddleware.isAdmin, async (req, res) => {
+router.put('/users/:id/role', auth, isAdmin, async (req, res) => {
   try {
     const { role } = req.body;
     
@@ -119,7 +119,7 @@ router.put('/users/:id/role', auth, adminMiddleware.isAdmin, async (req, res) =>
 });
 
 // Toggle user active status
-router.put('/users/:id/status', auth, adminMiddleware.isAdmin, async (req, res) => {
+router.put('/users/:id/status', auth, isAdmin, async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) {
@@ -143,7 +143,7 @@ router.put('/users/:id/status', auth, adminMiddleware.isAdmin, async (req, res) 
 });
 
 // Get all videos (admin view with additional details)
-router.get('/videos', auth, adminMiddleware.isAdmin, async (req, res) => {
+router.get('/videos', auth, isAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', status = '' } = req.query;
     const offset = (page - 1) * limit;
@@ -185,7 +185,7 @@ router.get('/videos', auth, adminMiddleware.isAdmin, async (req, res) => {
 });
 
 // Delete any video (admin privilege)
-router.delete('/videos/:id', auth, adminMiddleware.isAdmin, async (req, res) => {
+router.delete('/videos/:id', auth, isAdmin, async (req, res) => {
   try {
     const video = await Video.findByPk(req.params.id);
     if (!video) {
@@ -326,7 +326,7 @@ router.post('/setup-admin', async (req, res) => {
 });
 
 // System settings (placeholder for future features)
-router.get('/settings', auth, adminMiddleware.isAdmin, async (req, res) => {
+router.get('/settings', auth, isAdmin, async (req, res) => {
   try {
     // This could be extended to store system settings in a database table
     const settings = {
