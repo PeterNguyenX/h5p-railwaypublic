@@ -274,21 +274,11 @@ router.post('/create-admin', async (req, res) => {
 // Simple initial admin setup (no auth required, only works if no users exist)
 router.post('/setup-admin', async (req, res) => {
   try {
-    // Check if any users exist
-    const userCount = await User.count();
-    
-    if (userCount > 0) {
-      return res.status(400).json({ 
-        error: 'Admin setup only available for new installations. Users already exist.',
-        existingUsers: userCount 
-      });
-    }
-
     // Check if admin already exists
     const existingAdmin = await User.findOne({ where: { username: 'admin' } });
     if (existingAdmin) {
-      return res.status(400).json({ 
-        error: 'Admin user already exists',
+      return res.status(200).json({ 
+        message: 'Admin user already exists',
         credentials: {
           username: 'admin',
           password: 'admin123',
@@ -297,7 +287,7 @@ router.post('/setup-admin', async (req, res) => {
       });
     }
 
-    // Create simple admin user
+    // Create admin user (removed the user count check)
     const adminUser = await User.create({
       username: 'admin',
       email: 'admin@hoclieutuongtac2.com',
@@ -306,7 +296,7 @@ router.post('/setup-admin', async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'Initial admin user created successfully',
+      message: 'Admin user created successfully',
       credentials: {
         username: 'admin',
         password: 'admin123',
