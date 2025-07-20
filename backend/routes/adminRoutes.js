@@ -391,4 +391,40 @@ router.get('/settings', auth, isAdmin, async (req, res) => {
   }
 });
 
+// Promote existing user to admin
+router.post('/promote-to-admin', async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'Username required' });
+    }
+
+    // Find user by username
+    const user = await User.findOne({ where: { username } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update user role to admin
+    await user.update({ role: 'admin' });
+
+    res.json({
+      message: `User ${username} promoted to admin successfully`,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Error promoting user to admin:', error);
+    res.status(500).json({ 
+      error: 'Error promoting user to admin',
+      details: error.message 
+    });
+  }
+});
+
 module.exports = router;
