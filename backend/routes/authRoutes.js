@@ -160,14 +160,24 @@ router.post("/login", async (req, res) => {
 // Get current user
 router.get("/me", auth, async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+    
+    // req.user is already the user object from auth middleware, 
+    // but let's fetch fresh data to be safe
     const user = await User.findByPk(req.user.id, {
       attributes: { exclude: ['password'] }
     });
+    
     if (!user) {
       return res.status(404).json({
         message: "User not found",
       });
     }
+    
     res.json(user);
   } catch (error) {
     console.error("Get user error:", error);
