@@ -41,13 +41,13 @@ const auth = async (req, res, next) => {
       throw new Error('User not found');
     }
     
-    if (!user.isActive) {
+    // Check if user is active (treat null/undefined as active for backward compatibility)
+    if (user.isActive === false) {
       console.error(`User ${userId} is inactive`);
       throw new Error('User inactive');
     }
     
     console.log(`Auth successful for user: ${user.username} (${user.id}), role: ${user.role}`);
-    
 
     req.user = user;
     req.token = token;
