@@ -154,6 +154,11 @@ app.get('/api/public/info', (req, res) => {
   });
 });
 
+// Simple test route
+app.get("/api/test", (req, res) => {
+  res.json({ message: "Test route working", timestamp: new Date().toISOString() });
+});
+
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
