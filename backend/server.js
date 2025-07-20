@@ -160,7 +160,7 @@ app.get("/api/test", (req, res) => {
 });
 
 // API routes
-app.use("/api/auth", require('./routes/authRoutes.simple'));
+app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/h5p", h5pRoutes);
 app.use("/api/templates", templateRoutes);
@@ -281,29 +281,6 @@ app.use((err, req, res, next) => {
     error: 'Server error', 
     message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message 
   });
-});
-
-// Add a catch-all route for API routes not found
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ error: 'API endpoint not found', path: req.path });
-});
-
-// Temporary debug route to test auth
-app.get("/api/debug/test-auth", async (req, res) => {
-  try {
-    const User = require('./models/User');
-    const userCount = await User.count();
-    res.json({ 
-      message: "Auth test working", 
-      userCount,
-      timestamp: new Date().toISOString() 
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      error: "Auth test failed", 
-      message: error.message 
-    });
-  }
 });
 
 // Test database connection before starting server
