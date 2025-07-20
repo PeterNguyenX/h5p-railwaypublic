@@ -188,4 +188,37 @@ router.get("/me", auth, async (req, res) => {
   }
 });
 
+// Debug auth endpoint
+router.get("/debug", async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.json({ error: "No token provided" });
+    }
+
+    const jwt = require('jsonwebtoken');
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+      const User = require('../models/User');
+      const user = await User.findOne({ where: { id: decoded.userId || decoded.id } });
+      
+      res.json({
+        token: "provided",
+        decoded: decoded,
+        userFound: !!user,
+        user: user ? { id: user.id, username: user.username, role: user.role } : null,
+        jwtSecret: process.env.JWT_SECRET ? "set" : "not set"
+      });
+    } catch (jwtError) {
+      res.json({
+        error: "JWT verification failed",
+        message: jwtError.message,
+        jwtSecret: process.env.JWT_SECRET ? "set" : "not set"
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
