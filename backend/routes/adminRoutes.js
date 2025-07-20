@@ -325,6 +325,53 @@ router.post('/setup-admin', async (req, res) => {
   }
 });
 
+// Force create admin user (works even when users exist)
+router.post('/force-create-admin', async (req, res) => {
+  try {
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ where: { username: 'admin' } });
+    if (existingAdmin) {
+      return res.status(200).json({ 
+        message: 'Admin user already exists',
+        credentials: {
+          username: 'admin',
+          password: 'admin123',
+          note: 'Use these credentials to login'
+        }
+      });
+    }
+
+    // Create admin user regardless of existing users
+    const adminUser = await User.create({
+      username: 'admin',
+      email: 'admin@hoclieutuongtac2.com',
+      password: 'admin123',
+      role: 'admin'
+    });
+
+    res.status(201).json({
+      message: 'Admin user created successfully',
+      credentials: {
+        username: 'admin',
+        password: 'admin123',
+        email: 'admin@hoclieutuongtac2.com'
+      },
+      instructions: [
+        '1. Login with username: admin',
+        '2. Password: admin123',
+        '3. Change password after first login',
+        '4. Access admin dashboard at /admin'
+      ]
+    });
+  } catch (error) {
+    console.error('Error creating admin user:', error);
+    res.status(500).json({ 
+      error: 'Error creating admin user',
+      details: error.message 
+    });
+  }
+});
+
 // System settings (placeholder for future features)
 router.get('/settings', auth, isAdmin, async (req, res) => {
   try {
