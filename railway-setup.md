@@ -1,6 +1,6 @@
 # Railway Deployment Guide for H5P Interactive Video Platform
 
-This guide walks you through deploying the H5P Interactive Video Platform to Railway, a free hosting service that's simpler than Fly.io.
+This guide walks you through deploying the H5P Interactive Video Platform to Railway, a powerful hosting service for modern web applications.
 
 ## ✅ Current Status (Updated - December 2024)
 

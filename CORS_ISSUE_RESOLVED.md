@@ -2,14 +2,13 @@
 
 ## 🚨 Problem Identified
 The CORS error was caused by the frontend trying to call the wrong API endpoint:
-- ❌ **Wrong**: `https://h5p-interactive-video.fly.dev/api/auth/register` (old Fly.dev URL)
+- ❌ **Wrong**: Old deployment URL (outdated)
 - ✅ **Correct**: `https://h5p-hoclieutuongtac-production.up.railway.app/api/auth/register` (Railway URL)
 
 ## 🔧 Fixes Applied
 
 ### 1. **Updated Frontend API Configuration**
 - Fixed `frontend/.env.production`: 
-  - Changed from: `REACT_APP_API_URL=https://h5p-interactive-video.fly.dev/api`
   - Changed to: `REACT_APP_API_URL=/api` (relative URL - works for any domain)
 
 ### 2. **Rebuilt Frontend**

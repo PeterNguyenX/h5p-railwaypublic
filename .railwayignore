@@ -12,8 +12,6 @@ yarn-error.log*
 *.swo
 *~
 .railway/
-fly.toml
-fly.*.toml
 latest.tar.gz
 uploads/videos/*
 uploads/hls/*

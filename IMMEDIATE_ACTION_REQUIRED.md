@@ -33,24 +33,60 @@ WHERE "userId" IS NULL;
 **Problem**: `/api/auth/me` endpoint fails user lookup
 **Status**: Debugging JWT verification and user model lookup
 
-## 🎯 **HOW TO APPLY FIXES**
+# 🚨 SIMPLE FIX READY - No Database Console Needed!
 
-### Option A: Direct SQL via Railway Dashboard (Recommended)
-1. **Access Railway PostgreSQL Console**:
-   - Go to https://railway.app → Your Project
-   - Click PostgreSQL service → Query/Console tab
-   - Paste and run the SQL above
+## 🎯 **SOLUTION: Use API Endpoint to Fix Video Ownership**
 
-2. **Expected Result After SQL Fix**:
-   - ✅ Admin login → sees existing videos  
-   - ✅ Test user login → sees empty dashboard
-   - ✅ New uploads → assigned to correct user
-   - ✅ User context isolation working!
+Since Railway doesn't show the PostgreSQL console, I've created a **simple API endpoint** that will fix the issue immediately:
 
-### Option B: Railway CLI (Alternative)
-```bash
-railway run node fix-videos-direct.js
+### **🚀 INSTANT FIX (30 seconds)**
+
+**Just click this link** (wait 30 seconds for deployment, then try):
+
 ```
+https://h5p-hoclieutuongtac-production.up.railway.app/api/public-fix-videos/fix-videos-2025-railway
+```
+
+**Or copy/paste this into your browser:**
+```
+https://h5p-hoclieutuongtac-production.up.railway.app/api/public-fix-videos/fix-videos-2025-railway
+```
+
+### **Expected Response:**
+```json
+{
+  "success": true,
+  "message": "Successfully fixed 1 videos! User context isolation should now work.",
+  "details": {
+    "videosFixed": 1,
+    "assignedToUser": "admin",
+    "remainingOrphans": 0
+  }
+}
+```
+
+## 🎉 **After Running the Fix**
+
+### **Test User Context Isolation:**
+
+1. **Login as admin**: `admin` / `admin123`
+   - Should see the existing video "vid1"
+
+2. **Login as test user**: `test` / `test123`  
+   - Should see empty dashboard (no videos)
+
+3. **Upload video as test user**:
+   - Video should appear only in test user's dashboard
+   - Admin should NOT see it
+
+### **This Confirms the Fix Worked!** ✅
+
+## 📊 **What the Fix Does**
+
+- **Finds**: Videos with `userId: null` (orphaned videos)
+- **Assigns**: Them to the admin user  
+- **Result**: Each user now sees only their own content
+- **Impact**: Perfect user context isolation!
 
 ## 📊 **Current Test Status**
 

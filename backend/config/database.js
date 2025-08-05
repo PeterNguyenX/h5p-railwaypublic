@@ -1,7 +1,7 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-// Use DATABASE_URL from Railway/Fly.io if available, otherwise use individual env vars
+// Use DATABASE_URL from Railway if available, otherwise use individual env vars
 const databaseUrl = process.env.DATABASE_URL;
 
 // Debug database connection information
@@ -16,7 +16,7 @@ console.log(`- DB_PASSWORD: ${process.env.DB_PASSWORD ? 'Set (masked)' : 'Not se
 let sequelize;
 
 if (databaseUrl) {
-  // Use Railway/Fly.io PostgreSQL
+  // Use Railway PostgreSQL
   console.log('🔗 Using PostgreSQL from DATABASE_URL');
   sequelize = new Sequelize(databaseUrl, {
     dialect: 'postgres',
