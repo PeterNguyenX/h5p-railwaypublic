@@ -1,12 +1,31 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-// Use DATABASE_URL from Railway if available, otherwise use individual env vars
-const databaseUrl = process.env.DATABASE_URL;
+// Prefer an explicit DATABASE_URL, but allow a Supabase-specific alias as well.
+const databaseUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+
+function shouldEnablePostgresSsl(url) {
+  const sslMode = process.env.SUPABASE_DB_SSL;
+  if (sslMode === 'disable') {
+    return false;
+  }
+
+  if (sslMode === 'require') {
+    return true;
+  }
+
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname !== 'localhost' && hostname !== '127.0.0.1';
+  } catch (error) {
+    return true;
+  }
+}
 
 // Debug database connection information
 console.log(`Database connection info:`);
 console.log(`- DATABASE_URL: ${databaseUrl ? 'Set (masked)' : 'Not set'}`);
+console.log(`- SUPABASE_URL: ${process.env.SUPABASE_URL ? 'Set' : 'Not set'}`);
 console.log(`- DB_HOST: ${process.env.DB_HOST || 'localhost'}`);
 console.log(`- DB_PORT: ${process.env.DB_PORT || '3306'}`);
 console.log(`- DB_NAME: ${process.env.DB_NAME || 'h5p_wordpress'}`);
@@ -16,16 +35,13 @@ console.log(`- DB_PASSWORD: ${process.env.DB_PASSWORD ? 'Set (masked)' : 'Not se
 let sequelize;
 
 if (databaseUrl) {
-  // Use Railway PostgreSQL
-  console.log('🔗 Using PostgreSQL from DATABASE_URL');
-  sequelize = new Sequelize(databaseUrl, {
-    dialect: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    },
+  // Detect dialect from DATABASE_URL
+  const isMysql = databaseUrl.startsWith('mysql://');
+  const dialect = isMysql ? 'mysql' : 'postgres';
+  console.log(`🔗 Using ${dialect.toUpperCase()} from DATABASE_URL`);
+  
+  const config = {
+    dialect: dialect,
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
       max: 5,
@@ -33,54 +49,35 @@ if (databaseUrl) {
       acquire: 30000,
       idle: 10000
     }
-  });
-} else {
-  // Fallback: try to use PostgreSQL with individual env vars, or fail gracefully
-  console.log('⚠️ DATABASE_URL not found, checking individual database env vars...');
+  };
   
-  if (process.env.DB_HOST && process.env.DB_NAME) {
-    console.log('🔗 Using PostgreSQL from individual env vars');
-    sequelize = new Sequelize(
-      process.env.DB_NAME,
-      process.env.DB_USER || 'root',
-      process.env.DB_PASSWORD || '',
-      {
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT || 5432,
-        dialect: 'postgres',
-        dialectOptions: {
-          ssl: process.env.NODE_ENV === 'production' ? {
-            require: true,
-            rejectUnauthorized: false
-          } : false
-        },
-        logging: process.env.NODE_ENV === 'development' ? console.log : false,
-        pool: {
-          max: 5,
-          min: 0,
-          acquire: 30000,
-          idle: 10000
-        }
+  // Supabase Postgres requires SSL on hosted instances.
+  if (dialect === 'postgres' && shouldEnablePostgresSsl(databaseUrl)) {
+    config.dialectOptions = {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
       }
-    );
-  } else {
-    // No database config found - create a dummy sequelize that will fail gracefully
-    console.log('❌ No database configuration found!');
-    console.log('💡 Add PostgreSQL database in Railway Dashboard');
-    console.log('💡 Or set DATABASE_URL environment variable');
-    
-    // Create a dummy sequelize that won't crash the app immediately
-    sequelize = new Sequelize('sqlite::memory:', {
-      dialect: 'sqlite',
-      logging: false,
-      define: {
-        timestamps: false
-      }
-    });
-    
-    // Mark it as invalid so we can handle this in the app
-    sequelize._isInvalid = true;
+    };
   }
+  
+  sequelize = new Sequelize(databaseUrl, config);
+} else {
+  // Fallback: use SQLite for local development (easiest option)
+  console.log('⚠️ DATABASE_URL not found, using SQLite for local development...');
+  console.log('🔗 Using SQLITE from local file');
+  
+  const path = require('path');
+  const dbPath = path.join(__dirname, '../h5p.db');
+  
+  sequelize = new Sequelize(`sqlite:${dbPath}`, {
+    dialect: 'sqlite',
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    storage: dbPath,
+    define: {
+      timestamps: true
+    }
+  });
 }
 
 module.exports = sequelize;

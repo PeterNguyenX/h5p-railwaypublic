@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './i18n';
+import './styles/teachplay-theme.css';
+
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

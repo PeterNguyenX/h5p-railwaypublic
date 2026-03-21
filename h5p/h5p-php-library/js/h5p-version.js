@@ -11,18 +11,18 @@ H5P.Version = (function () {
     if (typeof version === 'string') {
       // Name version string (used by content upgrade)
       var versionSplit = version.split('.', 3);
-      this.major =+ versionSplit[0];
-      this.minor =+ versionSplit[1];
+      this.major = parseInt(versionSplit[0], 10);
+      this.minor = parseInt(versionSplit[1], 10);
     }
     else {
       // Library objects (used by editor)
       if (version.localMajorVersion !== undefined) {
-        this.major =+ version.localMajorVersion;
-        this.minor =+ version.localMinorVersion;
+        this.major = parseInt(version.localMajorVersion, 10);
+        this.minor = parseInt(version.localMinorVersion, 10);
       }
       else {
-        this.major =+ version.majorVersion;
-        this.minor =+ version.minorVersion;
+        this.major = parseInt(version.majorVersion, 10);
+        this.minor = parseInt(version.minorVersion, 10);
       }
     }
 

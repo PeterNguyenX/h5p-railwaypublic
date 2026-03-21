@@ -12,7 +12,6 @@ import {
   IconButton,
   Card,
   CardContent,
-  CardActions,
   Grid,
   TextField,
   MenuItem,
@@ -56,8 +55,8 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
   const [libraries, setLibraries] = useState<H5PLibrary[]>([]);
   const [selectedLibrary, setSelectedLibrary] = useState<string>('');
   const [step, setStep] = useState<'select' | 'edit'>('select');
-  const [contentData, setContentData] = useState<any>({});
   const [timestamp, setTimestamp] = useState<number>(0);
+  const [showPreview, setShowPreview] = useState(true);
 
   // Multiple Choice specific state
   const [question, setQuestion] = useState('');
@@ -477,6 +476,85 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
     }
   };
 
+  const renderPreview = () => {
+    switch (selectedLibrary) {
+      case 'H5P.MultiChoice':
+        return (
+          <Card sx={{ bgcolor: '#f9f9f9', p: 2 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                {question || 'Your question here'}
+              </Typography>
+              <Stack spacing={1}>
+                {options.filter(opt => opt).map((option, index) => (
+                  <Button
+                    key={index}
+                    variant={correctAnswer === index ? 'contained' : 'outlined'}
+                    fullWidth
+                    sx={{ justifyContent: 'flex-start', textAlign: 'left', textTransform: 'none' }}
+                  >
+                    {option}
+                  </Button>
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+
+      case 'H5P.TrueFalse':
+        return (
+          <Card sx={{ bgcolor: '#f9f9f9', p: 2 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                {statement || 'Your statement here'}
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <Button
+                  variant={isTrue ? 'contained' : 'outlined'}
+                  sx={{ flex: 1 }}
+                >
+                  True
+                </Button>
+                <Button
+                  variant={!isTrue ? 'contained' : 'outlined'}
+                  sx={{ flex: 1 }}
+                >
+                  False
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+
+      case 'H5P.Blanks':
+        return (
+          <Card sx={{ bgcolor: '#f9f9f9', p: 2 }}>
+            <CardContent>
+              <Typography variant="body1">
+                {(blankText || 'Your text with blanks here').split('*').map((part, i) => (
+                  i % 2 === 0 ? (
+                    <span key={i}>{part}</span>
+                  ) : (
+                    <TextField
+                      key={i}
+                      size="small"
+                      variant="outlined"
+                      placeholder={part}
+                      sx={{ mx: 1, mb: 1 }}
+                      style={{ width: '100px' }}
+                    />
+                  )
+                ))}
+              </Typography>
+            </CardContent>
+          </Card>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <Dialog
       open={open}
@@ -519,7 +597,21 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
             {step === 'select' && renderLibrarySelector()}
             {step === 'edit' && (
               <>
-                {renderContentEditor()}
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={showPreview ? 6 : 12}>
+                    {renderContentEditor()}
+                  </Grid>
+                  {showPreview && (
+                    <Grid item xs={12} md={6}>
+                      <Box>
+                        <Typography variant="h6" gutterBottom>
+                          Preview
+                        </Typography>
+                        {renderPreview()}
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
                 
                 {/* Timestamp Configuration */}
                 <Box sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
@@ -559,6 +651,12 @@ const AdvancedH5PEditor: React.FC<AdvancedH5PEditorProps> = ({
                   </Button>
                   
                   <Stack direction="row" spacing={2}>
+                    <Button 
+                      variant={showPreview ? 'contained' : 'outlined'}
+                      onClick={() => setShowPreview(!showPreview)}
+                    >
+                      {showPreview ? 'Hide' : 'Show'} Preview
+                    </Button>
                     <Button variant="outlined" onClick={handleClose}>
                       Cancel
                     </Button>

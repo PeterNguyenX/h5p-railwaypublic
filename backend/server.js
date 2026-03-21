@@ -16,9 +16,13 @@ const templateRoutes = require("./routes/templateRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const ltiRoutes = require("./routes/ltiRoutes");
 const projectsRoutes = require("./routes/projects");
+// CHANGE NOTE: Added AI enrichment and transcript routes for AI-powered H5P feature
+const transcriptRoutes = require("./routes/transcriptRoutes");
+const aiRoutes = require("./routes/aiRoutes");
 const h5pService = require("./services/h5pService");
 const thumbnailFallbackMiddleware = require("./middleware/thumbnailFallback");
 const sequelize = require('./config/database');
+const { getSupabaseConfig } = require('./config/supabase');
 
 dotenv.config();
 const app = express();
@@ -123,15 +127,20 @@ app.use('/api/uploads/**/*thumbnail.jpg', (req, res, next) => {
 
 // Basic health check endpoint (no database dependency)
 app.get('/api/health', (req, res) => {
+  const supabase = getSupabaseConfig();
+  const databaseUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     message: 'Server is running',
     environment: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3001,
-    hasDatabase: !!process.env.DATABASE_URL,
+    hasDatabase: !!databaseUrl,
     hasJWT: !!process.env.JWT_SECRET,
     hasSession: !!process.env.SESSION_SECRET,
+    hasSupabaseBrowserConfig: supabase.hasBrowserConfig,
+    hasSupabaseAdminConfig: supabase.hasAdminConfig,
     version: '1.0.1' // Added version to force refresh
   });
 });
@@ -432,6 +441,9 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/lti", ltiRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/admin", require('./routes/adminRoutes'));
+// CHANGE NOTE: AI enrichment routes for transcript parsing and AI analysis
+app.use("/api/transcript", transcriptRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Video streaming endpoint
 app.get("/video/:videoPath", (req, res) => {

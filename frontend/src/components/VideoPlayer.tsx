@@ -10,11 +10,9 @@ import {
   DialogActions, 
   Button,
   Fade,
-  Grow,
-  Alert,
-  Snackbar
+  Grow
 } from '@mui/material';
-import { QuestionMark, TouchApp, CheckCircle, Cancel, Replay } from '@mui/icons-material';
+import { TouchApp, CheckCircle, Cancel, Replay } from '@mui/icons-material';
 import api from '../config/api';
 import Hls from 'hls.js';
 
@@ -77,9 +75,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onContentAnswered
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [, setIsPlaying] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
-  const [duration, setDuration] = React.useState(0);
   const [videoData, setVideoData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +89,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [showIncorrectFeedback, setShowIncorrectFeedback] = useState(false);
   const [currentContentForRetry, setCurrentContentForRetry] = useState<any>(null);
-  const [lastAnswerTime, setLastAnswerTime] = useState<number>(0);
 
   useEffect(() => {
     const fetchVideoData = async () => {
@@ -119,10 +115,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     if (videoRef.current) {
       const video = videoRef.current;
-      
-      const handleLoadedMetadata = () => {
-        setDuration(video.duration || 0);
-      };
       
       const handleTimeUpdate = () => {
         setCurrentTime(video.currentTime);
@@ -156,13 +148,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setIsPlaying(false);
       };
       
-      video.addEventListener('loadedmetadata', handleLoadedMetadata);
       video.addEventListener('timeupdate', handleTimeUpdate);
       video.addEventListener('play', handlePlay);
       video.addEventListener('pause', handlePause);
       
       return () => {
-        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('timeupdate', handleTimeUpdate);
         video.removeEventListener('play', handlePlay);
         video.removeEventListener('pause', handlePause);
@@ -182,7 +172,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hlsUrl = `/api/${videoData.hlsPath}`;
       }
       
-      console.log('Setting up HLS for:', videoData.title);
       console.log('HLS URL:', hlsUrl);
       console.log('Hls.isSupported():', Hls.isSupported());
       console.log('Browser canPlayType HLS:', videoRef.current.canPlayType('application/vnd.apple.mpegurl'));
@@ -199,7 +188,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('✅ HLS manifest parsed successfully');
-          setDuration(videoRef.current?.duration || 0);
         });
         
         hls.on(Hls.Events.MANIFEST_LOADING, () => {
@@ -263,23 +251,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [videoData?.hlsPath]);
 
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
   const handleH5PInteractionClick = (content: any) => {
     setSelectedH5PContent(content);
     setH5pDialogOpen(true);
@@ -339,7 +310,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleCorrectAnswer = (contentId: string) => {
     // Show success animation
     setShowSuccessAnimation(true);
-    setLastAnswerTime(currentTime);
     
     // Mark content as answered
     setAnsweredContent(prev => {
@@ -370,7 +340,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleIncorrectAnswer = (content: any) => {
     setShowIncorrectFeedback(true);
     setCurrentContentForRetry(content);
-    setLastAnswerTime(currentTime);
   };
 
   const handleTryAgain = () => {
@@ -606,7 +575,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Handle YouTube videos
   if (videoData.youtubeUrl) {
-    const youtubeId = videoData.youtubeId || videoData.youtubeUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i)?.[1];
+    const youtubeId = videoData.youtubeId || videoData.youtubeUrl.match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i)?.[1];
     
     if (!youtubeId) {
       return (

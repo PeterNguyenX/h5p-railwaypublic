@@ -17,6 +17,8 @@ import HLSTest from './pages/HLSTest';
 import FinalTest from './pages/FinalTest';
 import AdminDashboard from './pages/AdminDashboard';
 import NotFound from './pages/NotFound';
+// CHANGE NOTE: Added AI Enrichment page for AI-powered H5P feature
+import AiEnrichment from './pages/AiEnrichment';
 import PrivateRoute from './components/PrivateRoute';
 
 const theme = createTheme({
@@ -71,6 +73,15 @@ const App: React.FC = () => {
                 element={
                   <PrivateRoute>
                     <VideoPlayer />
+                  </PrivateRoute>
+                }
+              />
+              {/* CHANGE NOTE: AI enrichment route for AI-powered H5P feature */}
+              <Route
+                path="/videos/:id/ai-enrich"
+                element={
+                  <PrivateRoute>
+                    <AiEnrichment />
                   </PrivateRoute>
                 }
               />

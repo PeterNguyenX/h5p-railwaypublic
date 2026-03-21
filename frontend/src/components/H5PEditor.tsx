@@ -43,7 +43,7 @@ const H5PEditor: React.FC<H5PEditorProps> = ({ videoId, onSave, onCancel }) => {
             hubScript.onload = () => {
               // Initialize H5P Editor after all scripts load
               if (window.H5PEditor && editorRef.current) {
-                const editor = new window.H5PEditor.Editor(
+                new window.H5PEditor.Editor(
                   // ...other config,
                   {
                     hubIsEnabled: true,
@@ -56,7 +56,7 @@ const H5PEditor: React.FC<H5PEditorProps> = ({ videoId, onSave, onCancel }) => {
           };
         } else if (editorRef.current) {
           // Already loaded, initialize editor with hub enabled
-          const editor = new window.H5PEditor.Editor(
+          new window.H5PEditor.Editor(
             // ...other config,
             {
               hubIsEnabled: true,

@@ -1,1 +1,7 @@
 h5p-hub-client/
+
+# Local secret env files
+.env
+.env.*
+backend/.env
+frontend/.env

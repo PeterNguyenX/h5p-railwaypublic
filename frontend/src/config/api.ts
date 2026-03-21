@@ -1,7 +1,7 @@
 import axios from 'axios';
+import { runtimeConfig } from './runtime';
 
-// API base URL - use environment variable if available, otherwise default to localhost
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL = runtimeConfig.apiUrl;
 
 // Create axios instance with default config
 const api = axios.create({

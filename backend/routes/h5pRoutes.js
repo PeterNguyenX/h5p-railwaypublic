@@ -302,4 +302,98 @@ router.post("/video/:videoId/export", auth, async (req, res) => {
   }
 });
 
+// Multer setup for .h5p file uploads
+const multer = require('multer');
+const h5pStorage = multer.memoryStorage();
+const h5pUpload = multer({ 
+  storage: h5pStorage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for .h5p files
+});
+
+// Upload and import .h5p file
+router.post("/upload", auth, h5pUpload.single('h5pFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    if (!req.file.originalname.endsWith('.h5p')) {
+      return res.status(400).json({ error: 'File must be a .h5p file' });
+    }
+
+    try {
+      // Extract .h5p file (it's a ZIP)
+      const zip = new AdmZip(req.file.buffer);
+      
+      // Read h5p.json to get content data
+      const h5pJsonEntry = zip.getEntry('h5p.json');
+      if (!h5pJsonEntry) {
+        return res.status(400).json({ error: 'Invalid .h5p file: missing h5p.json' });
+      }
+
+      const h5pJson = JSON.parse(zip.readAsText(h5pJsonEntry));
+      const contentId = h5pJson.contentId || null;
+      
+      // Read content.json
+      const contentJsonEntry = zip.getEntry('content/content.json');
+      if (!contentJsonEntry) {
+        return res.status(400).json({ error: 'Invalid .h5p file: missing content/content.json' });
+      }
+
+      const contentJson = JSON.parse(zip.readAsText(contentJsonEntry));
+      
+      // Get the library information
+      const library = h5pJson.library || {};
+      const libraryString = `${library.name} ${library.majorVersion}.${library.minorVersion}`;
+      
+      // Create H5P content object
+      const { v4: uuidv4 } = require('uuid');
+      const h5pContent = {
+        id: contentId || uuidv4(),
+        title: h5pJson.title || 'Imported H5P Content',
+        library: libraryString,
+        params: contentJson,
+        metadata: h5pJson.metadata || {},
+        timestamp: req.body.timestamp ? parseInt(req.body.timestamp) : 0
+      };
+
+      // If videoId is provided, add to video
+      if (req.body.videoId) {
+        const video = await Video.findOne({
+          where: {
+            id: req.body.videoId,
+            userId: req.user.id
+          }
+        });
+
+        if (!video) {
+          return res.status(404).json({ error: 'Video not found' });
+        }
+
+        // Add to video's h5pContent
+        const h5pContentArray = video.h5pContent || [];
+        h5pContentArray.push({
+          id: h5pContent.id,
+          title: h5pContent.title,
+          timestamp: h5pContent.timestamp,
+          type: libraryString
+        });
+
+        await video.update({ h5pContent: h5pContentArray });
+      }
+
+      res.json({
+        message: 'H5P file imported successfully',
+        content: h5pContent
+      });
+    } catch (parseError) {
+      console.error('Error parsing .h5p file:', parseError);
+      res.status(400).json({ error: 'Error parsing .h5p file: ' + parseError.message });
+    }
+  } catch (error) {
+    console.error('Error uploading H5P file:', error);
+    res.status(500).json({ error: 'Error uploading H5P file: ' + error.message });
+  }
+});
+
 module.exports = router;

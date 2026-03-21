@@ -236,4 +236,6 @@ class VideoStore {
   }
 }
 
-export default new VideoStore(); 
+const videoStore = new VideoStore();
+
+export default videoStore;

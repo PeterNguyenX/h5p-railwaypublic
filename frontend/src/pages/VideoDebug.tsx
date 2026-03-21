@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Typography, Button, Paper, Alert } from '@mui/material';
 import api from '../config/api';
 
@@ -23,14 +23,7 @@ const VideoDebug: React.FC = () => {
     console.log('Auto-authenticated for testing');
   }, []);
 
-  // Test video data fetching
-  useEffect(() => {
-    if (authStatus === 'authenticated') {
-      fetchVideoData();
-    }
-  }, [authStatus]);
-
-  const fetchVideoData = async () => {
+  const fetchVideoData = useCallback(async () => {
     try {
       console.log('Fetching video data...');
       
@@ -50,7 +43,14 @@ const VideoDebug: React.FC = () => {
     } catch (error) {
       console.error('Error fetching video data:', error);
     }
-  };
+  }, []);
+
+  // Test video data fetching
+  useEffect(() => {
+    if (authStatus === 'authenticated') {
+      fetchVideoData();
+    }
+  }, [authStatus, fetchVideoData]);
 
   const testUrls = async (video1: any, video2: any) => {
     const tests: any = {};

@@ -44,3 +44,38 @@ You don’t have to ever use `eject`. The curated feature set is suitable for sm
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
+
+## AI H5P Feature
+
+This project includes an AI-powered enrichment editor that reads subtitle transcripts (`.vtt` or `.srt`) and proposes timestamped H5P interactions.
+
+### Setup
+
+1. Install dependencies in all project scopes:
+
+```bash
+npm install
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+2. Add required environment variables in `backend/.env`:
+
+```env
+ANTHROPIC_API_KEY=your_anthropic_api_key
+```
+
+3. Start the full stack from the repository root:
+
+```bash
+npm run dev
+```
+
+### Usage
+
+1. Open a video edit page and navigate to the AI enrichment screen (`/videos/:id/ai-enrich`).
+2. Upload a transcript file (`.vtt` or `.srt`).
+3. Click **Run AI Analysis** to stream suggestions in real time.
+4. Review suggestions in the right panel, then accept/reject/edit each one.
+5. Click **Apply Changes** to inject accepted interactions into the video.
+6. Re-run analysis after transcript edits to see a diff (`new`, `modified`, `unchanged`, `removed`).
