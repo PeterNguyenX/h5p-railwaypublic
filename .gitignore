@@ -1,4 +1,10 @@
 h5p-hub-client/
+node_modules/
+frontend/build/
+backend/build/
+dist/
+.DS_Store
+*.log
 
 # Local secret env files
 .env
