@@ -1,10 +1,12 @@
 require('dotenv').config();
-console.log('🚀 Starting H5P Interactive Video Platform...');
+console.log('🚀 Starting AI-ActivEdu...');
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Port:', process.env.PORT || 3001);
 
 const express = require("express");
 const cors = require("cors");
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const dotenv = require("dotenv");
 const path = require("path");
 const fs = require("fs");
@@ -21,36 +23,123 @@ const transcriptRoutes = require("./routes/transcriptRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const h5pService = require("./services/h5pService");
 const thumbnailFallbackMiddleware = require("./middleware/thumbnailFallback");
+const requestLogger = require('./middleware/requestLogger');
+const { notFound, errorHandler } = require('./middleware/errorHandler');
 const sequelize = require('./config/database');
 const { getSupabaseConfig } = require('./config/supabase');
 
 dotenv.config();
 const app = express();
 
-const allowedOrigins = [
+// REQ-3: Strict CORS allowlist
+// NOTE: LOCALHOST_ONLY_MODE is enabled by default for local testing.
+// Set LOCALHOST_ONLY_MODE=false only when you intentionally need non-local origins.
+const localhostOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'http://localhost:8888',
-  'http://103.88.123.117',
-  'https://h5p-hoclieutuongtac-production.up.railway.app',
-  'https://hoclieutuongtac2.com',
-  /\.railway\.app$/,  // Allow all Railway.app subdomains
-  /\.up\.railway\.app$/  // Allow Railway preview deployments
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:5173',
 ];
+const configuredProductionDomain = process.env.OFFICIAL_PRODUCTION_DOMAIN || process.env.FRONTEND_URL || 'https://hoclieutuongtac2.com';
+const normalizedProductionOrigin = (() => {
+  try {
+    return new URL(configuredProductionDomain).origin;
+  } catch {
+    return configuredProductionDomain;
+  }
+})();
+const localhostOnlyMode = process.env.LOCALHOST_ONLY_MODE !== 'false';
+const allowedOrigins = localhostOnlyMode
+  ? new Set(localhostOrigins)
+  : new Set([...localhostOrigins, normalizedProductionOrigin]);
+
+const localhostOriginRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+console.log(
+  localhostOnlyMode
+    ? 'LOCALHOST_ONLY_MODE enabled: allowing localhost origins only'
+    : `LOCALHOST_ONLY_MODE disabled: allowing localhost + ${normalizedProductionOrigin}`
+);
+
+let Sentry = null;
+try {
+  Sentry = require('@sentry/node');
+  if (process.env.SENTRY_DSN) {
+    Sentry.init({ dsn: process.env.SENTRY_DSN });
+  }
+} catch {
+  // Sentry is optional
+}
 
 // Enable CORS for development and production
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests without Origin (server-to-server, health checks)
+    if (!origin) {
       callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return;
     }
+
+    if (allowedOrigins.has(origin) || localhostOriginRegex.test(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    // Do not throw an app-level error for CORS rejections.
+    // Returning false lets CORS middleware deny silently without generating 500 responses.
+    callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+if (Sentry?.Handlers?.requestHandler && process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.requestHandler());
+}
+
+app.use(requestLogger);
+
+// REQ-4: Global API rate limit
+// In development, use more lenient limits for better testing experience
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDevelopment ? 1000 : 100, // More lenient in development
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip health checks and routes with their own rate limiters
+    if (req.path === '/health' || req.path === '/api/health') return true;
+    if (req.path.startsWith('/api/transcript')) return true;
+    if (req.path.startsWith('/api/ai')) return true;
+    return false;
+  },
+  message: {
+    error: 'Too many requests. Please slow down and try again shortly.',
+    code: 'RATE_LIMITED',
+  },
+});
+
+// Additional lenient limiter for transcript and AI routes (more requests needed during processing)
+const transcriptRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDevelopment ? 500 : 200, // Even more lenient for transcripts
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.path === '/api/health',
+});
+
+app.use('/api', apiRateLimiter);
+app.use('/api/transcript', transcriptRateLimiter);
+app.use('/api/ai', transcriptRateLimiter);
 
 app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ limit: '200mb', extended: true }));
@@ -145,7 +234,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Simple root health check for Railway
+// Simple root health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'H5P Platform is running' });
 });
@@ -156,7 +245,7 @@ app.get('/health', (req, res) => {
 // Public information endpoint (no authentication required)
 app.get('/api/public/info', (req, res) => {
   res.json({
-    name: 'H5P Interactive Video Platform',
+    name: 'AI-ActivEdu',
     description: 'Create, edit, and share interactive H5P content',
     version: '1.0.0',
     public_access: true
@@ -167,6 +256,12 @@ app.get('/api/public/info', (req, res) => {
 app.get("/api/test", (req, res) => {
   res.json({ message: "Test route working", timestamp: new Date().toISOString() });
 });
+
+const enableUnsafeMaintenanceEndpoints =
+  process.env.ENABLE_UNSAFE_MAINTENANCE_ENDPOINTS === 'true' &&
+  process.env.NODE_ENV !== 'production';
+
+if (enableUnsafeMaintenanceEndpoints) {
 
 // Temporary video patch endpoint (direct in server.js)
 app.post("/api/temp-fix-videos", async (req, res) => {
@@ -364,7 +459,7 @@ app.get('/api/public-fix-videos/:secret', async (req, res) => {
     const { secret } = req.params;
     
     // Simple security check
-    if (secret !== 'fix-videos-2025-railway') {
+    if (secret !== process.env.VIDEO_FIX_SECRET || !secret) {
       return res.status(403).json({ error: 'Invalid access code' });
     }
     
@@ -432,6 +527,8 @@ app.get('/api/public-fix-videos/:secret', async (req, res) => {
   }
 });
 
+}
+
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
@@ -444,6 +541,9 @@ app.use("/api/admin", require('./routes/adminRoutes'));
 // CHANGE NOTE: AI enrichment routes for transcript parsing and AI analysis
 app.use("/api/transcript", transcriptRoutes);
 app.use("/api/ai", aiRoutes);
+
+// API-only 404 routing handled by centralized error middleware
+app.use('/api/*', notFound);
 
 // Video streaming endpoint
 app.get("/video/:videoPath", (req, res) => {
@@ -531,7 +631,7 @@ if (fs.existsSync(frontendBuildPath)) {
       }
       
       res.json({
-        message: 'H5P Interactive Video Platform',
+        message: 'AI-ActivEdu',
         status: 'API Only - Frontend not found',
         info: 'Frontend build files are missing. Only API endpoints are available.',
         api_docs: '/api/health',
@@ -550,14 +650,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Add global error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ 
-    error: 'Server error', 
-    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message 
-  });
-});
+if (Sentry?.Handlers?.errorHandler && process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
+// Centralized tiered error responses and structured logging
+app.use(errorHandler);
 
 // Test database connection before starting server
 async function testDatabaseConnection() {
@@ -566,7 +664,7 @@ async function testDatabaseConnection() {
     if (sequelize._isInvalid) {
       console.log('⚠️ No valid database configuration found');
       console.log('💡 App will start but database features will be disabled');
-      console.log('💡 Add PostgreSQL database in Railway Dashboard to enable full functionality');
+      console.log('💡 Add PostgreSQL DATABASE_URL env var to enable full functionality');
       return false;
     }
     
@@ -586,10 +684,13 @@ async function testDatabaseConnection() {
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error.message);
     console.log('💡 This is likely because DATABASE_URL is not set');
-    console.log('💡 Add PostgreSQL database in Railway Dashboard');
+    console.log('💡 Add PostgreSQL DATABASE_URL env var');
     return false;
   }
 }
+
+// ─── Real-time Collaboration via Socket.io ────────────────────────────────────
+const { Server: SocketIOServer } = require('socket.io');
 
 // Start the server after testing database connection
 const PORT = process.env.PORT || 3001;
@@ -608,7 +709,7 @@ testDatabaseConnection().then(dbConnected => {
     console.log(`🗄️ Database connection: ${dbConnected ? 'SUCCESS' : 'FAILED'}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
     console.log(`🔗 Projects health: http://localhost:${PORT}/api/projects/health`);
-    
+
     if (!dbConnected && process.env.NODE_ENV === 'production') {
       console.warn('⚠️ WARNING: Server started with database connection issues!');
       console.warn('API endpoints requiring database access may fail.');
@@ -617,6 +718,72 @@ testDatabaseConnection().then(dbConnected => {
     console.error('❌ Failed to start server:', err);
     process.exit(1);
   });
+
+  // ─── Socket.io real-time collaboration ─────────────────────────────────────
+  const io = new SocketIOServer(server, {
+    cors: {
+      origin: (origin, cb) => {
+        if (!origin || allowedOrigins.has(origin) || localhostOriginRegex.test(origin)) {
+          cb(null, true);
+        } else {
+          cb(null, false);
+        }
+      },
+      credentials: true,
+    },
+  });
+
+  // Map: videoId → Set of { socketId, username }
+  const videoRooms = new Map();
+
+  io.on('connection', (socket) => {
+    let currentRoom = null;
+    let currentUser = null;
+
+    socket.on('join-video', ({ videoId, username }) => {
+      if (!videoId) return;
+      currentRoom = `video:${videoId}`;
+      currentUser = username || 'Anonymous';
+
+      socket.join(currentRoom);
+
+      if (!videoRooms.has(currentRoom)) videoRooms.set(currentRoom, new Map());
+      videoRooms.get(currentRoom).set(socket.id, currentUser);
+
+      const collaborators = Array.from(videoRooms.get(currentRoom).values());
+      io.to(currentRoom).emit('collaborators-updated', { collaborators });
+      console.log(`👥 ${currentUser} joined room ${currentRoom} (${collaborators.length} total)`);
+    });
+
+    // Broadcast suggestion status changes to all collaborators
+    socket.on('suggestion-status', ({ videoId, suggestionId, status }) => {
+      socket.to(`video:${videoId}`).emit('suggestion-status', { suggestionId, status, by: currentUser });
+    });
+
+    // Broadcast new manual H5P additions
+    socket.on('h5p-added', ({ videoId, content }) => {
+      socket.to(`video:${videoId}`).emit('h5p-added', { content, by: currentUser });
+    });
+
+    // Broadcast H5P removals
+    socket.on('h5p-removed', ({ videoId, contentId }) => {
+      socket.to(`video:${videoId}`).emit('h5p-removed', { contentId, by: currentUser });
+    });
+
+    socket.on('disconnect', () => {
+      if (currentRoom && videoRooms.has(currentRoom)) {
+        videoRooms.get(currentRoom).delete(socket.id);
+        if (videoRooms.get(currentRoom).size === 0) {
+          videoRooms.delete(currentRoom);
+        } else {
+          const collaborators = Array.from(videoRooms.get(currentRoom).values());
+          io.to(currentRoom).emit('collaborators-updated', { collaborators });
+        }
+      }
+    });
+  });
+
+  console.log('🔌 Socket.io real-time collaboration enabled');
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
