@@ -108,4 +108,218 @@ router.post('/inject', auth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/ai/transcribe-and-generate
+ * Transform a teaching video into interactive H5P content with AI-generated questions
+ * 
+ * Request: {
+ *   videoId: string (UUID),
+ *   educationLevel?: 'high-school' | 'undergraduate' | 'professional',
+ *   learningObjectives?: string[],
+ *   questionDensity?: 'sparse' | 'moderate' | 'dense',
+ *   questionTypes?: ('multipleChoice' | 'truefalse' | 'fillblank')[]
+ * }
+ * 
+ * Response: {
+ *   videoId,
+ *   transcript: { fullText, segments, wordCount },
+ *   suggestions: [ { type, timestamp, question, answers, explanation, bloomsLevel, ... } ],
+ *   metadata: { videoDuration, generationTime, ... }
+ * }
+ */
+router.post('/transcribe-and-generate', auth, async (req, res) => {
+  try {
+    const { videoId, educationLevel = 'high-school', learningObjectives = [], questionDensity = 'moderate', questionTypes = ['multipleChoice', 'truefalse', 'fillblank'] } = req.body;
+
+    if (!videoId) {
+      return res.status(400).json({ error: 'videoId is required' });
+    }
+
+    if (!ANTHROPIC_API_KEY) {
+      return res.status(500).json({ 
+        error: 'ANTHROPIC_API_KEY is not configured',
+        code: 'MISSING_CONFIG'
+      });
+    }
+
+    const { Video } = require('../models');
+    const { fetchYoutubeTranscriptSegments } = require('../services/transcriptExtraction');
+
+    // Fetch video
+    const video = await Video.findByPk(videoId);
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found', code: 'VIDEO_NOT_FOUND' });
+    }
+
+    // Check authorization
+    if (video.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized access to this video' });
+    }
+
+    const startTime = Date.now();
+
+    // Step 1: Get transcript
+    let transcript;
+    let transcriptSource = 'unknown';
+
+    // Try existing captions first
+    if (video.captions) {
+      transcript = video.captions;
+      transcriptSource = 'existing';
+    } else if (video.youtubeUrl) {
+      // Extract from YouTube
+      const result = await fetchYoutubeTranscriptSegments(video.youtubeUrl);
+      if (result.segments && result.segments.length > 0) {
+        transcript = result.segments;
+        transcriptSource = 'youtube';
+      }
+    }
+
+    if (!transcript) {
+      return res.status(400).json({
+        error: 'No transcript available for this video',
+        code: 'NO_TRANSCRIPT',
+        message: 'Upload a transcript file or use a YouTube video with captions enabled'
+      });
+    }
+
+    // Step 2: Generate questions with Claude
+    const suggestions = await generateQuestionsWithClaude(
+      transcript,
+      video.title,
+      educationLevel,
+      learningObjectives,
+      questionDensity,
+      questionTypes
+    );
+
+    const generationTime = Date.now() - startTime;
+
+    // Return response
+    res.json({
+      success: true,
+      videoId,
+      transcript: {
+        fullText: typeof transcript === 'string' ? transcript : transcript.map(s => s.text || '').join(' ') || '',
+        segments: Array.isArray(transcript) ? transcript : [],
+        wordCount: (typeof transcript === 'string' ? transcript : transcript.map(s => s.text || '').join(' ')).split(/\s+/).length
+      },
+      suggestions: suggestions.slice(0, 20),
+      metadata: {
+        videoDuration: video.duration,
+        videoTitle: video.title,
+        educationLevel,
+        questionDensity,
+        questionCount: suggestions.length,
+        generationTime,
+        transcriptSource,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in transcribe-and-generate:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to generate interactive content',
+      code: 'GENERATION_ERROR'
+    });
+  }
+});
+
+/**
+ * Generate questions using Claude API
+ * @private
+ */
+async function generateQuestionsWithClaude(transcript, videoTitle, educationLevel, objectives, density, types) {
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY
+    });
+
+    const densityMap = { sparse: 1, moderate: 2, dense: 3 };
+    const targetCount = Math.ceil((Array.isArray(transcript) ? transcript.length : 1) * densityMap[density]);
+
+    // Build transcript text
+    let transcriptText = '';
+    if (Array.isArray(transcript)) {
+      transcriptText = transcript.map(s => `[${s.start || 0}s] ${s.text || ''}`).join('\n');
+    } else {
+      transcriptText = transcript;
+    }
+
+    const prompt = `You are an expert educator and instructional designer. Analyze this educational video transcript and generate interactive learning questions.
+
+Video: ${videoTitle}
+Education Level: ${educationLevel}
+Question Density: ${density} (target ~${Math.min(targetCount, 15)} questions)
+Question Types: ${types.join(', ')}
+${objectives.length > 0 ? `Learning Objectives: ${objectives.join(', ')}` : ''}
+
+Transcript:
+${transcriptText}
+
+Generate ${Math.min(targetCount, 15)} educational questions that:
+- Test understanding of key concepts
+- Include exact timestamp (in seconds) for when to ask
+- Vary difficulty across Bloom's taxonomy levels
+- Have clear, defensible correct answers
+- Include comprehensive explanations
+- Are appropriate for ${educationLevel} level
+
+Return ONLY a valid JSON array with this exact structure (no markdown, no code blocks):
+[
+  {
+    "type": "multipleChoice",
+    "timestamp": 45,
+    "question": "What is the primary mechanism of...?",
+    "answers": ["Option A", "Option B", "Option C", "Option D"],
+    "correctIndex": 0,
+    "explanation": "Correct because... Wrong answers because...",
+    "bloomsLevel": "understand",
+    "concept": "key concept name",
+    "difficulty": 0.5
+  }
+]`;
+
+    const message = await client.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 4096,
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    });
+
+    // Extract and parse JSON
+    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    
+    // Try to find JSON array
+    const jsonMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/);
+    if (!jsonMatch) {
+      throw new Error('Invalid Claude response format');
+    }
+
+    const questions = JSON.parse(jsonMatch[0]);
+    
+    // Validate and add IDs
+    return questions.map((q, idx) => ({
+      id: `q-${Date.now()}-${idx}`,
+      type: q.type || 'multipleChoice',
+      timestamp: q.timestamp || 0,
+      question: q.question || '',
+      answers: q.answers || [],
+      correctIndex: q.correctIndex !== undefined ? q.correctIndex : 0,
+      explanation: q.explanation || '',
+      bloomsLevel: q.bloomsLevel || 'understand',
+      concept: q.concept || 'General knowledge',
+      difficulty: q.difficulty || 0.5,
+      accepted: false
+    }));
+
+  } catch (error) {
+    console.error('Claude generation error:', error);
+    throw new Error(`Question generation failed: ${error.message}`);
+  }
+}
+
 module.exports = router;
