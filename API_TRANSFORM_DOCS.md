@@ -1,7 +1,23 @@
 # AI Video Transformation API Documentation
 
 ## Overview
-Transform teaching videos into interactive H5P content with AI-generated questions using OpenAI Whisper for transcription and Claude for question generation.
+Transform teaching videos into interactive H5P content with AI-generated questions using Claude for intelligent question generation based on video transcripts.
+
+## Prerequisites
+
+This endpoint requires proper configuration to function:
+
+**Required Environment Variables:**
+```bash
+ANTHROPIC_API_KEY=sk-ant-...  # Get from https://console.anthropic.com
+```
+
+**Optional Environment Variables:**
+```bash
+OPENAI_API_KEY=sk-...         # Future: For Whisper transcription
+```
+
+If `ANTHROPIC_API_KEY` is not configured, the endpoint returns HTTP 503 with helpful guidance.
 
 ## Endpoint: `POST /api/ai/transcribe-and-generate`
 
@@ -235,6 +251,65 @@ async function transformVideoToInteractive(videoId: string) {
   saveTranscript(data.transcript);
 }
 ```
+
+---
+
+## Setup & Configuration Guide
+
+### 1. Get Anthropic API Key
+
+1. Go to https://console.anthropic.com
+2. Create an account or sign in
+3. Navigate to API Keys section
+4. Create a new API key
+5. Copy the key (format: `sk-ant-...`)
+
+### 2. Configure Environment Variable
+
+**Development (local):**
+```bash
+# Add to .env file in project root
+ANTHROPIC_API_KEY=sk-ant-xyz123abc...
+
+# Or set directly:
+export ANTHROPIC_API_KEY=sk-ant-xyz123abc...
+npm run dev
+```
+
+**Production (Docker/Railway):**
+```bash
+# Set as environment variable in deployment platform
+# Example for Railway:
+railway env add ANTHROPIC_API_KEY sk-ant-xyz123abc...
+```
+
+### 3. Verify Configuration
+
+```bash
+# Test that API key is recognized:
+curl http://localhost:5001/api/health
+# Should show server running
+
+# Test endpoint without video (no transcript):
+curl -X POST http://localhost:5001/api/ai/transcribe-and-generate \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"videoId":"test"}'
+# Should fail with MISSING_CONFIG if key not set,
+# or VIDEO_NOT_FOUND if key is set
+```
+
+### 4. Cost Estimation
+
+- **Per video**: ~$0.003 - $0.01 depending on transcript length
+- **Model**: Claude 3.5 Sonnet (fastest & cheapest for this task)
+- **Token usage**: ~3000-5000 tokens per request
+- **Pricing**: $3 per 1M input tokens, $15 per 1M output tokens
+
+For a typical 10-minute video with 2000-word transcript:
+- **Input tokens**: ~3500 (transcript + prompt)
+- **Output tokens**: ~1500 (questions)
+- **Cost**: ~$0.008 per video
 
 ---
 

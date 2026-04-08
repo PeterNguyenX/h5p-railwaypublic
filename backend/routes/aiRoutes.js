@@ -136,9 +136,12 @@ router.post('/transcribe-and-generate', auth, async (req, res) => {
     }
 
     if (!ANTHROPIC_API_KEY) {
-      return res.status(500).json({ 
-        error: 'ANTHROPIC_API_KEY is not configured',
-        code: 'MISSING_CONFIG'
+      return res.status(503).json({ 
+        error: 'AI question generation is not available',
+        code: 'MISSING_CONFIG',
+        message: 'ANTHROPIC_API_KEY environment variable is not configured on the server',
+        suggestion: 'Set ANTHROPIC_API_KEY in your .env file or server environment variables',
+        documentationUrl: '/docs/api/transform#configuration'
       });
     }
 
