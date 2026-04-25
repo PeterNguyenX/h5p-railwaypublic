@@ -17,29 +17,8 @@ router.get('/health', (req, res) => {
 // Public route for viewing published projects (no auth required)
 router.get('/public', async (req, res) => {
   try {
-    console.log('GET /api/projects/public - Returning public projects');
-    // For now, return mock data for public projects
-    res.json([{
-      id: 1,
-      title: 'Public Demo Project',
-      thumbnail_url: '/default-thumbnail.svg',
-      description: 'This is a publicly accessible project',
-      created_at: new Date().toISOString(),
-      isPublic: true
-    },
-    {
-      id: 2,
-      title: 'H5P Tutorial',
-      thumbnail_url: '/default-thumbnail.svg',
-      description: 'Learn how to create H5P content',
-      created_at: new Date().toISOString(),
-      isPublic: true
-    }]);
-    
-    /* To be implemented later with database:
     const publicProjects = await Project.findAll({ where: { isPublic: true } });
     res.json(publicProjects || []);
-    */
   } catch (error) {
     console.error('Error fetching public projects:', error);
     res.status(500).json({ error: 'Failed to fetch public projects', details: error.message });
@@ -49,19 +28,8 @@ router.get('/public', async (req, res) => {
 // GET all projects for user
 router.get('/', auth, async (req, res) => {
   try {
-    // For initial testing, return a simple empty array with example project
-    console.log('GET /api/projects - Returning mock data');
-    res.json([{
-      id: 1,
-      title: 'Example Project',
-      thumbnail_url: '/default-thumbnail.svg',
-      created_at: new Date().toISOString()
-    }]);
-    
-    /* Commented out for initial testing
     const projects = await Project.findAll({ where: { user_id: req.user.id } });
     res.json(projects || []);
-    */
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects', details: error.message });

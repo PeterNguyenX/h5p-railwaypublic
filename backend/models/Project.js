@@ -20,6 +20,10 @@ const Project = sequelize.define('Project', {
   thumbnail_url: {
     type: DataTypes.STRING,
   },
+  isPublic: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

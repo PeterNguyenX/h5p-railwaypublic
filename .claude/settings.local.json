@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \":*)",
+      "Bash(grep -E \"README|\\\\.md$|package.json\")",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(python3 -c ':*)",
+      "Bash(pip3 install:*)",
+      "Bash(brew list:*)",
+      "Read(//Library/TeX/**)",
+      "Bash(node -e ':*)",
+      "Bash(python3 /Users/peternguyen/Downloads/itp-h5p/backend/scripts/whisper_transcribe.py)",
+      "Bash(ollama --version)",
+      "Bash(brew install:*)",
+      "Bash(brew services:*)",
+      "Bash(ollama pull:*)",
+      "Bash(echo \"pulling in background, PID=$!\")",
+      "Bash(ollama list:*)",
+      "Bash(ollama ps:*)"
+    ]
+  }
+}

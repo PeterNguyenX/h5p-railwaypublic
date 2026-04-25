@@ -74,6 +74,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   h5pContents = [],
   onContentAnswered
 }) => {
+  const extractYouTubeVideoId = (rawUrl: string): string | null => {
+    if (!rawUrl) return null;
+
+    const trimmed = rawUrl.trim();
+    const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+    try {
+      const parsed = new URL(candidate);
+      const host = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+
+      if (host === 'youtu.be') {
+        const id = parsed.pathname.split('/').filter(Boolean)[0];
+        return id && id.length === 11 ? id : null;
+      }
+
+      if (!host.endsWith('youtube.com') && !host.endsWith('youtube-nocookie.com')) {
+        return null;
+      }
+
+      const fromQuery = parsed.searchParams.get('v');
+      if (fromQuery && fromQuery.length === 11) {
+        return fromQuery;
+      }
+
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      const markerIndex = parts.findIndex((part) => ['embed', 'v', 'shorts', 'live'].includes(part));
+      if (markerIndex >= 0 && parts[markerIndex + 1] && parts[markerIndex + 1].length === 11) {
+        return parts[markerIndex + 1];
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const [, setIsPlaying] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
@@ -575,7 +611,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Handle YouTube videos
   if (videoData.youtubeUrl) {
-    const youtubeId = videoData.youtubeId || videoData.youtubeUrl.match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i)?.[1];
+    const youtubeId = videoData.youtubeId || extractYouTubeVideoId(videoData.youtubeUrl);
     
     if (!youtubeId) {
       return (

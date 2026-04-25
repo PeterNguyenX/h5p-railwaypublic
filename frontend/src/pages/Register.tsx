@@ -1,111 +1,155 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  TextField,
-  Button,
-  Paper,
-  Alert,
-  Stack,
-} from '@mui/material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { observer } from 'mobx-react-lite';
-import authStore from '../stores/authStore';
-import './Register.css';
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { User, Mail, Lock, UserPlus, AlertCircle, Video } from "lucide-react";
+import { useAuthStore } from "../lib/authStore";
 
-const Register: React.FC = observer(() => {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+export default function Register() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { register, isLoading, error, clearError } = useAuthStore();
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    clearError();
+    setLocalError(null);
 
-    if (password !== confirmPassword) {
-      setError(t('auth.passwordsDoNotMatch'));
+    if (username.trim().length < 3) {
+      setLocalError("Username must be at least 3 characters.");
       return;
     }
 
-    try {
-      await authStore.register(username, email, password);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+    if (!email.includes("@")) {
+      setLocalError("Please enter a valid email address.");
+      return;
     }
+
+    if (password.length < 6) {
+      setLocalError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setLocalError("Passwords do not match.");
+      return;
+    }
+
+    const ok = await register(username.trim(), email.trim(), password);
+    if (ok) navigate("/app/dashboard");
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 8, mb: 4 }}>
-        <Typography variant="h4" component="h1" align="center" gutterBottom>
-          {t('auth.register')}
-        </Typography>
-        <Paper sx={{ p: 4, mt: 3 }}>
-          <form onSubmit={handleSubmit}>
-            <Stack spacing={3}>
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              )}
-              <TextField
-                label={t('auth.username')}
-                value={username}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
-                fullWidth
-                required
-              />
-              <TextField
-                label={t('auth.email')}
-                type="email"
-                value={email}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                fullWidth
-                required
-              />
-              <TextField
-                label={t('auth.password')}
-                type="password"
-                value={password}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                fullWidth
-                required
-              />
-              <TextField
-                label={t('auth.confirmPassword')}
-                type="password"
-                value={confirmPassword}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
-                fullWidth
-                required
-              />
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                fullWidth
-              >
-                {t('auth.register')}
-              </Button>
-              <Typography variant="body2" align="center">
-                {t('auth.haveAccount')}{' '}
-                <RouterLink to="/login" className="inherit-color">
-                  {t('auth.login')}
-                </RouterLink>
-              </Typography>
-            </Stack>
-          </form>
-        </Paper>
-      </Box>
-    </Container>
-  );
-});
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-[560px] bg-white shadow-xl rounded-2xl border border-slate-200 p-8 sm:p-10">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="bg-sky-600 p-2.5 rounded-xl flex items-center justify-center">
+              <Video className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-slate-800 tracking-tight">ReactivEdu</span>
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h1>
+          <p className="text-slate-500 text-[15px]">Start building interactive lessons in minutes.</p>
+        </div>
 
-export default Register;
+        {(localError || error) && (
+          <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{localError || error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[14px] font-semibold text-slate-700 ml-1">Username</label>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+              </div>
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all text-[15px]"
+                placeholder="Choose a username"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[14px] font-semibold text-slate-700 ml-1">Email</label>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+              </div>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all text-[15px]"
+                placeholder="teacher@school.edu"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[14px] font-semibold text-slate-700 ml-1">Password</label>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all text-[15px]"
+                placeholder="At least 6 characters"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[14px] font-semibold text-slate-700 ml-1">Confirm Password</label>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+              </div>
+              <input
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 focus:bg-white transition-all text-[15px]"
+                placeholder="Re-enter password"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-[15px] font-bold text-white bg-orange-500 hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <UserPlus className="w-5 h-5" />
+              {isLoading ? "Creating account..." : "Create Account"}
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-6 text-center text-sm text-slate-600">
+          Already have an account?{" "}
+          <Link to="/login" className="font-semibold text-blue-700 hover:text-blue-900">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

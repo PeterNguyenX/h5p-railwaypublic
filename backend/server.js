@@ -37,10 +37,10 @@ const app = express();
 const localhostOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'http://localhost:5173',
+  'http://localhost:3002',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3002',
 ];
 const configuredProductionDomain = process.env.OFFICIAL_PRODUCTION_DOMAIN || process.env.FRONTEND_URL || 'https://hoclieutuongtac2.com';
 const normalizedProductionOrigin = (() => {
@@ -107,17 +107,18 @@ if (Sentry?.Handlers?.requestHandler && process.env.SENTRY_DSN) {
 app.use(requestLogger);
 
 // REQ-4: Global API rate limit
-// In development, use more lenient limits for better testing experience
+// In development, use very lenient limits for better testing experience
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isDevelopment ? 1000 : 100, // More lenient in development
+  max: isDevelopment ? 10000 : 100, // Very lenient in development
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
     // Skip health checks and routes with their own rate limiters
     if (req.path === '/health' || req.path === '/api/health') return true;
+    if (isDevelopment) return false; // Don't skip any API routes in dev
     if (req.path.startsWith('/api/transcript')) return true;
     if (req.path.startsWith('/api/ai')) return true;
     return false;
@@ -131,15 +132,17 @@ const apiRateLimiter = rateLimit({
 // Additional lenient limiter for transcript and AI routes (more requests needed during processing)
 const transcriptRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isDevelopment ? 500 : 200, // Even more lenient for transcripts
+  max: isDevelopment ? 5000 : 200, // Very lenient for transcripts in dev
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => req.path === '/health' || req.path === '/api/health',
 });
 
 app.use('/api', apiRateLimiter);
-app.use('/api/transcript', transcriptRateLimiter);
-app.use('/api/ai', transcriptRateLimiter);
+if (!isDevelopment) {
+  app.use('/api/transcript', transcriptRateLimiter);
+  app.use('/api/ai', transcriptRateLimiter);
+}
 
 app.use(express.json({ limit: '200mb' }));
 app.use(express.urlencoded({ limit: '200mb', extended: true }));
@@ -256,278 +259,6 @@ app.get('/api/public/info', (req, res) => {
 app.get("/api/test", (req, res) => {
   res.json({ message: "Test route working", timestamp: new Date().toISOString() });
 });
-
-const enableUnsafeMaintenanceEndpoints =
-  process.env.ENABLE_UNSAFE_MAINTENANCE_ENDPOINTS === 'true' &&
-  process.env.NODE_ENV !== 'production';
-
-if (enableUnsafeMaintenanceEndpoints) {
-
-// Temporary video patch endpoint (direct in server.js)
-app.post("/api/temp-fix-videos", async (req, res) => {
-  try {
-    const { secret } = req.body;
-    
-    if (secret !== 'fix-videos-now-2025') {
-      return res.status(403).json({ error: 'Invalid secret' });
-    }
-    
-    console.log('Starting video patch...');
-    
-    const { Video, User } = require('./models');
-    
-    // Get all videos with null userId
-    const videosWithoutUser = await Video.findAll({
-      where: {
-        userId: null
-      }
-    });
-    
-    console.log(`Found ${videosWithoutUser.length} videos without userId`);
-    
-    if (videosWithoutUser.length === 0) {
-      return res.json({ 
-        message: 'No videos to patch', 
-        fixed: 0,
-        total: 0
-      });
-    }
-    
-    // Get the admin user
-    const adminUser = await User.findOne({
-      where: {
-        role: 'admin'
-      },
-      order: [['createdAt', 'ASC']]
-    });
-    
-    if (!adminUser) {
-      return res.status(404).json({ error: 'No admin user found' });
-    }
-    
-    console.log(`Assigning videos to admin user: ${adminUser.username} (${adminUser.id})`);
-    
-    // Update all videos without userId to belong to admin
-    const [updatedCount] = await Video.update(
-      { userId: adminUser.id },
-      {
-        where: {
-          userId: null
-        }
-      }
-    );
-    
-    console.log(`Updated ${updatedCount} videos to belong to admin user`);
-    
-    res.json({
-      message: `Successfully patched ${updatedCount} videos`,
-      fixed: updatedCount,
-      total: videosWithoutUser.length,
-      assignedTo: {
-        id: adminUser.id,
-        username: adminUser.username
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error patching videos:', error);
-    res.status(500).json({ 
-      error: 'Error patching videos',
-      details: error.message 
-    });
-  }
-});
-
-// Temporary video patch endpoint via GET (no body parsing needed)
-app.get("/api/temp-fix-videos/:secret", async (req, res) => {
-  try {
-    const { secret } = req.params;
-    
-    if (secret !== 'fix-videos-now-2025') {
-      return res.status(403).json({ error: 'Invalid secret' });
-    }
-    
-    console.log('Starting video patch...');
-    
-    const { Video, User } = require('./models');
-    
-    // Get all videos with null userId
-    const videosWithoutUser = await Video.findAll({
-      where: {
-        userId: null
-      }
-    });
-    
-    console.log(`Found ${videosWithoutUser.length} videos without userId`);
-    
-    if (videosWithoutUser.length === 0) {
-      return res.json({ 
-        message: 'No videos to patch', 
-        fixed: 0,
-        total: 0
-      });
-    }
-    
-    // Get the admin user
-    const adminUser = await User.findOne({
-      where: {
-        role: 'admin'
-      },
-      order: [['createdAt', 'ASC']]
-    });
-    
-    if (!adminUser) {
-      return res.status(404).json({ error: 'No admin user found' });
-    }
-    
-    console.log(`Assigning videos to admin user: ${adminUser.username} (${adminUser.id})`);
-    
-    // Update all videos without userId to belong to admin
-    const [updatedCount] = await Video.update(
-      { userId: adminUser.id },
-      {
-        where: {
-          userId: null
-        }
-      }
-    );
-    
-    console.log(`Updated ${updatedCount} videos to belong to admin user`);
-    
-    res.json({
-      message: `Successfully patched ${updatedCount} videos`,
-      fixed: updatedCount,
-      total: videosWithoutUser.length,
-      assignedTo: {
-        id: adminUser.id,
-        username: adminUser.username
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error patching videos:', error);
-    res.status(500).json({ 
-      error: 'Error patching videos',
-      details: error.message 
-    });
-  }
-});
-
-// Temporary simple user endpoint for debugging
-app.get("/api/auth/me-simple", async (req, res) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-    
-    const jwt = require('jsonwebtoken');
-    const { User } = require('./models');
-    
-    console.log('Token received:', token.substring(0, 50) + '...');
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
-    console.log('JWT decoded:', decoded);
-    
-    const userId = decoded.userId || decoded.id;
-    console.log('Looking for user ID:', userId);
-    
-    const user = await User.findByPk(userId, {
-      attributes: { exclude: ['password'] }
-    });
-    
-    console.log('User found:', user ? user.username : 'null');
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found in database' });
-    }
-    
-    res.json(user);
-    
-  } catch (error) {
-    console.error('Simple /me error:', error);
-    res.status(500).json({ 
-      error: 'Authentication error',
-      details: error.message 
-    });
-  }
-});
-
-// PUBLIC VIDEO OWNERSHIP FIX - No auth required
-app.get('/api/public-fix-videos/:secret', async (req, res) => {
-  try {
-    const { secret } = req.params;
-    
-    // Simple security check
-    if (secret !== process.env.VIDEO_FIX_SECRET || !secret) {
-      return res.status(403).json({ error: 'Invalid access code' });
-    }
-    
-    console.log('🔧 Starting video ownership fix...');
-    
-    const { Video, User } = require('./models');
-    
-    // Get all videos with null userId  
-    const orphanedVideos = await Video.findAll({
-      where: { userId: null }
-    });
-    
-    console.log(`📊 Found ${orphanedVideos.length} orphaned videos`);
-    
-    if (orphanedVideos.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No orphaned videos found - user context should be working!',
-        fixed: 0
-      });
-    }
-    
-    // Get admin user to assign videos to
-    const adminUser = await User.findOne({
-      where: { role: 'admin' },
-      order: [['createdAt', 'ASC']]
-    });
-    
-    if (!adminUser) {
-      return res.status(404).json({ error: 'No admin user found' });
-    }
-    
-    console.log(`👤 Assigning videos to admin: ${adminUser.username}`);
-    
-    // Update all orphaned videos to belong to admin
-    const [updatedCount] = await Video.update(
-      { userId: adminUser.id },
-      { where: { userId: null } }
-    );
-    
-    console.log(`✅ Updated ${updatedCount} videos`);
-    
-    // Verify the fix worked
-    const remainingOrphans = await Video.count({
-      where: { userId: null }
-    });
-    
-    res.json({
-      success: true,
-      message: `Successfully fixed ${updatedCount} videos! User context isolation should now work.`,
-      details: {
-        videosFixed: updatedCount,
-        assignedToUser: adminUser.username,
-        remainingOrphans: remainingOrphans
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ Error fixing video ownership:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fix video ownership',
-      details: error.message
-    });
-  }
-});
-
-}
 
 // API routes
 app.use("/api/auth", authRoutes);

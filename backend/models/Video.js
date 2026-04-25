@@ -11,9 +11,7 @@ const Video = sequelize.define('Video', {
   title: {
     type: DataTypes.STRING,
     allowNull: false,
-    validate: {
-      len: [1, 100]
-    }
+    validate: { len: [1, 100] }
   },
   description: {
     type: DataTypes.TEXT,
@@ -21,7 +19,7 @@ const Video = sequelize.define('Video', {
   },
   filePath: {
     type: DataTypes.STRING,
-    allowNull: true // Allow null for YouTube videos
+    allowNull: true
   },
   hlsPath: {
     type: DataTypes.STRING,
@@ -47,19 +45,15 @@ const Video = sequelize.define('Video', {
     type: DataTypes.JSON,
     allowNull: true
   },
-  // New fields for YouTube integration
   youtubeUrl: {
     type: DataTypes.STRING,
     allowNull: true,
-    validate: {
-      isUrl: true
-    }
+    validate: { isUrl: true }
   },
   youtubeId: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  // New fields for video editing
   trimStart: {
     type: DataTypes.FLOAT,
     allowNull: true,
@@ -73,32 +67,29 @@ const Video = sequelize.define('Video', {
     type: DataTypes.JSON,
     allowNull: true
   },
-  // New field for LTI integration
   ltiLink: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  // New field for templates
   templateId: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  // New field for language
   language: {
     type: DataTypes.ENUM('en', 'vi'),
     defaultValue: 'en'
   }
+}, {
+  // REQ-7: B-tree indexes on foreign keys and common filter/sort columns
+  indexes: [
+    { fields: ['userId'], name: 'idx_videos_user_id' },
+    { fields: ['status'], name: 'idx_videos_status' },
+    { fields: ['createdAt'], name: 'idx_videos_created_at' },
+    { fields: ['userId', 'status'], name: 'idx_videos_user_status' },
+  ]
 });
 
-// Define associations
-Video.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'owner'
-});
+Video.belongsTo(User, { foreignKey: 'userId', as: 'owner' });
+User.hasMany(Video, { foreignKey: 'userId', as: 'videos' });
 
-User.hasMany(Video, {
-  foreignKey: 'userId',
-  as: 'videos'
-});
-
-module.exports = Video; 
+module.exports = Video;

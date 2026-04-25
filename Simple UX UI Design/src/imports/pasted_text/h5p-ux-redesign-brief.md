@@ -1,8 +1,8 @@
 # UX/UI Redesign Brief
-## H5P Interactive Video Platform
+## ReactivEdu
 
 ## Project Summary
-This website is an H5P interactive video platform for creating, editing, enriching, and exporting interactive learning videos.
+This website is ReactivEdu for creating, editing, enriching, and exporting interactive learning videos.
 
 The product is used primarily by teachers. A major priority for this redesign is that the website must be easy to use for middle-aged teachers who may not be highly technical, may not be familiar with modern complex interfaces, and may prefer clarity, predictability, and low-stress workflows over power-user density.
 

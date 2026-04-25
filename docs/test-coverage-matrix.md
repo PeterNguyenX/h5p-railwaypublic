@@ -142,7 +142,7 @@
 | Component | File | Type | Status | Coverage |
 |-----------|------|------|--------|----------|
 | Containerized builds (Dockerfile) | Dockerfile | Build | ✅ IMPL | Multi-stage, minimal image |
-| Railway deployment config | railway.json | IaC | ✅ IMPL | Auto health checks + auto-rollback |
+| Docker deployment config | docker-compose.yml | IaC | ✅ IMPL | Auto health checks + rollback via image tags |
 | Health check in container | Dockerfile | Build | ✅ IMPL | curl /health exit code |
 | Environment variable secrets | Deployment vars | Ops | ✅ IMPL | All secrets from env, not in image |
 | Instant rollback procedure | Deployment docs | Procedure | ✅ IMPL | 2-minute rollback to previous release |

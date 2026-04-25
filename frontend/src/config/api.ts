@@ -11,6 +11,16 @@ const api = axios.create({
   },
 });
 
+const GLOBAL_API_ERROR_EVENT = 'global-api-error';
+
+const emitGlobalApiError = (status: number, message: string) => {
+  window.dispatchEvent(
+    new CustomEvent(GLOBAL_API_ERROR_EVENT, {
+      detail: { status, message },
+    })
+  );
+};
+
 // Add request interceptor to add auth token to all requests
 api.interceptors.request.use(
   (config) => {
@@ -29,13 +39,24 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle 401 Unauthorized errors (token expired)
-    if (error.response && error.response.status === 401) {
+    const status = error?.response?.status;
+    const serverMessage = error?.response?.data?.message || error?.response?.data?.error;
+
+    if (status === 401) {
+      emitGlobalApiError(401, serverMessage || 'Your session expired. Please sign in again.');
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 800);
+    } else if (status === 403) {
+      emitGlobalApiError(403, serverMessage || 'You do not have permission to perform this action.');
+    } else if (status === 404) {
+      emitGlobalApiError(404, serverMessage || 'The requested resource was not found.');
     }
+
     return Promise.reject(error);
   }
 );
 
 export default api;
+export { GLOBAL_API_ERROR_EVENT };

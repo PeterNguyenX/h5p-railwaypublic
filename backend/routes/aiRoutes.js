@@ -9,6 +9,12 @@ const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
 const { analyzeTranscript, analyzeTranscriptStream } = require('../services/aiService');
+const {
+  isOllamaAvailable,
+  analyzeTranscriptOllama,
+  analyzeTranscriptOllamaStream,
+  OLLAMA_MODEL,
+} = require('../services/aiServiceOllama');
 const { injectAll } = require('../services/aiInjectionService');
 const {
   analyzeRequestSchema,
@@ -19,9 +25,39 @@ const {
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 /**
+ * GET /api/ai/status
+ * Returns which AI backends are available.
+ */
+router.get('/status', async (req, res) => {
+  const path = require('path');
+  const fs = require('fs');
+  const { execFileSync } = require('child_process');
+
+  const ollamaOk = await isOllamaAvailable();
+
+  const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
+  const pythonBin = fs.existsSync(venvPython) ? venvPython : 'python3';
+  let whisperOk = false;
+  try {
+    execFileSync(pythonBin, ['-c', 'import faster_whisper'], { timeout: 5000 });
+    whisperOk = true;
+  } catch {
+    whisperOk = false;
+  }
+
+  res.json({
+    ollama: { available: ollamaOk, model: OLLAMA_MODEL },
+    claude: { available: !!ANTHROPIC_API_KEY },
+    whisper: { available: whisperOk, python: pythonBin },
+    preferred: ollamaOk ? 'ollama' : (ANTHROPIC_API_KEY ? 'claude' : 'none'),
+  });
+});
+
+/**
  * POST /api/ai/analyze
  * Body: { segments: TranscriptSegment[], videoId: string }
  * Response: { suggestions: AISuggestion[] }
+ * Saves suggestions to Video.h5pContent in database
  */
 router.post('/analyze', auth, async (req, res) => {
   try {
@@ -31,19 +67,72 @@ router.post('/analyze', auth, async (req, res) => {
     }
 
     const { segments, videoId } = parsed.data;
+    const { Video } = require('../models');
 
-    if (!ANTHROPIC_API_KEY) {
-      return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured on the server' });
+    // Verify video exists and user has access
+    const video = await Video.findByPk(videoId);
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+    if (video.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized access to this video' });
     }
 
-    const { suggestions, rawResponse } = await analyzeTranscript(segments, ANTHROPIC_API_KEY);
+    let suggestions;
+    let model;
 
-    res.json({
-      suggestions,
-      count: suggestions.length,
-      videoId,
-      rawResponse
-    });
+    // Try Ollama first (free, local), fallback to Claude
+    const ollamaOk = await isOllamaAvailable();
+    if (ollamaOk) {
+      try {
+        console.log('Using Ollama for AI analysis');
+        const result = await analyzeTranscriptOllama(segments);
+        suggestions = result.suggestions;
+        model = result.model;
+      } catch (ollamaErr) {
+        console.warn('Ollama analysis failed, falling back to Claude:', ollamaErr.message);
+        if (!ANTHROPIC_API_KEY) {
+          return res.status(500).json({ error: 'No AI backend available. Ollama is not running and ANTHROPIC_API_KEY is not set.' });
+        }
+        const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY);
+        suggestions = result.suggestions;
+        model = 'claude';
+      }
+    } else {
+      if (!ANTHROPIC_API_KEY) {
+        return res.status(500).json({ error: 'No AI backend available. Ollama is not running and ANTHROPIC_API_KEY is not set.' });
+      }
+      const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY);
+      suggestions = result.suggestions;
+      model = 'claude';
+    }
+
+    // Save suggestions to Video.h5pContent in database
+    const h5pContent = video.h5pContent || [];
+    if (!Array.isArray(h5pContent)) {
+      h5pContent = [];
+    }
+
+    // Add suggestions to h5pContent array
+    const newContent = suggestions.map(suggestion => ({
+      id: suggestion.id,
+      timestamp: suggestion.timestamp,
+      type: suggestion.type,
+      h5pLibrary: suggestion.h5pLibrary || suggestion.type,
+      config: suggestion.config,
+      reason: suggestion.reason || 'AI-generated interaction',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    }));
+
+    h5pContent.push(...newContent);
+
+    // Update video with new h5pContent
+    await video.update({ h5pContent });
+
+    console.log(`Persisted ${newContent.length} H5P suggestions to video ${videoId}`);
+
+    res.json({ suggestions, count: suggestions.length, videoId, model });
   } catch (error) {
     console.error('Error in AI analysis:', error.message);
     res.status(500).json({ error: error.message });
@@ -54,6 +143,7 @@ router.post('/analyze', auth, async (req, res) => {
  * POST /api/ai/analyze-stream
  * Body: { segments: TranscriptSegment[], videoId: string }
  * Response: Server-Sent Events stream
+ * Saves suggestions to Video.h5pContent in database
  */
 router.post('/analyze-stream', auth, async (req, res) => {
   try {
@@ -62,17 +152,33 @@ router.post('/analyze-stream', auth, async (req, res) => {
       return res.status(400).json(formatValidationError(parsed.error));
     }
 
-    const { segments } = parsed.data;
+    const { segments, videoId } = parsed.data;
+    const { Video } = require('../models');
 
-    if (!ANTHROPIC_API_KEY) {
-      return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured on the server' });
+    // Verify video exists and user has access
+    const video = await Video.findByPk(videoId);
+    if (!video) {
+      return res.status(400).json({ error: 'Video not found' });
+    }
+    if (video.userId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized access to this video' });
     }
 
-    // analyzeTranscriptStream handles SSE headers and writing
-    await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res);
+    // Try Ollama first (free, local), fallback to Claude
+    const ollamaOk = await isOllamaAvailable();
+    if (ollamaOk) {
+      console.log('Using Ollama for AI streaming analysis');
+      await analyzeTranscriptOllamaStream(segments, res, videoId, video);
+      return;
+    }
+
+    if (!ANTHROPIC_API_KEY) {
+      return res.status(500).json({ error: 'No AI backend available. Ollama is not running and ANTHROPIC_API_KEY is not set.' });
+    }
+
+    await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res, videoId, video);
   } catch (error) {
     console.error('Error in AI streaming analysis:', error.message);
-    // If headers haven't been sent yet, send error normally
     if (!res.headersSent) {
       res.status(500).json({ error: error.message });
     }
@@ -135,13 +241,12 @@ router.post('/transcribe-and-generate', auth, async (req, res) => {
       return res.status(400).json({ error: 'videoId is required' });
     }
 
-    if (!ANTHROPIC_API_KEY) {
-      return res.status(503).json({ 
-        error: 'AI question generation is not available',
+    const ollamaReadyForGenerate = await isOllamaAvailable();
+    if (!ollamaReadyForGenerate && !ANTHROPIC_API_KEY) {
+      return res.status(503).json({
+        error: 'No AI backend available',
         code: 'MISSING_CONFIG',
-        message: 'ANTHROPIC_API_KEY environment variable is not configured on the server',
-        suggestion: 'Set ANTHROPIC_API_KEY in your .env file or server environment variables',
-        documentationUrl: '/docs/api/transform#configuration'
+        message: 'Either start Ollama (ollama serve) or set ANTHROPIC_API_KEY',
       });
     }
 
@@ -186,15 +291,33 @@ router.post('/transcribe-and-generate', auth, async (req, res) => {
       });
     }
 
-    // Step 2: Generate questions with Claude
-    const suggestions = await generateQuestionsWithClaude(
-      transcript,
-      video.title,
-      educationLevel,
-      learningObjectives,
-      questionDensity,
-      questionTypes
-    );
+    // Step 2: Generate questions — Ollama first, then Claude
+    let suggestions;
+    if (ollamaReadyForGenerate) {
+      try {
+        const segs = Array.isArray(transcript) ? transcript : [];
+        const ollamaResult = await analyzeTranscriptOllama(segs);
+        // Map Ollama result to transcribe-and-generate format
+        suggestions = ollamaResult.suggestions.map((s) => ({
+          id: s.id,
+          type: s.type === 'MultiChoice' ? 'multipleChoice' : s.type === 'TrueFalse' ? 'truefalse' : 'fillblank',
+          timestamp: s.timestamp,
+          question: s.config?.question || s.config?.text || '',
+          answers: s.config?.answers ? s.config.answers.map((a) => a.text) : [],
+          correctIndex: s.config?.answers ? s.config.answers.findIndex((a) => a.correct) : 0,
+          explanation: s.reason || '',
+          bloomsLevel: 'understand',
+          concept: 'Key concept',
+          difficulty: 0.5,
+          accepted: false,
+        }));
+      } catch (ollamaErr) {
+        console.warn('Ollama generation failed, falling back to Claude:', ollamaErr.message);
+        suggestions = await generateQuestionsWithClaude(transcript, video.title, educationLevel, learningObjectives, questionDensity, questionTypes);
+      }
+    } else {
+      suggestions = await generateQuestionsWithClaude(transcript, video.title, educationLevel, learningObjectives, questionDensity, questionTypes);
+    }
 
     const generationTime = Date.now() - startTime;
 

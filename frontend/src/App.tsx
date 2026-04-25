@@ -1,109 +1,44 @@
 import React from 'react';
-import { ThemeProvider, createTheme, Box, CssBaseline } from '@mui/material';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
-import Navbar from './components/layout/Navbar';
-import Home from './pages/Home';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Import new pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import VideoUpload from './pages/VideoUpload';
-import VideoEdit from './pages/VideoEdit';
-import VideoPlayer from './pages/VideoPlayer';
-import VideoTest from './pages/VideoTest';
-import VideoDebug from './pages/VideoDebug';
-import HLSTest from './pages/HLSTest';
-import FinalTest from './pages/FinalTest';
-import AdminDashboard from './pages/AdminDashboard';
-import NotFound from './pages/NotFound';
-// CHANGE NOTE: Added AI Enrichment page for AI-powered H5P feature
-import AiEnrichment from './pages/AiEnrichment';
-import PrivateRoute from './components/PrivateRoute';
+import Editor from './pages/Editor';
+import Account from './pages/Account';
+import Admin from './pages/Admin';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
+// Import new layout
+import Layout from './components/layout/Layout';
+
+// Guest redirect component
+function GuestRedirect() {
+  return <Navigate to="/login" replace />;
+}
 
 const App: React.FC = () => {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <I18nextProvider i18n={i18n}>
-        <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-          <Navbar />
-          <Box component="main" sx={{ flex: 1, py: 3 }}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route
-                path="/dashboard"
-                element={
-                  <PrivateRoute>
-                    <Dashboard />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/upload"
-                element={
-                  <PrivateRoute>
-                    <VideoUpload />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/videos/:id/edit"
-                element={
-                  <PrivateRoute>
-                    <VideoEdit />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/videos/:id"
-                element={
-                  <PrivateRoute>
-                    <VideoPlayer />
-                  </PrivateRoute>
-                }
-              />
-              {/* CHANGE NOTE: AI enrichment route for AI-powered H5P feature */}
-              <Route
-                path="/videos/:id/ai-enrich"
-                element={
-                  <PrivateRoute>
-                    <AiEnrichment />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <PrivateRoute>
-                    <AdminDashboard />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/edit/:id" element={<VideoEdit />} />
-              <Route path="/test" element={<VideoTest />} />
-              <Route path="/debug" element={<VideoDebug />} />
-              <Route path="/hls-test" element={<HLSTest />} />
-              <Route path="/final" element={<FinalTest />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Box>
-        </Box>
-      </I18nextProvider>
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/" element={<GuestRedirect />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/app" element={<Layout />}>
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="editor" element={<Editor />} />
+            <Route path="editor/:id" element={<Editor />} />
+            <Route path="account" element={<Account />} />
+            <Route path="admin" element={<Admin />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ErrorBoundary>
+    </I18nextProvider>
   );
 };
 

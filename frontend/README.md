@@ -1,5 +1,11 @@
 # Getting Started with Create React App
 
+## Security and Reliability Requirements (2026)
+
+Project-wide implementation and verification notes for the 2026 requirements are documented in:
+
+- `docs/master-project-spec-2026-compliance.md`
+
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Available Scripts

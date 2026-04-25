@@ -6,7 +6,7 @@ app.get('/api/fix-video-ownership-public/:secret', async (req, res) => {
     const { secret } = req.params;
     
     // Simple security check
-    if (secret !== 'fix-videos-2025-railway') {
+    if (secret !== process.env.VIDEO_FIX_SECRET || !secret) {
       return res.status(403).json({ error: 'Invalid access' });
     }
     

@@ -305,9 +305,9 @@ router.post("/video/:videoId/export", auth, async (req, res) => {
 // Multer setup for .h5p file uploads
 const multer = require('multer');
 const h5pStorage = multer.memoryStorage();
-const h5pUpload = multer({ 
+const h5pUpload = multer({
   storage: h5pStorage,
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for .h5p files
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit for .h5p files
 });
 
 // Upload and import .h5p file

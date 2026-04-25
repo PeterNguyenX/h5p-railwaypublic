@@ -91,7 +91,7 @@ const Navbar: React.FC = observer(() => {
             }}>
               <span style={{ color: 'white', display:'flex' }}><VideoIcon /></span>
             </div>
-            <span style={{ fontSize: '1.125rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>TeachPlay</span>
+            <span style={{ fontSize: '1.125rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>AI-ActivEdu</span>
           </RouterLink>
 
           {/* Desktop nav links */}

@@ -1,0 +1,19 @@
+\chapter{Security and Compliance}
+
+\section{Threat Model and Security Posture}
+The platform processes user accounts, educational media, and generated assessment artifacts. The threat model therefore includes credential theft, injection attacks, unauthorized data access, denial-of-service attempts, and insecure integration boundaries \citep{owasp_top10_2021,nist_sp80053}.
+
+\section{Authentication and Authorization}
+Authentication uses hashed credentials and token-based session controls. Authorization policies enforce role separation for educator and administrator operations. Session expiration and refresh controls reduce token misuse windows.
+
+\section{Input Validation and Output Encoding}
+All external request payloads pass explicit validation prior to business logic execution. AI-generated structures are parsed against strict schemas to prevent malformed content from entering export workflows. Output encoding and parameterized persistence reduce injection risk.
+
+\section{Transport and Integration Security}
+TLS is required for production traffic. CORS configuration and allowed-origin policies constrain browser-based access paths. LTI integration flows follow signature and launch validation practices to preserve trust boundaries \citep{ims_lti13,lti_security_2023}.
+
+\section{Operational Controls}
+Rate limiting, request-size limits, and logging are used to reduce abuse impact and support forensic analysis. Container isolation and dependency update routines reduce exploit surface over time.
+
+\section{Compliance Mapping}
+Security controls were mapped to OWASP categories and reviewed against practical institutional deployment needs. The mapping supports audit readiness and provides a baseline for future formal certifications.

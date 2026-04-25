@@ -12,17 +12,13 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
-    validate: {
-      len: [3, 30]
-    }
+    validate: { len: [3, 30] }
   },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
-    validate: {
-      isEmail: true
-    }
+    validate: { isEmail: true }
   },
   password: {
     type: DataTypes.STRING,
@@ -35,26 +31,42 @@ const User = sequelize.define('User', {
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  // REQ-5: Secure password reset fields
+  resetToken: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  resetTokenExpiry: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   hooks: {
     beforeCreate: async (user) => {
       if (user.password) {
-        const salt = await bcrypt.genSalt(10);
+        const salt = await bcrypt.genSalt(12); // Increased from 10 to 12 rounds
         user.password = await bcrypt.hash(user.password, salt);
       }
     },
     beforeUpdate: async (user) => {
       if (user.changed('password')) {
-        const salt = await bcrypt.genSalt(10);
+        const salt = await bcrypt.genSalt(12);
         user.password = await bcrypt.hash(user.password, salt);
       }
     }
-  }
+  },
+  // REQ-7: Database indexes for frequent queries
+  indexes: [
+    { unique: true, fields: ['email'], name: 'idx_users_email' },
+    { unique: true, fields: ['username'], name: 'idx_users_username' },
+    { fields: ['resetToken'], name: 'idx_users_reset_token' },
+    { fields: ['isActive'], name: 'idx_users_is_active' },
+  ]
 });
 
 User.prototype.validatePassword = async function(password) {
   return bcrypt.compare(password, this.password);
 };
 
-module.exports = User; 
+module.exports = User;

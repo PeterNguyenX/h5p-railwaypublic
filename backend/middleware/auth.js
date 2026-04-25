@@ -10,9 +10,9 @@ const PUBLIC_PATHS = [
 
 const auth = async (req, res, next) => {
   // Check if the path is public
-  const currentPath = req.path;
+  const currentPath = req.originalUrl || req.path;
   // For non-API main interface routes, bypass authentication
-  if (PUBLIC_PATHS.some(publicPath => currentPath.startsWith(publicPath)) && !req.path.startsWith('/api')) {
+  if (PUBLIC_PATHS.some(publicPath => currentPath.startsWith(publicPath)) && !currentPath.startsWith('/api')) {
     console.log(`Public access granted for path: ${currentPath}`);
     req.user = { id: null, isPublic: true };
     return next();

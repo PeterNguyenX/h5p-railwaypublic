@@ -1,17 +1,18 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
+  const target = process.env.BACKEND_PROXY_TARGET || 'http://localhost:5001';
   console.log('Setting up proxy middleware for /api routes...');
   
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost:3001',
+      target,
       changeOrigin: true,
       secure: false,
       logLevel: 'debug',
       onProxyReq: (proxyReq, req, res) => {
-        console.log(`[PROXY] ${req.method} ${req.url} -> http://localhost:3001${req.url}`);
+        console.log(`[PROXY] ${req.method} ${req.url} -> ${target}${req.url}`);
       },
       onProxyRes: (proxyRes, req, res) => {
         console.log(`[PROXY] Response ${proxyRes.statusCode} for ${req.url}`);

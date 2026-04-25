@@ -7,7 +7,7 @@ async function fixVideoOwnership() {
   let sequelize;
   
   try {
-    // Connect to database using Railway DATABASE_URL
+    // Connect to database using DATABASE_URL
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
       throw new Error('DATABASE_URL not found');

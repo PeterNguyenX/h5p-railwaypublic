@@ -68,12 +68,57 @@ router.get('/users', auth, isAdmin, async (req, res) => {
       ]
     } : {};
 
-    const { count, rows: users } = await User.findAndCountAll({
+    const { count, rows } = await User.findAndCountAll({
       where: whereClause,
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [['createdAt', 'DESC']],
-      attributes: ['id', 'username', 'email', 'role', 'isActive', 'createdAt']
+      attributes: ['id', 'username', 'email', 'password', 'role', 'isActive', 'createdAt', 'updatedAt']
+    });
+
+    const now = Date.now();
+    const users = rows.map((user) => {
+      const lastLoginAt = user.updatedAt;
+      const lastLoginDays = Math.max(0, Math.floor((now - new Date(lastLoginAt).getTime()) / (1000 * 60 * 60 * 24)));
+
+      const suspiciousReasons = [];
+      const recentActivity = [];
+
+      if (!user.isActive) {
+        suspiciousReasons.push('Account is currently deactivated');
+        recentActivity.push('Account was deactivated by an administrator');
+      }
+
+      if (lastLoginDays >= 60) {
+        suspiciousReasons.push(`No login for ${lastLoginDays} days`);
+        recentActivity.push(`Last login was ${lastLoginDays} days ago`);
+      }
+
+      if (user.role === 'admin' && lastLoginDays >= 14) {
+        suspiciousReasons.push('Admin account has not logged in recently');
+        recentActivity.push('Privileged account is inactive for over 14 days');
+      }
+
+      if (/test|temp|demo/i.test(`${user.username} ${user.email}`)) {
+        suspiciousReasons.push('Username/email matches temporary account patterns');
+        recentActivity.push('Detected test-like naming pattern in account details');
+      }
+
+      return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        passwordHash: user.password,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLoginAt,
+        lastLoginDays,
+        suspicious: suspiciousReasons.length > 0,
+        suspiciousReason: suspiciousReasons.join('; '),
+        recentActivity,
+      };
     });
 
     res.json({
@@ -88,6 +133,100 @@ router.get('/users', auth, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Error fetching users' });
+  }
+});
+
+// Get one user by id (admin only)
+router.get('/users/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id, {
+      attributes: ['id', 'username', 'email', 'role', 'isActive', 'createdAt', 'updatedAt'],
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return res.status(500).json({ error: 'Error fetching user' });
+  }
+});
+
+// Update user account settings (username/email) (admin only)
+router.put('/users/:id/account', auth, isAdmin, async (req, res) => {
+  try {
+    const { username, email } = req.body;
+
+    if (!username || !email) {
+      return res.status(400).json({ error: 'Username and email are required' });
+    }
+
+    const normalizedUsername = String(username).trim();
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    if (normalizedUsername.length < 3 || normalizedUsername.length > 30) {
+      return res.status(400).json({ error: 'Username must be between 3 and 30 characters' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    const user = await User.findByPk(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const usernameTaken = await User.findOne({
+      where: {
+        username: normalizedUsername,
+        id: { [Op.ne]: user.id },
+      },
+    });
+    if (usernameTaken) {
+      return res.status(400).json({ error: 'Username is already taken' });
+    }
+
+    const emailTaken = await User.findOne({
+      where: {
+        email: normalizedEmail,
+        id: { [Op.ne]: user.id },
+      },
+    });
+    if (emailTaken) {
+      return res.status(400).json({ error: 'Email is already in use' });
+    }
+
+    await user.update({ username: normalizedUsername, email: normalizedEmail });
+
+    return res.json({
+      message: 'Account settings updated successfully',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating user account settings:', error);
+    return res.status(500).json({ error: 'Error updating account settings' });
   }
 });
 
@@ -184,7 +323,7 @@ router.get('/videos', auth, isAdmin, async (req, res) => {
   }
 });
 
-// Delete any video (admin privilege)
+// Delete a video (admin privilege)
 router.delete('/videos/:id', auth, isAdmin, async (req, res) => {
   try {
     const video = await Video.findByPk(req.params.id);
@@ -197,6 +336,109 @@ router.delete('/videos/:id', auth, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error deleting video:', error);
     res.status(500).json({ error: 'Error deleting video' });
+  }
+});
+
+// Create a new user (admin only)
+router.post('/users/create', auth, isAdmin, async (req, res) => {
+  try {
+    const { username, email, password, role = 'user' } = req.body;
+
+    // Validate input
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email and password are required' });
+    }
+
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be "user" or "admin"' });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      where: {
+        [Op.or]: [
+          { username },
+          { email }
+        ]
+      }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'User with this username or email already exists' });
+    }
+
+    const newUser = await User.create({ username, email, password, role, isActive: true });
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+        isActive: newUser.isActive,
+        createdAt: newUser.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'Error creating user' });
+  }
+});
+
+// Delete a user (admin only)
+router.delete('/users/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent deleting the last admin
+    if (user.role === 'admin') {
+      const adminCount = await User.count({ where: { role: 'admin' } });
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the last admin user' });
+      }
+    }
+
+    await user.destroy();
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Error deleting user' });
+  }
+});
+
+// Reset user password (admin only)
+router.post('/users/:id/reset-password', auth, isAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const user = await User.findByPk(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await user.update({ password });
+
+    res.json({
+      message: 'Password reset successfully',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({ error: 'Error resetting password' });
   }
 });
 
@@ -241,7 +483,7 @@ router.post('/create-admin', async (req, res) => {
     // If this is the first user (initial setup), use simple credentials
     if (userCount === 0) {
       adminCredentials = {
-        username: 'admin',
+        username: 'ADMIN',
         email: 'admin@hoclieutuongtac2.com',
         password: 'admin123',
         role: 'admin'
@@ -260,7 +502,7 @@ router.post('/create-admin', async (req, res) => {
       },
       isFirstUser: userCount === 0,
       credentials: userCount === 0 ? {
-        username: 'admin',
+        username: 'ADMIN',
         password: 'admin123',
         note: 'Easy-to-remember credentials for first setup'
       } : null
@@ -275,21 +517,28 @@ router.post('/create-admin', async (req, res) => {
 router.post('/setup-admin', async (req, res) => {
   try {
     // Check if admin already exists
-    const existingAdmin = await User.findOne({ where: { username: 'admin' } });
+    const existingAdmin = await User.findOne({
+      where: {
+        [Op.or]: [
+          { username: 'ADMIN' },
+          { username: 'admin' }
+        ]
+      }
+    });
     if (existingAdmin) {
       return res.status(200).json({ 
         message: 'Admin user already exists',
         credentials: {
-          username: 'admin',
+          username: existingAdmin.username,
           password: 'admin123',
           note: 'Use these credentials to login'
         }
       });
     }
 
-    // Create admin user (removed the user count check)
+    // Create admin user with ADMIN username
     const adminUser = await User.create({
-      username: 'admin',
+      username: 'ADMIN',
       email: 'admin@hoclieutuongtac2.com',
       password: 'admin123',
       role: 'admin'
@@ -298,12 +547,12 @@ router.post('/setup-admin', async (req, res) => {
     res.status(201).json({
       message: 'Admin user created successfully',
       credentials: {
-        username: 'admin',
+        username: 'ADMIN',
         password: 'admin123',
         email: 'admin@hoclieutuongtac2.com'
       },
       instructions: [
-        '1. Login with username: admin',
+        '1. Login with username: ADMIN',
         '2. Password: admin123',
         '3. Change password after first login',
         '4. Access admin dashboard at /admin'
@@ -319,21 +568,28 @@ router.post('/setup-admin', async (req, res) => {
 router.post('/force-create-admin', async (req, res) => {
   try {
     // Check if admin already exists
-    const existingAdmin = await User.findOne({ where: { username: 'admin' } });
+    const existingAdmin = await User.findOne({
+      where: {
+        [Op.or]: [
+          { username: 'ADMIN' },
+          { username: 'admin' }
+        ]
+      }
+    });
     if (existingAdmin) {
       return res.status(200).json({ 
         message: 'Admin user already exists',
         credentials: {
-          username: 'admin',
+          username: existingAdmin.username,
           password: 'admin123',
           note: 'Use these credentials to login'
         }
       });
     }
 
-    // Create admin user regardless of existing users
+    // Create admin user with ADMIN username
     const adminUser = await User.create({
-      username: 'admin',
+      username: 'ADMIN',
       email: 'admin@hoclieutuongtac2.com',
       password: 'admin123',
       role: 'admin'
@@ -342,12 +598,12 @@ router.post('/force-create-admin', async (req, res) => {
     res.status(201).json({
       message: 'Admin user created successfully',
       credentials: {
-        username: 'admin',
+        username: 'ADMIN',
         password: 'admin123',
         email: 'admin@hoclieutuongtac2.com'
       },
       instructions: [
-        '1. Login with username: admin',
+        '1. Login with username: ADMIN',
         '2. Password: admin123',
         '3. Change password after first login',
         '4. Access admin dashboard at /admin'
@@ -381,8 +637,8 @@ router.get('/settings', auth, isAdmin, async (req, res) => {
   }
 });
 
-// Promote existing user to admin
-router.post('/promote-to-admin', async (req, res) => {
+// Promote existing user to admin (admin only)
+router.post('/promote-to-admin', auth, isAdmin, async (req, res) => {
   try {
     const { username } = req.body;
     

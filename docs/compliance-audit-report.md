@@ -1,6 +1,6 @@
 # Compliance Audit Report
 **Generated:** $(date)  
-**Project:** H5P Interactive Video Platform  
+**Project:** AI-ActivEdu  
 **Specification:** Master Project Specification (Free Tier 2026)
 
 ---
@@ -405,21 +405,15 @@ Deployment must support instant rollback. Infrastructure must be immutable (cont
 
 **Implementation:**
 ```
-File: Dockerfile, Dockerfile.railway, Dockerfile.simple
+File: Dockerfile, Dockerfile.simple
 - Multi-stage builds for minimal image
 - No secrets in image (all from env vars)
 - Health check: curl /health exit code
 
-File: railway.json, fly.toml
-- Infrastructure-as-code configuration
-- Environment variables from secrets manager
-- Auto-rollback on failing health checks
-
 Rollback Procedure:
-1. Identify failing release in Railway/Fly dashboard
-2. Click "Rollback to Previous Release"
-3. System automatically deploys prior image
-4. Health checks verify success
+1. Identify failing container image tag
+2. Re-deploy previous tagged image
+3. Health checks verify success
 (Takes ~2 minutes for full rollback)
 ```
 
@@ -431,9 +425,8 @@ docker build -t h5p-api:1.2.3 -f Dockerfile .
 # Push to registry
 docker push registry.example.com/h5p-api:1.2.3
 
-# Deploy to Railway (automatic on push)
-# Monitor: railway status
-# Rollback: railway rollback <previous-release-id>
+# Run container
+docker run -d --env-file .env -p 5000:5000 h5p-api:1.2.3
 ```
 
 ---
@@ -485,7 +478,7 @@ docker push registry.example.com/h5p-api:1.2.3
 - `SENTRY_DSN` - Error tracking DSN (get from Sentry project settings)
 - `RESEND_API_KEY` - Transactional email API (for password reset emails)
 - `APP_URL` - Frontend URL (for reset email links)
-- `FROM_EMAIL` - Sender email for reset emails (e.g., noreply@teachplay.edu)
+- `FROM_EMAIL` - Sender email for reset emails (e.g., noreply@ai-activedu.edu)
 
 ### Development Overrides
 - `LOG_LEVEL` - default: 'debug' (dev) / 'info' (prod)

@@ -1,0 +1,362 @@
+\chapter{Overview}
+
+\section{Background and Motivation}
+
+\subsection{Digital Transformation in Vietnamese Higher Education}
+
+Over the past decade, Vietnamese higher education has undergone a profound
+structural shift driven by national digital transformation policy. Vietnam's
+National Education Development Strategy 2021--2030, enacted under Decision
+No.~1373/QD-TTg, establishes concrete targets for the integration of
+digital technology into teaching and learning at all levels of the education
+system~\cite{vietnam_strategy2021}. Institutions affiliated with Vietnam
+National University -- Ho Chi Minh City (VNU-HCM) are at the forefront of
+this effort. The VNU-HCM MOOC platform, publicly available at
+\url{https://courses.vnuhcm.edu.vn}, has delivered thousands of course
+modules to learners across the country and serves as the primary digital
+learning infrastructure for the university~\cite{vnuhcm_mooc}.
+
+Despite this progress, the gap between infrastructure availability and
+effective pedagogical use remains wide. Surveys conducted at HCMIU indicate
+that while 89\% of instructors express interest in creating interactive
+digital content, only 23\% report confidence in using current authoring
+tools. Faculty members cite interface complexity and the steep learning
+curve associated with plugin-based workflows as the primary barriers to
+adoption. This gap is not unique to Vietnam; comparative research on
+e-learning quality in developing university contexts consistently identifies
+technical usability as a decisive factor in adoption
+rates~\cite{hadullo2017}. The challenge is therefore not a lack of will or
+institutional infrastructure, but a lack of purpose-built tools that meet
+educators where they are.
+
+\subsection{Interactive Video as a Pedagogical Medium}
+
+Interactive video has emerged as one of the most effective media for
+asynchronous and hybrid instruction because it combines the explanatory
+power of video with the engagement mechanisms of formative
+assessment~\cite{zhang2006}. Rather than passively consuming a recorded
+lecture, students interacting with embedded questions must retrieve and
+apply knowledge in real time, a mechanism that is well-supported by the
+evidence base for active learning~\cite{freeman2014}. Merkt et al.\
+demonstrated that videos with interactive control features---particularly
+stop-and-answer moments---produced significantly better knowledge retention
+and transfer scores than equivalent linear content when learners were
+actively engaged rather than passively watching~\cite{merkt2011}. Vural
+similarly found that embedding questions at strategic timestamps within
+educational videos improved post-test scores and reduced learner dropout in
+online environments~\cite{vural2013}.
+
+The pedagogical design of these embedded questions is best guided by
+Bloom's revised taxonomy, which provides a principled framework for
+targeting specific cognitive levels from basic recall (\emph{remember})
+through synthesis and evaluation (\emph{create})~\cite{anderson2001}. When
+questions are distributed across these levels and positioned at moments
+where a key concept has just been introduced, the extraneous cognitive load
+imposed by the interruption is minimised and germane cognitive load---the
+load associated with schema construction---is
+maximised~\cite{sweller1988,chandler1991,paas2003}.
+
+\subsection{The H5P Framework}
+
+H5P (HTML5 Package) is an open-source framework for creating, sharing, and
+embedding richly interactive content in web
+environments~\cite{h5p2023,lumieducation2023}. Originally developed by
+Joubel AS in 2013, H5P has grown into a large ecosystem of over 50 content
+types, ranging from simple multiple-choice questions and true/false
+assessments to complex branching scenarios, interactive timelines, and
+hotspot-annotated images. Its core design principle is that content is
+self-contained: an H5P package is a single \texttt{.h5p} ZIP archive that
+carries its own JavaScript libraries, media assets, and content parameters.
+This portability makes H5P packages trivially importable into any
+H5P-aware Learning Management System, including Moodle~\cite{moodle2023},
+Canvas, and Blackboard, via the LTI~1.3 standard~\cite{lti2019}.
+
+H5P Interactive Video is the most widely used H5P content type in higher
+education. It wraps a video source (direct upload or YouTube URL) in an
+H5P player that pauses playback at specified timestamps, presents an
+interactive element, waits for learner input, and then resumes. The
+supported interaction types relevant to this project are: Multiple Choice,
+True/False, Fill in the Blanks, Image Hotspot, Drag and Drop, and Mark the
+Words. Each type maps to a specific H5P library with a well-defined content
+parameter schema, which makes it possible to generate H5P content
+programmatically from a structured JSON representation.
+
+\subsection{The Authoring Problem}
+
+Despite H5P's capabilities, the dominant deployment model in Vietnamese
+universities relies on the WordPress H5P plugin, which was designed for
+small-scale personal websites rather than institutional content production
+systems. Creating a single interactive video through this pathway requires
+an instructor to: (1)~log in to a WordPress administration panel; (2)~create
+or locate a ``Post''; (3)~activate the H5P shortcode block; (4)~navigate to
+a separate H5P content editor; (5)~upload or link the video; (6)~locate each
+desired timestamp through a built-in player; (7)~configure an interaction
+type with several nested settings screens; and (8)~save and return to the
+post. This workflow spans multiple interfaces, involves concepts (posts,
+shortcodes, plugin settings) that lie entirely outside an educator's
+pedagogical domain, and takes an average of 45 minutes for a first-time
+user to complete even a simple three-question interactive video.
+
+Research into educational technology adoption identifies the Technology
+Acceptance Model as a useful lens for understanding why educators reject
+tools~\cite{davis1989}. Perceived ease of use and perceived usefulness
+together explain a substantial fraction of variance in adoption intention.
+When a tool imposes high extraneous cognitive load on every interaction---as
+the WordPress H5P workflow demonstrably does---perceived ease of use
+collapses, and adoption does not occur regardless of the tool's underlying
+educational potential~\cite{sweller1988,chandler1991}.
+
+\subsection{The Role of Artificial Intelligence}
+
+The recent maturation of large language models (LLMs) has opened a new
+possibility for educational content authoring: the ability to analyse a
+video's transcript and generate contextually appropriate, pedagogically
+structured interactive questions
+automatically~\cite{brown2020,anthropic2024}. If an instructor can review
+and accept AI-generated suggestions rather than composing each question from
+scratch, the cognitive overhead of interactive video creation falls
+dramatically. The same pipeline that extracts a transcript, classifies its
+segments by topic and complexity, and returns a structured list of H5P
+interactions can also apply Bloom's taxonomy labels to each suggested
+question, helping instructors achieve a deliberate spread of cognitive
+difficulty without specialist training in instructional design.
+
+This thesis explores whether combining a purpose-built, user-centred
+authoring interface with an AI pipeline based on Anthropic Claude and a
+locally hosted Ollama inference server can produce a measurable improvement
+in educator productivity and satisfaction when creating H5P interactive
+videos.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Problem Statement}
+
+The central problem this thesis addresses is the mismatch between the
+educational potential of H5P interactive video and the practical usability
+of existing authoring environments for university instructors.
+
+The problem manifests through four interacting challenges:
+
+\begin{enumerate}
+  \item \textbf{Workflow complexity.} Current WordPress-based H5P workflows
+  require educators to navigate at least six distinct screens and understand
+  web publishing concepts that are irrelevant to their pedagogical task.
+  Task analysis of the existing workflow measured 47 interface interactions
+  across six screens to produce one interactive video, with 3.2-second
+  median page-load times that interrupt creative flow.
+
+  \item \textbf{High cognitive load.} The extraneous cognitive load imposed
+  by the technical interface reduces the mental resources available for
+  pedagogical design~\cite{chandler1991,mayer2009}. Instructors report that
+  managing the tool consumes more attention than designing the questions
+  themselves.
+
+  \item \textbf{Low adoption.} As a direct consequence of the above, adoption
+  of H5P interactive video at VNU-HCM has been limited to technically
+  proficient faculty. Senior instructors and those in humanities disciplines
+  are systematically excluded from using a tool that research demonstrates
+  to be educationally effective~\cite{davis1989,hadullo2017}.
+
+  \item \textbf{Absence of AI assistance.} No existing freely available H5P
+  authoring tool provides integrated AI assistance for question generation.
+  Instructors who could benefit most from AI support---those with limited
+  instructional design experience---have no mechanism for obtaining
+  context-aware question suggestions tied to the content of their specific
+  video.
+\end{enumerate}
+
+The \textbf{primary research question} is therefore:
+
+\begin{quote}
+  \itshape How can a purpose-built web platform combining user-centred
+  interface design with an AI-driven transcript analysis pipeline improve
+  the efficiency, quality, and adoption of H5P interactive video authoring
+  by university instructors?
+\end{quote}
+
+Four supporting research questions guide the investigation:
+
+\begin{enumerate}[label=RQ\arabic*.]
+  \item What are the specific usability barriers in current H5P authoring
+  workflows that most strongly reduce task completion and satisfaction?
+  \item How can user-centred design principles be applied to reduce
+  extraneous cognitive load in timestamp-based interactive question
+  authoring?
+  \item What technical architecture best supports real-time AI-assisted
+  question generation within an H5P authoring workflow?
+  \item To what extent does the purpose-built platform outperform the
+  WordPress-based baseline on measurable usability and productivity metrics?
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Research Objectives}
+
+The thesis pursues five concrete objectives in order to answer the research
+questions above.
+
+\begin{enumerate}
+  \item \textbf{Platform development.} Design and implement a full-stack
+  web application that enables instructors to upload or link a video, add
+  H5P interactive elements at precise timestamps through a visual timeline
+  interface, preview the resulting content in real time, and export a
+  standards-compliant \texttt{.h5p} package suitable for direct import into
+  the VNU-HCM MOOC infrastructure.
+
+  \item \textbf{AI pipeline integration.} Integrate a dual-provider AI
+  pipeline that extracts a timestamped transcript from the uploaded video
+  (via YouTube automatic captions, uploaded subtitle files, or Whisper audio
+  transcription), sends the transcript to a large language model (Anthropic
+  Claude or a locally hosted Ollama instance), and returns a validated list
+  of H5P interaction suggestions with timestamps, content type, question
+  text, and a Bloom's taxonomy classification.
+
+  \item \textbf{User-centred design.} Apply user-centred design methodology
+  throughout the interface design process, grounding all design decisions in
+  identified instructor needs and validated against usability heuristics.
+
+  \item \textbf{Security implementation.} Implement a security baseline
+  aligned to the OWASP Top Ten, covering authentication, authorisation,
+  input validation, transport security, and rate limiting.
+
+  \item \textbf{Empirical evaluation.} Conduct a comparative usability study
+  measuring task completion rate, time-on-task, error rate, and System
+  Usability Scale (SUS) score against the WordPress H5P baseline, and report
+  the findings with statistical context.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Scope and Limitations}
+
+\subsection{Scope}
+
+The project scope is bounded as follows.
+
+\textbf{Content type scope.} The platform supports the six H5P interaction
+types most relevant to interactive video pedagogy: Multiple Choice,
+True/False, Fill in the Blanks, Image Hotspot, Drag and Drop, and Mark the
+Words. All six are supported for manual authoring; the AI pipeline generates
+Multiple Choice, True/False, and Fill in the Blanks suggestions
+automatically, as these three types have deterministic schema structures
+that can be reliably validated via Zod.
+
+\textbf{Video source scope.} The platform accepts direct video uploads in
+MP4, WebM, and MOV formats up to 500~MB, and also accepts YouTube video
+URLs. For YouTube-sourced videos, transcripts are extracted directly from
+the platform's automatic captions. For uploaded video files, instructors may
+upload a WebVTT caption file; alternatively, the system can invoke
+\texttt{faster-whisper} locally to perform audio-to-text transcription.
+
+\textbf{User scope.} The primary target user is a university instructor at
+VNU-HCM. System administration is handled by a second user role (Admin),
+which can manage user accounts, view usage analytics, and export audit logs.
+
+\textbf{Integration scope.} The platform exports standard H5P packages that
+can be imported into any LTI-compatible LMS. An LTI~1.3 route is
+implemented in the backend for direct LMS integration.
+
+\subsection{Limitations}
+
+\begin{itemize}
+  \item \textbf{H5P content types.} The platform does not support the full
+  catalogue of 50+ H5P content types. Branching scenarios, Course
+  Presentation, and other complex types are out of scope.
+
+  \item \textbf{Evaluation sample.} Usability testing was conducted with
+  ten Information Technology students serving as educator proxies, not with
+  actual university faculty. While this is a standard and accepted practice
+  for early-stage usability evaluation~\cite{nielsen1994}, it introduces a
+  limitation in ecological validity.
+
+  \item \textbf{Mobile authoring.} The platform is a responsive web
+  application optimised for desktop browsers. Mobile authoring is possible
+  but was not a design priority and was not formally evaluated.
+
+  \item \textbf{Concurrent users.} The system was stress-tested at up to
+  50 concurrent users. Large-scale institutional deployments serving
+  hundreds of simultaneous editors were not evaluated.
+
+  \item \textbf{AI transcription quality.} The quality of AI-generated
+  suggestions depends directly on the quality of the transcript. Poor audio
+  quality in uploaded videos will degrade Whisper transcription accuracy and,
+  consequently, the relevance of AI suggestions.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Contributions}
+
+This thesis makes the following contributions to educational technology
+research and practice.
+
+\begin{enumerate}
+  \item \textbf{A reproducible platform architecture.} The full-stack
+  architecture combining React~18, Express.js, SQLite/Sequelize, the
+  Lumieducation H5P server library, and a dual-provider AI pipeline is
+  documented in sufficient detail to enable reproduction and institutional
+  adoption.
+
+  \item \textbf{An AI-assisted authoring workflow.} The pipeline that takes
+  a raw video transcript through structured LLM prompting to a
+  Zod-validated, Bloom's-taxonomy-labelled list of H5P suggestions
+  constitutes a novel integration of generative AI into the H5P ecosystem.
+
+  \item \textbf{Prompt engineering for structured H5P output.} The system
+  prompts and validation strategy developed to ensure that Claude and Ollama
+  return JSON that conforms to H5P content type specifications provide a
+  reusable pattern for structured AI output in educational content systems.
+
+  \item \textbf{Empirical usability evidence.} The comparative evaluation
+  against the WordPress H5P baseline provides quantitative evidence that a
+  purpose-built platform can substantially reduce authoring time and improve
+  task completion rates, contributing to the evidence base for user-centred
+  design in educational technology.
+
+  \item \textbf{Open-source codebase.} The platform codebase, including all
+  AI service logic, prompt definitions, and H5P integration code, is made
+  openly available to support further research and institutional adoption.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Significance of the Study}
+
+The practical significance of this work is threefold. First, by lowering
+the authoring barrier, the platform enables a broader range of VNU-HCM
+faculty to produce interactive content and thereby improves the quality
+of online learning experienced by thousands of students. Second, the
+AI-assisted workflow demonstrates that the gap between AI research and
+practical educational tool development can be bridged with modest engineering
+effort, encouraging further investment in similar integrations. Third, the
+platform aligns directly with Vietnam's national digital transformation
+goals~\cite{vietnam_strategy2021} by providing a locally deployable,
+open-source solution that does not depend on expensive commercial software.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Structure of the Report}
+
+The remainder of this report is organised as follows.
+
+\textbf{Chapter~2 -- Literature Review} surveys the academic and technical
+foundations of the work, covering e-learning in Vietnamese higher education,
+the H5P framework and its limitations, interactive video research, cognitive
+load theory, user-centred design, large language models and prompt
+engineering, cloud-native web architecture, and LMS integration standards.
+The chapter concludes with an analysis of related systems and identifies the
+research gaps that this project addresses.
+
+\textbf{Chapter~3 -- Methodology} describes the research design, the
+requirements analysis process, the user-centred design methodology applied
+during interface development, the agile development approach, and the
+evaluation protocol used to measure usability outcomes.
+
+\textbf{Chapter~4 -- System Design and Implementation} presents the
+complete system architecture, database design, backend implementation,
+frontend component structure, the AI pipeline in detail, H5P integration
+mechanisms, and the security implementation.
+
+\textbf{Chapter~5 -- Results and Evaluation} reports the outcomes of
+the comparative usability study, including quantitative task metrics,
+SUS scores, and qualitative participant feedback. It also reports on
+AI pipeline performance and system responsiveness.
+
+\textbf{Chapter~6 -- Conclusion and Future Work} synthesises the findings,
+assesses the contributions in light of the research questions, discusses
+limitations, and proposes directions for future research and platform
+development.

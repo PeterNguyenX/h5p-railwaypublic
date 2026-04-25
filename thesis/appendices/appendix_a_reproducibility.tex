@@ -1,0 +1,93 @@
+\chapter{System Setup and API Reference}
+
+\section{Runtime Environment}
+
+Table~\ref{tab:runtime} lists the software versions used during development
+and testing.
+
+\begin{table}[H]
+  \centering
+  \caption{Runtime environment versions}
+  \label{tab:runtime}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{Component} & \textbf{Version} & \textbf{Notes} \\
+    \midrule
+    Node.js      & 18.x LTS        & Required by \texttt{@lumieducation/h5p-server}. \\
+    npm          & 9.x              & Package manager. \\
+    React        & 18.2.0           & Frontend framework. \\
+    TypeScript   & 4.9.5            & Frontend and shared types. \\
+    Vite         & 4.x              & Frontend build tool. \\
+    Express.js   & 4.21.2           & Backend HTTP framework. \\
+    Sequelize    & 6.37.7           & ORM for SQLite. \\
+    sqlite3      & 5.1.7            & SQLite native bindings. \\
+    Python       & 3.10+            & Required for \texttt{faster-whisper} (optional). \\
+    faster-whisper & 0.10+          & Optional: audio transcription. \\
+    Ollama       & 0.1.x+           & Optional: local LLM inference. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{Starting the Platform}
+
+\begin{enumerate}
+  \item \textbf{Install backend dependencies:}
+\begin{lstlisting}[language=bash]
+cd backend && npm install
+\end{lstlisting}
+
+  \item \textbf{Configure environment:} Copy \texttt{backend/.env.example}
+  to \texttt{backend/.env} and set \texttt{JWT\_SECRET} and optionally
+  \texttt{ANTHROPIC\_API\_KEY}.
+
+  \item \textbf{Start the backend} (runs on port~3001 by default):
+\begin{lstlisting}[language=bash]
+cd backend && npm run dev
+\end{lstlisting}
+
+  \item \textbf{Install frontend dependencies:}
+\begin{lstlisting}[language=bash]
+cd "Simple UX UI Design" && npm install
+\end{lstlisting}
+
+  \item \textbf{Start the frontend} (runs on port~3000 by default):
+\begin{lstlisting}[language=bash]
+cd "Simple UX UI Design" && npm run dev
+\end{lstlisting}
+
+  \item \textbf{Open the application} at
+  \texttt{http://localhost:3000} in a modern web browser.
+\end{enumerate}
+
+\section{Key API Endpoints Reference}
+
+\begin{longtable}{lll}
+  \caption{Key API endpoints} \label{tab:api_ref} \\
+  \toprule
+  \textbf{Method} & \textbf{Path} & \textbf{Description} \\
+  \midrule
+  \endfirsthead
+  \multicolumn{3}{c}{\tablename\ \thetable{} (continued)} \\
+  \toprule
+  \textbf{Method} & \textbf{Path} & \textbf{Description} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endlastfoot
+  POST & /api/auth/register        & Create a new user account. \\
+  POST & /api/auth/login            & Authenticate and receive JWT. \\
+  GET  & /api/videos                & List authenticated user's videos. \\
+  POST & /api/videos                & Upload a new video file. \\
+  POST & /api/videos/youtube        & Import a YouTube video by URL. \\
+  GET  & /api/videos/:id            & Get a single video's metadata. \\
+  DELETE & /api/videos/:id          & Soft-delete a video. \\
+  GET  & /api/h5p/:videoId/content  & Get H5P interactions for a video. \\
+  POST & /api/h5p/:videoId/content  & Add an H5P interaction manually. \\
+  GET  & /api/h5p/:videoId/export   & Export H5P package (binary download). \\
+  GET  & /api/ai/status             & Check AI provider availability. \\
+  POST & /api/ai/analyze            & Analyse transcript (non-streaming). \\
+  POST & /api/ai/analyze-stream     & Analyse transcript (SSE streaming). \\
+  POST & /api/ai/inject             & Inject accepted suggestions into H5P. \\
+  POST & /api/transcript/youtube    & Extract captions from YouTube video. \\
+  GET  & /api/admin/users           & List all users (admin only). \\
+\end{longtable}

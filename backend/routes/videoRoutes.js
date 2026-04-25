@@ -3,9 +3,17 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
+const { z } = require('zod');
 const { auth } = require("../middleware/auth");
+const { validate, validateParams } = require('../middleware/validate');
+const {
+  idParamSchema,
+  updateVideoSchema,
+  youtubeImportSchema,
+} = require('../validation/schemas');
 const { Video } = require("../models");
 const VideoProcessingService = require("../services/videoProcessing");
+const { fetchYoutubeTranscriptSegments } = require('../services/transcriptExtraction');
 const ytdl = require('ytdl-core');
 const { v4: uuidv4 } = require('uuid');
 
@@ -42,12 +50,70 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 500 * 1024 * 1024 // 500MB limit
+    fileSize: 5 * 1024 * 1024 * 1024 // 5GB limit
   }
 });
+
+const videoTemplateParamsSchema = z.object({
+  id: z.string().uuid(),
+  templateId: z.string().uuid(),
+});
+
+const trimVideoSchema = z.object({
+  startTime: z.number().nonnegative(),
+  endTime: z.number().nonnegative(),
+}).refine((data) => data.endTime > data.startTime, {
+  message: 'endTime must be greater than startTime',
+  path: ['endTime'],
+});
+
+const h5pBodySchema = z.object({
+  h5pContent: z.unknown(),
+});
+
+const extractYouTubeVideoId = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+
+  const trimmed = rawUrl.trim();
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(candidate);
+    const host = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.split('/').filter(Boolean)[0];
+      return id && id.length === 11 ? id : null;
+    }
+
+    if (!host.endsWith('youtube.com') && !host.endsWith('youtube-nocookie.com')) {
+      return null;
+    }
+
+    const fromQuery = parsed.searchParams.get('v');
+    if (fromQuery && fromQuery.length === 11) {
+      return fromQuery;
+    }
+
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const markerIndex = parts.findIndex((part) => ['embed', 'v', 'shorts', 'live'].includes(part));
+    if (markerIndex >= 0 && parts[markerIndex + 1] && parts[markerIndex + 1].length === 11) {
+      return parts[markerIndex + 1];
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeYouTubeUrl = (rawUrl) => {
+  const trimmed = (rawUrl || '').trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
 
 // Helper function to format duration
 const formatDuration = (seconds) => {
@@ -68,8 +134,9 @@ const mapVideoData = (video) => {
     // Already set to default, keep as is
     thumbnailPath = '/default-thumbnail.svg';
   } else {
-    // Convert relative path to API accessible path
-    if (!thumbnailPath.startsWith('/api/') && !thumbnailPath.startsWith('/')) {
+    // Convert relative path to API accessible path (skip absolute URLs like YouTube thumbnails)
+    if (!thumbnailPath.startsWith('http://') && !thumbnailPath.startsWith('https://') &&
+        !thumbnailPath.startsWith('/api/') && !thumbnailPath.startsWith('/')) {
       thumbnailPath = `/uploads/${thumbnailPath.replace(/^uploads\//, '')}`;
     }
   }
@@ -174,20 +241,39 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
 });
 
 // YouTube video import route
-router.post("/youtube", auth, async (req, res) => {
+router.post("/youtube", auth, validate(youtubeImportSchema), async (req, res) => {
+  let youtubeUrl = '';
+  let title = '';
+  let description = '';
+
   try {
-    const { title, description, youtubeUrl, language } = req.body;
+    ({ title, description, youtubeUrl } = req.body);
+    const { language } = req.body;
+    youtubeUrl = normalizeYouTubeUrl(youtubeUrl);
 
     // Extract video ID from URL
-    const videoIdMatch = youtubeUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-    if (!videoIdMatch) {
+    const videoId = extractYouTubeVideoId(youtubeUrl);
+    if (!videoId) {
       return res.status(400).json({ error: "Invalid YouTube URL" });
     }
-    const videoId = videoIdMatch[1];
 
     try {
       // Get basic video info first
       const basicInfo = await ytdl.getBasicInfo(youtubeUrl);
+      let extractedCaptions = null;
+
+      // Try to extract captions
+      const transcriptData = await fetchYoutubeTranscriptSegments(youtubeUrl);
+      if (transcriptData.segments.length > 0) {
+        extractedCaptions = {
+          source: 'youtube',
+          languageCode: transcriptData.languageCode,
+          segments: transcriptData.segments,
+        };
+        console.log(`✅ Imported ${transcriptData.segments.length} caption segments from YouTube`);
+      } else {
+        console.warn('⚠️  YouTube video has no captions available');
+      }
       
       // Create video record with basic info
       const video = await Video.create({
@@ -197,6 +283,7 @@ router.post("/youtube", auth, async (req, res) => {
         youtubeId: videoId,
         thumbnailPath: basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.svg',
         duration: parseInt(basicInfo.videoDetails.lengthSeconds) || 0,
+        captions: extractedCaptions,
         userId: req.user.id,
         status: 'ready',
         language: language || 'en'
@@ -212,11 +299,15 @@ router.post("/youtube", auth, async (req, res) => {
       });
 
       res.status(201).json({
-        message: "YouTube video imported successfully",
+        message: extractedCaptions ? "YouTube video imported with captions" : "YouTube video imported (no captions available)",
         video: mapVideoData(video)
       });
     } catch (ytdlError) {
-      console.error("YouTube info extraction error:", ytdlError);
+      console.error("YouTube info extraction error:", {
+        message: ytdlError.message,
+        code: ytdlError.code,
+        youtubeUrl
+      });
       
       // Fallback: Create video with minimal info if ytdl fails
       const video = await Video.create({
@@ -230,8 +321,9 @@ router.post("/youtube", auth, async (req, res) => {
         language: language || 'en'
       });
 
+      console.log("⚠️ Created video with fallback info (ytdl failed)");
       res.status(201).json({
-        message: "YouTube video imported with basic info",
+        message: "YouTube video imported with basic info (captions could not be retrieved)",
         video: mapVideoData(video)
       });
     }
@@ -265,7 +357,7 @@ router.get("/", auth, async (req, res) => {
 });
 
 // Get a single video
-router.get("/:id", auth, async (req, res) => {
+router.get("/:id", auth, validateParams(idParamSchema), async (req, res) => {
   try {
     const video = await Video.findOne({
       where: { 
@@ -286,7 +378,7 @@ router.get("/:id", auth, async (req, res) => {
 });
 
 // Delete a video
-router.delete("/:id", auth, async (req, res) => {
+router.delete("/:id", auth, validateParams(idParamSchema), async (req, res) => {
   try {
     const video = await Video.findOne({
       where: { 
@@ -359,7 +451,7 @@ router.delete("/:id", auth, async (req, res) => {
 });
 
 // Update a video
-router.put("/:id", auth, async (req, res) => {
+router.put("/:id", auth, validateParams(idParamSchema), validate(updateVideoSchema), async (req, res) => {
   try {
     const video = await Video.findOne({
       where: { 
@@ -400,7 +492,7 @@ router.put("/:id", auth, async (req, res) => {
 });
 
 // Generate LTI link for a video
-router.post("/:id/lti", auth, async (req, res) => {
+router.post("/:id/lti", auth, validateParams(idParamSchema), async (req, res) => {
   try {
     const video = await Video.findOne({
       where: { 
@@ -430,7 +522,7 @@ router.post("/:id/lti", auth, async (req, res) => {
 });
 
 // Apply H5P template to a video
-router.post("/:id/template/:templateId", auth, async (req, res) => {
+router.post("/:id/template/:templateId", auth, validateParams(videoTemplateParamsSchema), async (req, res) => {
   try {
     const video = await Video.findOne({
       where: { 
@@ -469,7 +561,7 @@ router.post("/:id/template/:templateId", auth, async (req, res) => {
 });
 
 // Trim video
-router.post("/:id/trim", auth, async (req, res) => {
+router.post("/:id/trim", auth, validateParams(idParamSchema), validate(trimVideoSchema), async (req, res) => {
   try {
     const { startTime, endTime } = req.body;
     const video = await Video.findOne({
@@ -503,7 +595,7 @@ router.post("/:id/trim", auth, async (req, res) => {
 });
 
 // Add H5P content to video
-router.post("/:id/h5p", auth, async (req, res) => {
+router.post("/:id/h5p", auth, validateParams(idParamSchema), validate(h5pBodySchema), async (req, res) => {
   try {
     const { h5pContent } = req.body;
     const video = await Video.findOne({
@@ -530,7 +622,7 @@ router.post("/:id/h5p", auth, async (req, res) => {
 });
 
 // Stream video endpoint
-router.get('/:id/stream', auth, async (req, res) => {
+router.get('/:id/stream', auth, validateParams(idParamSchema), async (req, res) => {
   try {
     const video = await Video.findOne({
       where: { id: req.params.id, userId: req.user.id },

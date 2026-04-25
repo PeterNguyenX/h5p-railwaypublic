@@ -1,0 +1,21 @@
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=1.2cm,
+  comp/.style={draw,rounded corners,align=center,minimum width=3.2cm,minimum height=0.95cm,fill=purple!8}
+]
+\node[comp] (ingress) {Nginx Ingress / Reverse Proxy};
+\node[comp,below=0.9cm of ingress] (frontend) {Frontend Container};
+\node[comp,right=2.0cm of frontend] (backend) {Backend Container};
+\node[comp,below=0.9cm of backend] (db) {Database Service};
+\node[comp,below=0.9cm of frontend] (storage) {Persistent File Volumes};
+
+\draw[-{Latex}] (ingress) -- (frontend);
+\draw[-{Latex}] (ingress) -- (backend);
+\draw[-{Latex}] (backend) -- (db);
+\draw[-{Latex}] (backend) -- (storage);
+\draw[-{Latex}] (frontend) -- (backend);
+\end{tikzpicture}
+\caption{Containerized deployment topology for local and cloud environments}
+\label{fig:deployment}
+\end{figure}

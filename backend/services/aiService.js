@@ -10,7 +10,7 @@ const AI_SYSTEM_PROMPT = `You are an instructional design assistant. Given a vid
 Each object must match this schema exactly:
 {
   "timestamp": number,
-  "type": "MultiChoice" | "TrueFalse" | "FillBlanks" | "Hotspot" | "DragDrop",
+  "type": "MultiChoice" | "TrueFalse" | "FillBlanks" | "Hotspot" | "DragDrop" | "MarkWords",
   "config": { ...H5P content params },
   "reason": string
 }
@@ -18,13 +18,17 @@ Each object must match this schema exactly:
 Rules:
 - Space suggestions at least 30 seconds apart
 - Prefer moments after a concept is fully explained, not mid-sentence
-- For MultiChoice, always include exactly 4 options with one correct
-- For FillBlanks, mark the blank with *asterisks*
+- For MultiChoice, always include exactly 4 options with one correct: { "question": "...", "answers": [{"text":"...","correct":true},{"text":"...","correct":false},...] }
+- For TrueFalse: { "question": "...", "correct": true|false }
+- For FillBlanks, mark the blank with *asterisks*: { "text": "The *answer* goes here.", "questions": [{"text":"answer"}] }
+- For Hotspot: { "question": "...", "imageDescription": "...", "spots": [] }
+- For DragDrop: { "question": "...", "items": [{"text":"...","category":"..."}], "categories": ["...", "..."] }
+- For MarkWords, provide a sentence where key terms should be marked: { "taskDescription": "Mark all the key concepts.", "textField": "The *photosynthesis* process uses *sunlight* to produce *glucose*." }
 - Config keys must match H5P content type specification exactly`;
 
 const suggestionSchema = z.object({
   timestamp: z.number().nonnegative(),
-  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks', 'Hotspot', 'DragDrop']),
+  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks', 'Hotspot', 'DragDrop', 'MarkWords']),
   config: z.record(z.unknown()),
   reason: z.string()
 });
@@ -39,7 +43,8 @@ const H5P_TYPE_MAP = {
   TrueFalse: 'H5P.TrueFalse 1.6',
   FillBlanks: 'H5P.Blanks 1.14',
   Hotspot: 'H5P.ImageHotspotQuestion 1.8',
-  DragDrop: 'H5P.DragQuestion 1.14'
+  DragDrop: 'H5P.DragQuestion 1.14',
+  MarkWords: 'H5P.MarkTheWords 1.9'
 };
 
 /**
@@ -126,12 +131,15 @@ async function analyzeTranscript(segments, apiKey) {
 /**
  * Analyze transcript using Claude API with SSE streaming.
  * Writes Server-Sent Events to the Express response object.
+ * Optionally saves suggestions to Video.h5pContent if videoId and video are provided.
  * @param {{ start: number, end: number, text: string }[]} segments
  * @param {string} apiKey
  * @param {import('express').Response} res - Express response for SSE
+ * @param {string} videoId - Optional video ID for persistence
+ * @param {object} video - Optional video object for persistence
  * @returns {Promise<void>}
  */
-async function analyzeTranscriptStream(segments, apiKey, res) {
+async function analyzeTranscriptStream(segments, apiKey, res, videoId, video) {
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY is not configured');
   }
@@ -199,6 +207,29 @@ async function analyzeTranscriptStream(segments, apiKey, res) {
         status: 'pending'
       };
     }).filter(Boolean);
+
+    // Save to database if video is provided
+    if (videoId && video) {
+      try {
+        const h5pContent = video.h5pContent || [];
+        const newContent = enriched.map(suggestion => ({
+          id: suggestion.id,
+          timestamp: suggestion.timestamp,
+          type: suggestion.type,
+          h5pLibrary: suggestion.h5pLibrary,
+          config: suggestion.config,
+          reason: suggestion.reason,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        }));
+        h5pContent.push(...newContent);
+        await video.update({ h5pContent });
+        console.log(`Persisted ${newContent.length} H5P suggestions to video ${videoId}`);
+      } catch (dbErr) {
+        console.error('Failed to persist suggestions to database:', dbErr.message);
+        // Don't fail the stream, just log the error
+      }
+    }
 
     // Send final result
     res.write(`data: ${JSON.stringify({ type: 'result', suggestions: enriched })}\n\n`);

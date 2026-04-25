@@ -1,0 +1,359 @@
+\chapter{Methodology}
+
+This chapter describes how the research was designed and executed. It covers
+the overall research design, the requirements analysis process, the
+user-centred design methodology, the software development approach, and the
+evaluation protocol.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Research Design}
+
+This research adopts a \emph{design science} paradigm~\cite{sommerville2016},
+in which the primary contribution is an artefact---the H5P interactive video
+platform---that is created, described, and evaluated. Design science research
+is appropriate for projects that aim to solve a concrete problem for a
+defined stakeholder group (university instructors at VNU-HCM) by building
+and evaluating a purposeful artefact (a web-based authoring system).
+
+The research combines two methodological phases:
+
+\begin{enumerate}
+  \item \textbf{Constructive phase.} User requirements are elicited,
+  the system is designed and implemented, and the AI pipeline is built and
+  integrated.
+
+  \item \textbf{Evaluative phase.} A comparative usability study measures
+  the artefact's performance against the incumbent WordPress-based H5P
+  workflow on four metrics: task completion rate, time-on-task, error rate,
+  and SUS score.
+\end{enumerate}
+
+An \emph{agile development methodology} was adopted for the constructive
+phase, using short iterative cycles of 2--3 weeks each~\cite{beck2001}. Each
+cycle produced a testable increment of the platform, and informal
+walkthroughs at the end of each cycle informed the next design iteration.
+This approach was chosen because the interaction between the AI pipeline and
+the H5P authoring workflow could not be fully specified in advance; some
+requirements emerged only during implementation.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Requirements Analysis}
+
+\subsection{User Research}
+
+Prior to system design, informal structured interviews were conducted with
+five university instructors at HCMIU to understand their current H5P
+authoring experience, their pain points, and their expectations for an
+improved tool. Participants were selected to represent a range of technical
+proficiency levels and disciplinary backgrounds (engineering, social
+sciences, business). The key themes that emerged from these interviews are
+summarised in Table~\ref{tab:pain_points}.
+
+\begin{table}[H]
+  \centering
+  \caption{Pain points identified in instructor interviews (n\,=\,5)}
+  \label{tab:pain_points}
+  \begin{tabularx}{\linewidth}{lXl}
+    \toprule
+    \textbf{Theme} & \textbf{Representative quote} & \textbf{Frequency} \\
+    \midrule
+    Interface complexity & ``I have to click through so many pages just to add one question'' & 5/5 \\
+    Fear of losing work  & ``Sometimes the page refreshes and I lose everything'' & 4/5 \\
+    Time cost            & ``It takes me an entire afternoon to make a short interactive video'' & 5/5 \\
+    No preview           & ``I can only see what the question looks like after I export it'' & 4/5 \\
+    No AI assistance     & ``I wish I could tell the system to suggest questions for me'' & 3/5 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A brief observational session in which instructors were asked to create a
+simple three-question interactive video using the WordPress H5P plugin was
+also conducted. This session confirmed the 45-minute average task completion
+time reported in the project brief and revealed two additional insights:
+(a)~instructors frequently lost their position in the video while navigating
+to and from the question editor, requiring them to re-seek the correct
+timestamp; and (b)~instructors with lower technical proficiency abandoned
+the task entirely after encountering two consecutive error screens.
+
+\subsection{Functional Requirements}
+
+The functional requirements derived from the user research and the project
+objectives are listed in Table~\ref{tab:functional_reqs}.
+
+\begin{longtable}{lp{0.58\linewidth}l}
+  \caption{Functional requirements}
+  \label{tab:functional_reqs} \\
+  \toprule
+  \textbf{ID} & \textbf{Requirement} & \textbf{Priority} \\
+  \midrule
+  \endfirsthead
+  \multicolumn{3}{c}{\tablename\ \thetable{} (continued)} \\
+  \toprule
+  \textbf{ID} & \textbf{Requirement} & \textbf{Priority} \\
+  \midrule
+  \endhead
+  \midrule
+  \multicolumn{3}{r}{Continued on next page} \\
+  \endfoot
+  \bottomrule
+  \endlastfoot
+  FR-01 & User registration, login, and JWT-based session management. & Must \\
+  FR-02 & Video upload supporting MP4, WebM, and MOV formats up to 500~MB. & Must \\
+  FR-03 & YouTube URL import with automatic metadata and thumbnail extraction. & Must \\
+  FR-04 & Visual timeline-based H5P question editor with timestamp seek. & Must \\
+  FR-05 & Support for six H5P interaction types (see Table~\ref{tab:h5p_types}). & Must \\
+  FR-06 & Real-time H5P preview within the editor without export. & Must \\
+  FR-07 & H5P package export as a downloadable \texttt{.h5p} file. & Must \\
+  FR-08 & Transcript extraction from YouTube automatic captions. & Must \\
+  FR-09 & AI analysis of transcript segments to generate H5P suggestions. & Must \\
+  FR-10 & SSE streaming of AI analysis progress to the client. & Should \\
+  FR-11 & Accept/reject/edit workflow for AI-generated suggestions. & Must \\
+  FR-12 & Injection of accepted suggestions into the H5P content store. & Must \\
+  FR-13 & Audio transcription via \texttt{faster-whisper} for uploaded files. & Should \\
+  FR-14 & Admin role with user management and audit log access. & Should \\
+  FR-15 & LTI~1.3 launch endpoint for LMS integration. & Could \\
+  FR-16 & Content dashboard with search, folder organisation, and trash. & Must \\
+\end{longtable}
+
+\subsection{Non-Functional Requirements}
+
+Non-functional requirements govern the quality attributes of the system
+and are listed in Table~\ref{tab:nonfunc_reqs}.
+
+\begin{table}[H]
+  \centering
+  \caption{Non-functional requirements}
+  \label{tab:nonfunc_reqs}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{ID} & \textbf{Category} & \textbf{Requirement} \\
+    \midrule
+    NFR-01 & Performance  & REST API responses must complete within 500\,ms for all non-AI endpoints at 50 concurrent users. \\
+    NFR-02 & Performance  & Video upload processing (thumbnail generation, metadata extraction) must complete within 30\,s for files $\leq 100$\,MB. \\
+    NFR-03 & Security     & All passwords stored as bcrypt hashes with cost factor~$\geq$~12. \\
+    NFR-04 & Security     & Authentication tokens must be JWT, signed with HS256, expiring after 7~days. \\
+    NFR-05 & Security     & All HTTP responses must include Helmet-generated security headers. \\
+    NFR-06 & Security     & All API endpoints must validate and sanitise input before processing. \\
+    NFR-07 & Reliability  & The system must handle the absence of both Claude and Ollama gracefully, returning an informative error rather than crashing. \\
+    NFR-08 & Usability    & The platform must achieve a SUS score~$\geq$~70 in user testing. \\
+    NFR-09 & Usability    & First-time task completion rate for creating a 3-question interactive video must exceed 80\%. \\
+    NFR-10 & Compatibility & Exported \texttt{.h5p} packages must be importable into Moodle~4.x and Canvas without modification. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{User-Centred Design Process}
+
+The interface was designed using a three-stage user-centred design process
+following the principles established in Section~2.4~\cite{garrett2010,
+norman1988,nielsen1994}.
+
+\subsection{Stage 1: Conceptual Design}
+
+In the conceptual design stage, the pain points and requirements were
+translated into high-level user flow diagrams for the two primary use cases:
+(1)~creating an interactive video manually, and (2)~using the AI pipeline
+to generate and review suggestions. These flows were reviewed against
+Nielsen's usability heuristics~\cite{nielsen1994} to identify potential
+sources of extraneous cognitive load before any interface sketches were
+produced.
+
+The most significant design decision at this stage was to co-locate the video
+player, the timestamp display, and the question editor on a single screen.
+This directly addresses the split-attention effect identified in the
+literature (Section~2.5) and eliminates the requirement to navigate between
+screens during authoring.
+
+\subsection{Stage 2: Wireframing and Heuristic Evaluation}
+
+Low-fidelity wireframes were produced for the dashboard, the editor, and
+the AI suggestion review panel. These wireframes were evaluated against
+Nielsen's heuristics~\cite{nielsen1994} with a focus on:
+
+\begin{itemize}
+  \item \textbf{Visibility of system status:} Every asynchronous operation
+  (video upload, AI analysis, package export) must display a progress
+  indicator with status text.
+  \item \textbf{Error prevention:} All form inputs must be validated
+  client-side before submission; the submit button must be disabled until
+  all required fields are valid.
+  \item \textbf{User control and freedom:} Users must be able to cancel
+  any in-progress AI analysis without reloading the page.
+  \item \textbf{Recognition over recall:} Question types must be presented
+  as labelled tiles with icons, not as a dropdown menu requiring the user
+  to remember H5P type names.
+\end{itemize}
+
+\subsection{Stage 3: Prototype Testing and Iteration}
+
+A functional prototype implementing the core editor workflow was produced
+after the first development cycle and tested informally with two IT students.
+The session used a think-aloud protocol in which participants verbally
+described their intentions as they attempted to create a simple interactive
+video. Three usability problems were identified and resolved before the
+formal evaluation:
+
+\begin{enumerate}
+  \item The timestamp input field was not automatically populated with the
+  current playback position. Fix: added an auto-populate button that captures
+  the current time.
+  \item The AI analysis status messages were not visible without scrolling
+  down. Fix: anchored the status panel to the top of the suggestions column.
+  \item The ``Export H5P'' button label was unclear. Fix: relabelled to
+  ``Download .h5p package'' with a tooltip explaining LMS compatibility.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Development Methodology}
+
+\subsection{Technology Selection}
+
+Technology selection was guided by four criteria: community maturity,
+alignment with the H5P server library's Node.js requirement, developer
+familiarity, and suitability for the AI pipeline.
+
+\begin{itemize}
+  \item \textbf{Frontend: React~18 + TypeScript + Vite.}
+  React was selected because it is the most widely adopted JavaScript UI
+  framework, providing a large ecosystem of compatible libraries and
+  extensive documentation~\cite{react2023}. TypeScript was mandatory because
+  the AI pipeline involves multiple JSON schemas (transcript segments,
+  AI suggestions, H5P content parameters) that must be kept consistent
+  across client and server~\cite{typescript2023}. Vite was chosen as the
+  build tool for its sub-second hot module replacement~\cite{vite2023}.
+
+  \item \textbf{Backend: Node.js + Express.js.}
+  Node.js was selected to maintain a single language across the stack and to
+  satisfy the \texttt{@lumieducation/h5p-server} dependency~\cite{nodejs2023,
+  expressjs2023}. Express.js provides a minimal, middleware-based HTTP
+  framework that integrates cleanly with the H5P server library.
+
+  \item \textbf{Database: SQLite via Sequelize ORM.}
+  SQLite was selected for its zero-configuration deployment and its
+  sufficiency for the expected data volumes (hundreds of users, thousands
+  of videos)~\cite{sqlite2023}. The Sequelize ORM provides a type-safe
+  model layer, migration support, and future flexibility to switch to
+  PostgreSQL if institutional scale demands it~\cite{sequelize2023}.
+
+  \item \textbf{AI: Anthropic Claude + Ollama.}
+  Anthropic Claude was selected as the cloud AI provider because of its
+  strong instruction-following and reliable JSON output~\cite{anthropic2024}.
+  Ollama was added as a first-choice local provider to enable cost-free,
+  privacy-preserving operation in environments where API access is
+  unavailable~\cite{brown2020}.
+\end{itemize}
+
+\subsection{Development Cycles}
+
+The project was executed in five development cycles, each 2--3 weeks long,
+over a twelve-week period. Table~\ref{tab:dev_cycles} summarises the scope
+of each cycle.
+
+\begin{table}[H]
+  \centering
+  \caption{Development cycle summary}
+  \label{tab:dev_cycles}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{Cycle} & \textbf{Weeks} & \textbf{Deliverables} \\
+    \midrule
+    1 & 1--2  & Project setup, database schema, user authentication (JWT + bcrypt), basic video upload. \\
+    2 & 3--5  & H5P service integration, manual question editor, real-time preview. \\
+    3 & 6--8  & YouTube import, transcript extraction, AI analysis service (Claude + Ollama), SSE streaming. \\
+    4 & 9--10 & AI suggestion review panel, H5P injection service, export functionality. \\
+    5 & 11--12 & Dashboard enhancements, security hardening (Helmet, rate limiting, Zod validation), admin panel, LTI endpoint. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Evaluation Methodology}
+
+\subsection{Study Design}
+
+The evaluation employed a within-subject comparative usability study with
+ten participants, following the protocol recommended by Nielsen for small
+usability studies~\cite{nielsen1994}. Each participant completed an
+identical set of tasks on both the new platform and the WordPress H5P
+plugin, in counterbalanced order, with a 30-minute rest between sessions to
+reduce learning effects.
+
+\subsection{Participants}
+
+Participants were ten students enrolled in Information Technology programmes
+at HCMIU, recruited voluntarily. Serving as educator proxies is a standard
+and accepted approach in early-stage usability evaluation for educational
+technology~\cite{nielsen1994}: IT students are familiar with the concept of
+content authoring tools and can be briefed on the instructor role without
+extensive domain training. Table~\ref{tab:participants} summarises
+participant characteristics.
+
+\begin{table}[H]
+  \centering
+  \caption{Participant characteristics (n\,=\,10)}
+  \label{tab:participants}
+  \begin{tabularx}{\linewidth}{Xl}
+    \toprule
+    \textbf{Characteristic} & \textbf{Value} \\
+    \midrule
+    Mean age & 21.3 years (SD\,=\,1.2) \\
+    Gender & 6 male, 4 female \\
+    Prior H5P experience & None (10/10) \\
+    Prior WordPress experience & Minimal (8/10), Moderate (2/10) \\
+    Prior React/web development experience & Basic (7/10), Intermediate (3/10) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Task Scenarios}
+
+Participants were given a standardised task description:
+
+\begin{quote}
+  \itshape You are a lecturer preparing a short interactive video on a
+  scientific topic. You have been given a 5-minute lecture video. Your task
+  is to: (1)~upload or link the video, (2)~add at least three H5P questions
+  at appropriate timestamps, and (3)~export the H5P package for use in the
+  university's LMS. Complete these tasks as you would if preparing actual
+  teaching materials.
+\end{quote}
+
+For the new platform, participants were additionally instructed to:
+(4)~use the AI analysis feature and review the generated suggestions before
+adding their own questions.
+
+\subsection{Metrics}
+
+Four primary metrics were collected:
+
+\begin{enumerate}
+  \item \textbf{Task completion rate (TCR):} The percentage of participants
+  who completed all three sub-tasks without abandonment. A task was scored
+  as incomplete if the participant explicitly gave up or if the session
+  reached the 20-minute time limit without completion.
+
+  \item \textbf{Time-on-task (ToT):} The elapsed time from task
+  commencement to the point at which the participant exported a valid
+  \texttt{.h5p} package, measured in minutes and seconds.
+
+  \item \textbf{Error count:} The number of observable errors (incorrect
+  actions requiring correction, error messages triggered, or navigational
+  dead-ends) recorded by the observer.
+
+  \item \textbf{SUS score:} Administered immediately after each session.
+  A SUS score above 68 is considered above average; above 80 is
+  excellent~\cite{brooke1996}.
+\end{enumerate}
+
+Qualitative data were collected through think-aloud verbalisations during
+the sessions and a brief semi-structured interview administered after both
+sessions were complete.
+
+\subsection{Baseline System}
+
+The baseline was the WordPress H5P plugin (version 1.15.8) installed on a
+standard LAMP stack, configured to match the environment used by VNU-HCM
+faculty. Participants were given a brief 5-minute orientation to the
+WordPress interface before starting the task, equivalent to the orientation
+they would receive from a standard university ICT induction.

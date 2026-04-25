@@ -1,0 +1,561 @@
+\chapter{System Design and Implementation}
+
+This chapter presents the complete technical design and implementation of the
+platform. It covers the overall system architecture, database design, backend
+implementation, frontend structure, the AI pipeline, H5P integration, and
+the security model.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Overall System Architecture}
+
+\subsection{Architectural Overview}
+
+The platform follows a three-tier architecture consisting of a
+\emph{presentation tier} (React SPA), an \emph{application tier}
+(Express.js REST API), and a \emph{data tier} (SQLite database managed via
+Sequelize ORM)~\cite{bass2012}. External service dependencies are limited to
+the Anthropic Claude API (cloud AI) and Ollama (local AI); all other
+components run within the local server process.
+
+Figure~\ref{fig:architecture} shows the complete system architecture.
+
+\begin{figure}[H]
+  \centering
+  \input{figures/fig_system_architecture}
+  \caption{Three-tier system architecture of the H5P Interactive Video Platform}
+  \label{fig:architecture}
+\end{figure}
+
+The architectural goals that drove the design are:
+
+\begin{itemize}
+  \item \textbf{Separation of concerns.} The frontend communicates with the
+  backend exclusively through a versioned REST API. No server-side rendering
+  is used, ensuring that the UI can be developed and tested independently.
+
+  \item \textbf{AI provider independence.} The AI pipeline checks for Ollama
+  availability at request time and falls back to Claude transparently. The
+  frontend receives identical suggestion structures regardless of which
+  provider was used.
+
+  \item \textbf{H5P library isolation.} All H5P operations are delegated to
+  the \texttt{@lumieducation/h5p-server} library, ensuring compliance with
+  H5P specification changes without requiring platform-level modifications.
+
+  \item \textbf{Stateless REST API.} The API server is stateless; all
+  session state is carried by the JWT Bearer token in the
+  \texttt{Authorization} header. This design supports horizontal scaling.
+\end{itemize}
+
+\subsection{API Route Structure}
+
+The REST API is organised under the \texttt{/api/} prefix. Table~\ref{tab:api_routes}
+lists the primary route groups.
+
+\begin{table}[H]
+  \centering
+  \caption{REST API route groups}
+  \label{tab:api_routes}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{Prefix}            & \textbf{Methods}               & \textbf{Responsibility} \\
+    \midrule
+    \texttt{/api/auth}         & POST                           & Registration, login, password reset, JWT refresh. \\
+    \texttt{/api/videos}       & GET, POST, PUT, DELETE         & Video CRUD, YouTube import, metadata management. \\
+    \texttt{/api/h5p}          & GET, POST, DELETE              & H5P content CRUD, package export, preview rendering. \\
+    \texttt{/api/ai/analyze}   & POST                           & Non-streaming transcript analysis (JSON response). \\
+    \texttt{/api/ai/analyze-stream} & POST                      & Streaming transcript analysis (SSE response). \\
+    \texttt{/api/ai/inject}    & POST                           & Inject accepted suggestions into H5P content store. \\
+    \texttt{/api/ai/transcribe-and-generate} & POST             & Full pipeline: transcript extraction + AI generation. \\
+    \texttt{/api/transcript}   & POST                           & YouTube caption extraction and segment normalisation. \\
+    \texttt{/api/admin}        & GET, POST, PUT                 & User management, audit logs (admin role only). \\
+    \texttt{/api/lti}          & GET, POST                      & LTI~1.3 launch and deep-link endpoints. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Database Design}
+
+\subsection{Database Technology Selection}
+
+The platform uses SQLite as its database engine, managed through the
+Sequelize v6 ORM~\cite{sqlite2023,sequelize2023}. SQLite was selected
+over PostgreSQL for four reasons:
+
+\begin{enumerate}
+  \item \textbf{Zero-configuration deployment.} SQLite stores the entire
+  database in a single file (\texttt{h5p.db}), requiring no separate
+  database server process, no connection string configuration, and no user
+  or password management. This substantially lowers the barrier to local
+  installation for educational institutions with limited IT support.
+
+  \item \textbf{Sufficient capacity.} SQLite comfortably handles databases
+  in the hundreds-of-gigabytes range with concurrent reads and moderate
+  concurrent writes---far exceeding the expected scale of a
+  single-institution deployment.
+
+  \item \textbf{Future migration path.} Sequelize's dialect abstraction
+  layer allows migration to PostgreSQL (or MySQL) by changing a single
+  configuration variable when institutional scale demands a dedicated
+  database server.
+
+  \item \textbf{Native JSON support.} Sequelize's \texttt{DataTypes.JSON}
+  mapping stores the H5P content parameter structure as a native JSON column,
+  enabling efficient reads without schema migration when H5P content
+  structure changes.
+\end{enumerate}
+
+\subsection{Entity--Relationship Design}
+
+The data model is deliberately minimal, comprising two primary entities:
+\textbf{User} and \textbf{Video}. The relationship is one-to-many: one user
+may own many videos; each video belongs to exactly one user.
+
+Figure~\ref{fig:erd} shows the entity--relationship diagram.
+
+\begin{figure}[H]
+  \centering
+  \input{figures/fig_erd}
+  \caption{Entity--relationship diagram for the platform data model}
+  \label{fig:erd}
+\end{figure}
+
+\subsection{User Model}
+
+The \texttt{Users} table stores account credentials and role information.
+Table~\ref{tab:user_model} documents its columns.
+
+\begin{table}[H]
+  \centering
+  \caption{User model columns}
+  \label{tab:user_model}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{Column}       & \textbf{Type}                 & \textbf{Description} \\
+    \midrule
+    \texttt{id}           & UUID (PK)                     & System-generated UUID~v4 primary key. \\
+    \texttt{username}     & VARCHAR(30), UNIQUE           & Unique display name (3--30 characters). \\
+    \texttt{email}        & VARCHAR, UNIQUE               & Validated email address. \\
+    \texttt{password}     & VARCHAR                       & bcrypt hash (cost factor~12). Never stored in plaintext. \\
+    \texttt{role}         & ENUM(user, admin)             & Role-based access control level. \\
+    \texttt{isActive}     & BOOLEAN                       & Soft-disable flag for admin use. \\
+    \texttt{resetToken}   & VARCHAR, nullable             & Secure random token for password reset flows. \\
+    \texttt{resetTokenExpiry} & DATETIME, nullable        & Expiry timestamp for reset token (1-hour TTL). \\
+    \texttt{createdAt}    & DATETIME                      & Sequelize auto-timestamp. \\
+    \texttt{updatedAt}    & DATETIME                      & Sequelize auto-timestamp. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Two database indexes are defined on \texttt{Users}: a unique index on
+\texttt{email} and a unique index on \texttt{username}. A partial index on
+\texttt{resetToken} supports efficient lookup during password reset flows.
+
+\subsection{Video Model}
+
+The \texttt{Videos} table stores all metadata for uploaded or imported videos
+and the H5P content associated with each video. Table~\ref{tab:video_model}
+documents its columns.
+
+\begin{table}[H]
+  \centering
+  \caption{Video model columns}
+  \label{tab:video_model}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{Column}         & \textbf{Type}                     & \textbf{Description} \\
+    \midrule
+    \texttt{id}             & UUID (PK)                         & System-generated UUID~v4 primary key. \\
+    \texttt{title}          & VARCHAR(100)                      & Instructor-provided title (1--100 characters). \\
+    \texttt{description}    & TEXT, nullable                    & Optional description. \\
+    \texttt{filePath}       & VARCHAR, nullable                 & Server filesystem path for uploaded video files. \\
+    \texttt{hlsPath}        & VARCHAR, nullable                 & Path to HLS manifest for adaptive streaming. \\
+    \texttt{thumbnailPath}  & VARCHAR, nullable                 & Path to auto-generated thumbnail image. \\
+    \texttt{duration}       & INTEGER (seconds), nullable       & Video duration in seconds. \\
+    \texttt{status}         & ENUM(processing, ready, error)    & Upload/processing state. \\
+    \texttt{h5pContent}     & JSON, nullable                    & Array of H5P interaction objects with timestamps. \\
+    \texttt{metadata}       & JSON, nullable                    & Free-form metadata (resolution, codec, etc.). \\
+    \texttt{youtubeUrl}     & VARCHAR, nullable                 & Original YouTube URL for imported videos. \\
+    \texttt{youtubeId}      & VARCHAR, nullable                 & Extracted 11-character YouTube video ID. \\
+    \texttt{trimStart}      & FLOAT, default 0                  & Trim start point in seconds. \\
+    \texttt{trimEnd}        & FLOAT, nullable                   & Trim end point in seconds. \\
+    \texttt{captions}       & JSON, nullable                    & Extracted or uploaded transcript segments. \\
+    \texttt{ltiLink}        & VARCHAR, nullable                 & LTI deep-link URL for LMS integration. \\
+    \texttt{language}       & ENUM(en, vi), default en          & Content language for AI prompt adaptation. \\
+    \texttt{userId}         & UUID (FK $\to$ Users.id)          & Owner reference with cascade-delete. \\
+    \texttt{createdAt}      & DATETIME                          & Sequelize auto-timestamp. \\
+    \texttt{updatedAt}      & DATETIME                          & Sequelize auto-timestamp. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Four composite and single-column indexes are defined on \texttt{Videos}:
+\texttt{idx\_videos\_user\_id}, \texttt{idx\_videos\_status},
+\texttt{idx\_videos\_created\_at}, and the compound index
+\texttt{idx\_videos\_user\_status}. These indexes support the dashboard's
+primary query pattern: retrieve all videos belonging to the authenticated
+user, ordered by creation date.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Backend Implementation}
+
+\subsection{Server Bootstrap and Middleware Stack}
+
+The Express application (\texttt{server.js}) is initialised with the
+middleware stack shown in Table~\ref{tab:middleware}. Middleware is applied
+in the order listed; security middleware precedes application middleware.
+
+\begin{table}[H]
+  \centering
+  \caption{Express middleware stack (in order of application)}
+  \label{tab:middleware}
+  \begin{tabularx}{\linewidth}{lX}
+    \toprule
+    \textbf{Middleware}          & \textbf{Purpose} \\
+    \midrule
+    \texttt{helmet()}            & Sets 12 HTTP security headers (CSP, HSTS, X-Frame-Options, etc.)~\cite{helmet2023}. \\
+    \texttt{cors()}              & Allows requests only from the configured allowlist (localhost ports and the production domain). \\
+    \texttt{express-rate-limit}  & Global rate limit of 100 requests per 15-minute window per IP address. \\
+    \texttt{express.json()}      & Parses JSON request bodies; limits request body to 10~MB. \\
+    \texttt{requestLogger}       & Winston-based structured logger recording method, path, status, and latency. \\
+    Route handlers               & Auth, video, H5P, AI, transcript, admin, LTI route groups. \\
+    \texttt{notFound}            & Catches unmatched routes and returns 404 JSON. \\
+    \texttt{errorHandler}        & Catches all unhandled errors and returns structured 500 JSON without stack traces in production. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Authentication and Authorisation}
+
+All protected endpoints require a valid JWT Bearer token in the HTTP
+\texttt{Authorization} header. The \texttt{auth} middleware verifies the
+token's signature using the \texttt{JWT\_SECRET} environment variable,
+extracts the \texttt{userId} and \texttt{role} claims, and attaches them
+to \texttt{req.user}. Token expiry is set to seven days.
+
+The \texttt{admin} middleware extends \texttt{auth} by additionally checking
+that \texttt{req.user.role === 'admin'}, returning HTTP~403 if not. Admin-only
+routes include user management (\texttt{/api/admin/users}) and audit log
+access.
+
+Password hashing uses \texttt{bcryptjs} with a cost factor of 12, as
+recommended by OWASP for 2025 hardware~\cite{owasp2021}. Hashing and
+comparison are performed in Sequelize model hooks (\texttt{beforeCreate}
+and \texttt{beforeUpdate}), ensuring that plaintext passwords never reach
+the database layer.
+
+\subsection{Video Processing}
+
+When a video file is uploaded, the server performs three asynchronous
+operations using \texttt{fluent-ffmpeg}~\cite{ffmpeg2023}:
+
+\begin{enumerate}
+  \item \textbf{Thumbnail generation:} Extracts a frame at the 10-second
+  mark and saves it as a JPEG in the \texttt{uploads/thumbnails/} directory.
+  \item \textbf{Metadata extraction:} Reads codec, resolution, frame rate,
+  and duration from the video container.
+  \item \textbf{Status update:} Updates the Video record's \texttt{status}
+  field from \texttt{processing} to \texttt{ready} upon completion, or
+  \texttt{error} if FFmpeg fails.
+\end{enumerate}
+
+For YouTube-imported videos, metadata is fetched from the YouTube oEmbed
+API using the \texttt{ytdl-core} library, which also provides the video
+thumbnail URL directly.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Frontend Implementation}
+
+\subsection{Application Structure}
+
+The React frontend is a TypeScript SPA built with Vite~\cite{vite2023}. The
+application is organised into three primary route-level components:
+
+\begin{itemize}
+  \item \textbf{Login / Register.} Authentication forms with client-side
+  validation using React controlled components.
+  \item \textbf{Dashboard.} Displays all videos owned by the authenticated
+  user, organised into user-managed folders with a virtual trash bin
+  (30-day retention). Provides global search, one-click H5P export, and a
+  video visit counter.
+  \item \textbf{Editor.} The core authoring interface, described in detail
+  below.
+\end{itemize}
+
+State management is handled using two Zustand stores: \texttt{authStore}
+(authentication state and JWT token) and \texttt{editorStore} (current video,
+H5P elements, AI suggestions, upload progress, and streaming status).
+
+\subsection{The Editor Interface}
+
+The editor is a single-screen interface with three vertical panels:
+
+\begin{enumerate}
+  \item \textbf{Left panel: Video source and upload.} Provides drag-and-drop
+  video upload, YouTube URL input, and a video metadata summary (title,
+  duration, status).
+
+  \item \textbf{Centre panel: Video player and H5P timeline.} Displays the
+  video using the HTML5 \texttt{<video>} element (or an embedded YouTube
+  iframe), with playback controls and a \emph{seek-to-timestamp} button.
+  Below the player, the H5P Timeline lists all existing interactions with
+  their timestamps, types, and quick-edit controls.
+
+  \item \textbf{Right panel: AI suggestions.} Displays the list of AI-generated
+  suggestions returned by the most recent analysis. Each suggestion card
+  shows the timestamp, H5P type, question text, Bloom's taxonomy level,
+  and the AI's reasoning. Instructors can accept (injecting the suggestion
+  into the H5P timeline), reject, or edit each suggestion individually.
+\end{enumerate}
+
+The AI analysis is initiated by clicking the ``AI Analyse'' button, which
+opens the transcript source selector. The frontend opens an SSE connection
+to \texttt{/api/ai/analyze-stream}; streaming tokens are accumulated and
+parsed into partial suggestion objects that appear progressively in the right
+panel as the LLM generates them.
+
+\subsection{Type Safety and API Client}
+
+The frontend communicates with the backend through a typed API client
+(\texttt{src/lib/api.ts}) that declares TypeScript interfaces for every
+request and response object. This prevents type mismatches between the
+frontend expectations and the backend JSON schemas, catching integration
+errors at compile time rather than at runtime.
+
+The \texttt{AISuggestion} type, for example, mirrors the Zod schema used
+by the AI service on the backend:
+
+\begin{lstlisting}[language=TypeScript,caption={AISuggestion TypeScript interface}]
+interface AISuggestion {
+  id: string;
+  timestamp: number;
+  type: 'MultiChoice' | 'TrueFalse' | 'FillBlanks'
+      | 'Hotspot' | 'DragDrop' | 'MarkWords';
+  h5pLibrary: string;
+  config: Record<string, unknown>;
+  reason: string;
+  status: 'pending' | 'accepted' | 'rejected';
+}
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{AI Pipeline Architecture}
+
+The AI pipeline is the defining technical contribution of this platform.
+It converts a raw video transcript into a validated, Bloom's-labelled list
+of H5P interaction suggestions through a four-stage process. Figure~\ref{fig:ai_pipeline}
+illustrates this flow.
+
+\begin{figure}[H]
+  \centering
+  \input{figures/fig_ai_pipeline}
+  \caption{AI pipeline: from video transcript to injected H5P interactions}
+  \label{fig:ai_pipeline}
+\end{figure}
+
+\subsection{Stage 1: Transcript Acquisition}
+
+Transcript acquisition is handled by the \texttt{transcriptExtraction.js}
+service, which supports three source mechanisms:
+
+\begin{enumerate}
+  \item \textbf{YouTube automatic captions} (primary for YouTube-sourced
+  videos). The \texttt{youtube-transcript} npm package fetches timestamped
+  caption segments directly from the YouTube API using the video's 11-character
+  ID. Segments are normalised into a standard format:
+  \texttt{\{start: number, end: number, text: string\}}.
+
+  \item \textbf{Uploaded caption file} (primary for uploaded video files).
+  Instructors may upload a WebVTT (\texttt{.vtt}) file alongside their video.
+  The service parses the VTT format and normalises segments.
+
+  \item \textbf{Whisper audio transcription} (fallback for uploaded files
+  without captions). The service invokes \texttt{faster-whisper} via a
+  Python subprocess, passing the video file path and the target language.
+  The resulting JSON transcript is normalised into the standard segment
+  format. Whisper availability is checked at startup and reported via the
+  \texttt{GET /api/ai/status} endpoint~\cite{radford2023}.
+\end{enumerate}
+
+All three sources produce the same \texttt{TranscriptSegment[]} structure,
+ensuring that the downstream AI stage is source-agnostic.
+
+\subsection{Stage 2: Segment Formatting}
+
+The \texttt{formatSegmentsForPrompt()} function in \texttt{aiService.js}
+converts the normalised segment array into a human-readable transcript
+string with timestamp labels. Each line takes the format:
+
+\begin{lstlisting}[language=JavaScript,caption={Transcript segment formatting}]
+// Input segment: { start: 65, end: 73, text: "Photosynthesis converts..." }
+// Output line:
+"[01:05 -> 01:13] Photosynthesis converts..."
+\end{lstlisting}
+
+This format makes the temporal structure of the transcript legible to
+the LLM and enables the model to place suggestions at accurate timestamp
+values.
+
+\subsection{Stage 3: AI Prompt and Generation}
+
+The core AI system prompt is defined as a constant in \texttt{aiService.js}.
+It instructs the model to:
+
+\begin{itemize}
+  \item Identify 4--8 moments where an H5P interaction would reinforce
+  learning.
+  \item Space suggestions at least 30~seconds apart.
+  \item Prefer positions after a concept is fully explained, not
+  mid-sentence.
+  \item Return \emph{only} a valid JSON array with no markdown formatting,
+  no preamble, and no explanation.
+  \item Conform each suggestion to a precisely specified schema (timestamp,
+  type, config, reason).
+  \item For MultiChoice, include exactly four options with exactly one
+  marked \texttt{"correct": true}.
+\end{itemize}
+
+The system prompt embeds the complete H5P content parameter schemas for
+all six supported types, ensuring that the model can produce valid
+\texttt{config} objects without hallucinating field names.
+
+The generation is dispatched to two providers in priority order:
+
+\begin{enumerate}
+  \item \textbf{Ollama} (if running locally). The \texttt{aiServiceOllama.js}
+  service calls the Ollama REST API at \texttt{http://localhost:11434}. The
+  default model is configurable via the \texttt{OLLAMA\_MODEL} environment
+  variable. Ollama provides free, privacy-preserving inference with no API
+  costs.
+
+  \item \textbf{Anthropic Claude} (cloud fallback). The
+  \texttt{@anthropic-ai/sdk} client calls
+  \texttt{claude-sonnet-4-20250514}~\cite{anthropic2024} for the streaming
+  endpoint and \texttt{claude-3-5-sonnet-20241022} for the non-streaming
+  endpoint. Both models offer strong instruction-following and reliable
+  structured JSON output.
+\end{enumerate}
+
+\subsection{Stage 4: Validation and Enrichment}
+
+The raw LLM output is parsed with \texttt{JSON.parse()} and then validated
+against a Zod schema:
+
+\begin{lstlisting}[language=JavaScript,caption={Zod validation schema for AI suggestions}]
+const suggestionSchema = z.object({
+  timestamp: z.number().nonnegative(),
+  type: z.enum(['MultiChoice','TrueFalse','FillBlanks',
+                'Hotspot','DragDrop','MarkWords']),
+  config: z.record(z.unknown()),
+  reason: z.string()
+});
+const suggestionListSchema = z.array(suggestionSchema);
+\end{lstlisting}
+
+If validation fails (e.g., the model returned malformed JSON), the pipeline
+returns a structured error rather than crashing. Valid suggestions are
+enriched with a system-generated ID, the H5P library identifier
+(e.g., \texttt{H5P.MultiChoice 1.16}), and a status of \texttt{pending}.
+The enriched array is returned to the client as the final response.
+
+\subsection{Stage 5: Suggestion Review and Injection}
+
+The \texttt{POST /api/ai/inject} endpoint accepts an array of accepted
+suggestions. The \texttt{aiInjectionService.js} service translates each
+suggestion's \texttt{config} object into the format expected by
+\texttt{h5pService.createTimeBasedContent()}, creates the H5P content
+record, and appends a \texttt{\{contentId, timestamp, type\}} entry to the
+Video's \texttt{h5pContent} JSON array. The result is returned to the
+frontend, which updates the H5P timeline immediately.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{H5P Integration}
+
+\subsection{Lumieducation H5P Server Library}
+
+The \texttt{@lumieducation/h5p-server} library~\cite{lumieducation2023}
+provides the following H5P capabilities as a Node.js service:
+
+\begin{itemize}
+  \item \textbf{Library management.} H5P library ZIP archives are
+  automatically downloaded and cached in the \texttt{h5p-libraries/}
+  directory on first use. Library versions are locked per platform version.
+
+  \item \textbf{Content CRUD.} H5P content is stored as JSON parameter
+  documents in the \texttt{h5p-content/} directory, indexed by a
+  system-generated content ID.
+
+  \item \textbf{Package export.} The library generates standards-compliant
+  \texttt{.h5p} ZIP archives containing the library files, content JSON,
+  and media assets. These archives are identical in structure to those
+  produced by the WordPress H5P plugin and are importable into Moodle,
+  Canvas, and any other LTI-compatible LMS.
+
+  \item \textbf{Preview rendering.} The \texttt{@lumieducation/h5p-express}
+  integration mounts an H5P rendering router at \texttt{/h5p/}, which
+  produces the HTML/JavaScript bundle required to embed and play H5P content
+  in the browser's preview panel.
+\end{itemize}
+
+\subsection{Time-Based Content Creation}
+
+The \texttt{h5pService.createTimeBasedContent()} function is the key
+integration point between the AI pipeline and the H5P layer. It wraps the
+library's content creation API to associate a content ID with a timestamp
+and the parent video ID. The resulting H5P content record specifies the
+H5P library identifier (e.g., \texttt{H5P.MultiChoice 1.16}), the content
+parameters as a JSON object, and metadata (title, license). The association
+between content and timestamp is stored in the Video's \texttt{h5pContent}
+JSON array rather than inside the H5P content record itself, keeping the
+H5P content portable.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Security Implementation}
+
+Security controls were designed to address the categories identified in the
+OWASP Top Ten 2021~\cite{owasp2021}. Table~\ref{tab:security} maps each
+major control to its OWASP category.
+
+\begin{table}[H]
+  \centering
+  \caption{Security controls mapped to OWASP Top Ten 2021 categories}
+  \label{tab:security}
+  \begin{tabularx}{\linewidth}{lXl}
+    \toprule
+    \textbf{Control} & \textbf{Implementation detail} & \textbf{OWASP category} \\
+    \midrule
+    JWT authentication        & \texttt{jsonwebtoken} HS256, 7-day expiry, validated on every protected route~\cite{jwt2015}. & A01 Broken Access Control \\
+    Role-based authorisation  & \texttt{role} claim in JWT; admin-only middleware on sensitive routes. & A01 Broken Access Control \\
+    bcrypt password hashing   & Cost factor~12 via \texttt{bcryptjs}; hashed in Sequelize model hook. & A02 Cryptographic Failures \\
+    Input validation (server) & \texttt{express-validator} and Zod schemas validate all request bodies. & A03 Injection \\
+    Input validation (client) & React form validation prevents malformed data from being submitted. & A03 Injection \\
+    HTTP security headers     & \texttt{helmet()} sets CSP, HSTS, X-Frame-Options, X-Content-Type-Options, and six other headers~\cite{helmet2023}. & A05 Security Misconfiguration \\
+    CORS allowlist            & Only \texttt{localhost} ports and the production domain are permitted as origins. & A05 Security Misconfiguration \\
+    Rate limiting             & 100 requests per 15-minute window per IP via \texttt{express-rate-limit}. & A07 Identification and Auth. Failures \\
+    Error message sanitisation & Production error handler strips stack traces from responses. & A05 Security Misconfiguration \\
+    Soft-delete and audit     & User deactivation sets \texttt{isActive = false}; admin audit log records management events. & A09 Security Logging and Monitoring \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Authentication Flow}
+
+The authentication flow proceeds as follows. On registration, the password
+is bcrypt-hashed in the Sequelize \texttt{beforeCreate} hook and never
+stored in plaintext. On login, the provided password is compared with the
+stored hash using \texttt{bcrypt.compare()}. On success, the server signs
+a JWT containing \texttt{userId}, \texttt{role}, and \texttt{iat}/\texttt{exp}
+claims, and returns it to the client. The client stores the token in
+memory (Zustand store) and includes it as a Bearer token on all subsequent
+API requests. The \texttt{auth} middleware verifies the signature on every
+protected request~\cite{jwt2015}.
+
+\subsection{Password Reset}
+
+The password reset flow generates a cryptographically random token
+(\texttt{crypto.randomBytes(32).toString('hex')}), stores its bcrypt hash
+in \texttt{resetToken} with a one-hour expiry in \texttt{resetTokenExpiry},
+and sends the plaintext token to the user's registered email address. The
+reset endpoint verifies the provided token against the stored hash and
+clears both fields on success.

@@ -68,7 +68,7 @@ class VideoStore {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch('http://localhost:3001/api/videos', {
+      const response = await fetch('http://localhost:5001/api/videos', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -100,7 +100,7 @@ class VideoStore {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch('http://localhost:3001/api/videos/upload', {
+      const response = await fetch('http://localhost:5001/api/videos/upload', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -138,7 +138,7 @@ class VideoStore {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`http://localhost:3001/api/videos/${videoId}`, {
+      const response = await fetch(`http://localhost:5001/api/videos/${videoId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -173,7 +173,7 @@ class VideoStore {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`http://localhost:3001/api/videos/${videoId}`, {
+      const response = await fetch(`http://localhost:5001/api/videos/${videoId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -212,13 +212,13 @@ class VideoStore {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch('http://localhost:3001/api/videos/youtube', {
+      const response = await fetch('http://localhost:5001/api/videos/youtube', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ youtubeUrl: url }),
       });
       
       if (!response.ok) {

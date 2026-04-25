@@ -169,20 +169,25 @@ class H5PService {
     }
 
     try {
-      const contents = Array.from(this.contentStorage.values())
-        .filter(content => content.videoId === videoId)
-        .map(content => ({
-          id: content.id,
-          library: content.library,
-          params: content.params,
-          metadata: content.metadata,
-          timestamp: content.timestamp,
-          title: content.metadata?.title || 'H5P Content',
-          status: 'active'
-        }));
-      
-      console.log('Getting H5P content for video:', videoId, 'Found:', contents.length);
-      return contents;
+      const { Video } = require('../models');
+      const video = await Video.findByPk(videoId);
+
+      if (!video) {
+        console.log('Video not found:', videoId);
+        return [];
+      }
+
+      // Get h5pContent from database, fall back to empty array
+      const h5pContent = video.h5pContent || [];
+
+      // Ensure it's an array
+      if (!Array.isArray(h5pContent)) {
+        console.warn('h5pContent is not an array for video:', videoId);
+        return [];
+      }
+
+      console.log('Getting H5P content for video:', videoId, 'Found:', h5pContent.length);
+      return h5pContent;
     } catch (error) {
       console.error('Error getting H5P content:', error);
       throw error;

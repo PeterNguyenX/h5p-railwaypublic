@@ -1,4 +1,4 @@
-# **H5P Interactive Video Platform - Thesis Report**
+# **AI-ActivEdu - Thesis Report**
 
 ---
 
@@ -8,7 +8,7 @@ I extend my sincere gratitude to my supervisor for their invaluable guidance and
 
 Special thanks to the faculty members of the Information Technology Department who provided valuable feedback during various stages of this research. I am particularly grateful to the educators who participated in the usability testing sessions, sharing their insights and experiences that greatly informed the platform design.
 
-I acknowledge the support of the university's research facilities and the technical resources provided by Railway cloud platform for hosting the prototype system. The collaboration with local educational institutions made the empirical evaluation possible.
+I acknowledge the support of the university's research facilities and the technical resources and infrastructure support for hosting the prototype system. The collaboration with local educational institutions made the empirical evaluation possible.
 
 Finally, I thank my family and friends for their encouragement and patience during the research and writing process.
 
@@ -18,7 +18,7 @@ Finally, I thank my family and friends for their encouragement and patience duri
 
 The digital transformation of education has created urgent need for intuitive interactive content creation tools, yet existing H5P implementations within WordPress environments present significant usability barriers resulting in 70% abandonment rates and lengthy creation times (45+ minutes for simple interactive videos). Vietnamese university educators face particular challenges with interface complexity, with 68% abandoning interactive content creation attempts due to technical barriers.
 
-This research presents the design, development, and evaluation of a cloud-based H5P interactive video platform specifically tailored for university educators. The platform employs user-centered design principles (23) with modern web architecture deployed on cloud infrastructure. Key features include streamlined video upload workflows, intuitive timestamp-based question embedding, real-time preview capabilities, and seamless H5P package export with LTI integration (17).
+This research presents the design, development, and evaluation of a cloud-based AI-ActivEdu specifically tailored for university educators. The platform employs user-centered design principles (23) with modern web architecture deployed on cloud infrastructure. Key features include streamlined video upload workflows, intuitive timestamp-based question embedding, real-time preview capabilities, and seamless H5P package export with LTI integration (17).
 
 Comprehensive usability testing with 10 participants demonstrated substantial improvements over existing solutions: 95% task completion rate versus 30% with WordPress-based implementations, task completion time reduction from 45 minutes to 3.2 minutes, and user satisfaction scores improving from 2.1/5.0 to 4.8/5.0.
 
@@ -78,18 +78,20 @@ The platform development is contextualized within the VNU-HCM educational ecosys
 - **Frontend Framework:** React 18.2.0 with TypeScript 4.9.5 for type-safe, component-based user interface development
 - **Backend Architecture:** Node.js 18.x with Express.js framework providing RESTful API services
 - **Database System:** PostgreSQL 14.x with advanced JSON support for complex H5P content structure storage
-- **Cloud Infrastructure:** Railway platform deployment with built-in containerization, automatic scaling and integrated monitoring
+- **Cloud Infrastructure:** Docker-based deployment with containerization, scaling, and integrated monitoring
 - **Authentication:** JWT-based authentication with bcrypt password hashing and role-based access control
 - **File Storage:** Cloud-based asset management with CDN integration for optimal performance
 - **Video Processing:** FFmpeg integration for thumbnail generation, metadata extraction, and format optimization
 
 **Functional Scope:**
 1. **Video Management System:** Support for multiple video sources including direct file uploads (MP4, WebM, MOV formats up to 500MB) and YouTube URL integration with metadata extraction
-2. **Interactive Content Authoring:** Visual timeline-based editing interface supporting multiple H5P question types (Multiple Choice, True/False, Fill-in-the-Blanks, Text Input)
-3. **Real-Time Preview System:** Immediate content rendering without export requirements, enabling iterative design and formative evaluation
-4. **Export Capabilities:** Multi-format export supporting standard H5P packages and LTI 1.3 integration for broad LMS compatibility
-5. **User Management:** Comprehensive user authentication, session management, and role-based permissions (User, Admin roles)
-6. **Analytics Integration:** Usage tracking, content performance metrics, and educational effectiveness measurement
+2. **Basic Video Editing:** Client-side video editing using FFmpeg WASM — trim/cut clips (set in/out points), split video at a timestamp, mute/adjust audio sections, and crop/resize the frame before publishing
+3. **Interactive Content Authoring:** Visual timeline-based editing interface supporting multiple H5P question types (Multiple Choice, True/False, Fill-in-the-Blanks, Text Input)
+4. **AI-Powered Transcript & Question Generation:** Automatic audio extraction from uploaded videos via FFmpeg, speech-to-text transcription with word-level timestamps using OpenAI Whisper API, followed by Claude API-powered question generation at key moments — with an accept/reject review workflow
+5. **Real-Time Preview System:** Immediate content rendering without export requirements, enabling iterative design and formative evaluation
+6. **Export Capabilities:** Multi-format export supporting standard H5P packages and LTI 1.3 integration for broad LMS compatibility
+7. **User Management:** Comprehensive user authentication, session management, and role-based permissions (User, Admin roles)
+8. **Analytics Integration:** Usage tracking, content performance metrics, and educational effectiveness measurement
 
 **Research Significance**
 
@@ -102,7 +104,7 @@ This research supports Vietnam's National Education Development Strategy 2021-20
 
 ### **1.4 Research Objectives and Methodology**
 
-**Primary Research Question:** How can a purpose-built H5P interactive video platform improve educator content creation efficiency and user satisfaction compared to existing WordPress-based solutions?
+**Primary Research Question:** How can a purpose-built AI-ActivEdu improve educator content creation efficiency and user satisfaction compared to existing WordPress-based solutions?
 
 **Methodology Overview:** User-centered design approach (32) with comparative usability evaluation using 10 IT students as educator proxies, measuring task completion rates, creation time, and satisfaction scores against WordPress H5P implementations (18, 37).
 
@@ -134,7 +136,7 @@ This research supports Vietnam's National Education Development Strategy 2021-20
 - Collect and analyze qualitative feedback through semi-structured interviews and observational studies during content creation workflows
 
 **5. Deployment, Documentation, and Knowledge Transfer (Weeks 10-12)**
-- Deploy production-ready system on Railway cloud platform with built-in containerization, automatic scaling, monitoring, and backup capabilities
+- Deploy production-ready system using Docker containers with monitoring, and backup capabilities
 - Create comprehensive technical documentation including installation guides, API documentation, and system administration procedures
 - Develop educator training materials and user guides tailored to Vietnamese university contexts and language preferences
 - Establish open-source project repository with contribution guidelines and community development frameworks
@@ -166,7 +168,7 @@ This research focuses specifically on interactive video content creation within 
 - Web-based application accessible through modern browsers (Chrome 90+, Firefox 88+, Safari 14+)
 - Support for video formats commonly used in educational settings (MP4, WebM, YouTube integration)
 - H5P content types specifically relevant to interactive video: Multiple Choice, True/False, Fill in the Blanks, Text-based hotspots
-- Cloud deployment on Railway platform for scalability and reliability testing
+- Cloud deployment on Docker containers for scalability and reliability testing
 - REST API for third-party integrations and LMS connectivity
 - Real-time content preview and collaborative editing capabilities
 
@@ -257,7 +259,7 @@ Cloud-native architectures offer significant advantages for educational technolo
 
 **Platform-as-a-Service for Educational Applications**
 
-Modern Platform-as-a-Service (PaaS) solutions provide compelling deployment options for educational technology applications. Services like Railway, Vercel, and Heroku abstract infrastructure complexity while providing integrated deployment pipelines, automatic scaling, and comprehensive monitoring capabilities.
+Modern Platform-as-a-Service (PaaS) solutions provide compelling deployment options for educational technology applications. Services like Vercel, Heroku, and Render abstract infrastructure complexity while providing integrated deployment pipelines, automatic scaling, and comprehensive monitoring capabilities.
 
 Comparative analysis by Sultan (2010) of traditional hosting versus PaaS deployment for educational applications showed significant advantages in development velocity, operational simplicity, and cost predictability. These factors are particularly important for educational institutions with limited technical infrastructure resources.
 
@@ -331,7 +333,7 @@ Cloud-native architectures offer significant advantages for educational technolo
 
 ### **2.6 Research Gaps and Opportunities**
 
-Current research lacks purpose-built educational authoring tools designed specifically for educator workflows, quantitative UX evaluation in educational technology contexts, comprehensive H5P-specific usability research, and cloud-native educational technology architecture patterns. This thesis addresses these gaps through development and evaluation of a purpose-built H5P interactive video platform, demonstrating that user-centered design principles can achieve significant improvements in educator productivity and content quality, ultimately enhancing educational outcomes through increased adoption of interactive learning materials.
+Current research lacks purpose-built educational authoring tools designed specifically for educator workflows, quantitative UX evaluation in educational technology contexts, comprehensive H5P-specific usability research, and cloud-native educational technology architecture patterns. This thesis addresses these gaps through development and evaluation of a purpose-built AI-ActivEdu, demonstrating that user-centered design principles can achieve significant improvements in educator productivity and content quality, ultimately enhancing educational outcomes through increased adoption of interactive learning materials.
 
 ### **2.7 Technology Architecture for Educational Platforms**
 
@@ -350,12 +352,12 @@ Technical Skill Level: Basic to Intermediate; Goals: Create engaging video conte
 
 ### **3.2 Overall System Architecture**
 
-**Technology Stack Justification:** React 18 + TypeScript for type safety and component reusability, Node.js + Express for JavaScript ecosystem consistency, PostgreSQL for ACID compliance and JSON support, Railway for simplified deployment and automatic scaling.
+**Technology Stack Justification:** React 18 + TypeScript for type safety and component reusability, Node.js + Express for JavaScript ecosystem consistency, PostgreSQL for ACID compliance and JSON support, Docker for containerized deployment and scalability.
 
 **Figure 3.1: Complete System Architecture**
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           H5P INTERACTIVE VIDEO PLATFORM                        │
+│                                   AI-ACTIVEDU                                    │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                 │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
@@ -406,7 +408,7 @@ Technical Skill Level: Basic to Intermediate; Goals: Create engaging video conte
 │  └────────────────────────────────────────────────────────────────────────┘     │
 │                                    │                                           │
 │  ┌─────────────────────────────────▼─────────────────────────────────────┐     │
-│  │                           RAILWAY CLOUD DEPLOYMENT                       │     │
+│  │                           DOCKER DEPLOYMENT                       │     │
 │  │                                                                        │     │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐│     │
 │  │  │   FRONTEND   │  │   BACKEND    │  │   DATABASE   │  │INFRASTRUCTURE││     │
@@ -537,7 +539,7 @@ Technical Skill Level: Basic to Intermediate; Goals: Create engaging video conte
 - **React 18 + TypeScript:** Type safety, component reusability, developer experience
 - **Node.js + Express:** JavaScript ecosystem consistency, real-time capabilities
 - **PostgreSQL:** ACID compliance, JSON support for H5P content structure
-- **Railway:** Simplified deployment, automatic scaling, built-in monitoring
+- **Docker:** Containerized deployment, scaling, built-in health checks
 
 ### **3.4 Entity-Relationship Diagram (ERD)**
 
@@ -886,12 +888,12 @@ Technical Skill Level: Basic to Intermediate; Goals: Create engaging video conte
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### **3.7 Railway Cloud Deployment Architecture**
+### **3.7 Docker Cloud Deployment Architecture**
 
 **Figure 3.6: Production Deployment Infrastructure**
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                       RAILWAY CLOUD DEPLOYMENT ARCHITECTURE                     │
+│                       DOCKER CLOUD DEPLOYMENT ARCHITECTURE                     │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                 │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
@@ -912,8 +914,8 @@ Technical Skill Level: Basic to Intermediate; Goals: Create engaging video conte
 │  │                    │                       │                           │   │
 │  │                    ▼                       ▼                           │   │
 │  │     ┌─────────────────────────┐   ┌─────────────────────────┐          │   │
-│  │     │      CUSTOM DOMAIN      │   │    RAILWAY DOMAIN       │          │   │
-│  │     │  h5p-platform.edu       │   │ app-abc123.railway.app  │          │   │
+│  │     │      CUSTOM DOMAIN      │   │    PRODUCTION DOMAIN       │          │   │
+│  │     │  h5p-platform.edu       │   │ h5p-platform.edu  │          │   │
 │  │     │                         │   │                         │          │   │
 │  │     │• DNS Management         │   │• Automatic SSL          │          │   │
 │  │     │• SSL Certificate        │   │• Load Balancing         │          │   │
@@ -922,7 +924,7 @@ Technical Skill Level: Basic to Intermediate; Goals: Create engaging video conte
 │  └─────────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                           │
 │  ┌─────────────────────────────────▼─────────────────────────────────────┐     │
-│  │                           RAILWAY PLATFORM                             │     │
+│  │                           DOCKER PLATFORM                             │     │
 │  │                                                                        │     │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐│     │
 │  │  │   FRONTEND   │  │   BACKEND    │  │   DATABASE   │  │   STORAGE    ││     │
@@ -1026,7 +1028,7 @@ Technical Skill Level: Basic to Intermediate; Goals: Create engaging video conte
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
 │  │                           DASHBOARD PAGE                                │   │
 │  │  ┌─────────────────────────────────────────────────────────────────┐    │   │
-│  │  │ H5P Interactive Video Platform    🔍 Search   👤 User    ⚙️      │    │   │
+│  │  │ AI-ActivEdu    🔍 Search   👤 User    ⚙️      │    │   │
 │  │  ├─────────────────────────────────────────────────────────────────┤    │   │
 │  │  │                                                                 │    │   │
 │  │  │  📊 Dashboard                                                   │    │   │
@@ -1279,18 +1281,19 @@ const generateH5PPackage = async (contentId) => {
 
 ### **4.4 Deployment and Infrastructure**
 
-**Railway Deployment Configuration:**
+**Docker Deployment Configuration:**
 ```yaml
-# railway.json
-{
-  "build": {
-    "builder": "NIXPACKS"
-  },
-  "deploy": {
-    "startCommand": "npm run start:prod",
-    "healthcheckPath": "/health"
-  }
-}
+# docker-compose.yml (excerpt)
+services:
+  backend:
+    build: ./backend
+    ports: ["5000:5000"]
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
 ```
 
 **Environment Configuration:**
@@ -1467,7 +1470,7 @@ Performance testing confirmed system reliability: video upload at 2MB/s, questio
 
 ### **6.1 Research Summary and Contributions**
 
-This research successfully developed and evaluated a purpose-built H5P interactive video platform that significantly improved educator experience over existing WordPress-based solutions. The study demonstrated that specialized educational technology platforms achieve substantial usability and productivity improvements through user-centered design principles (32) and modern web architecture (22).
+This research successfully developed and evaluated a purpose-built AI-ActivEdu that significantly improved educator experience over existing WordPress-based solutions. The study demonstrated that specialized educational technology platforms achieve substantial usability and productivity improvements through user-centered design principles (32) and modern web architecture (22).
 
 **Key Achievements:**
 - 95% task completion rate vs 30% with WordPress H5P
@@ -1526,7 +1529,7 @@ The technical challenges encountered during platform development have strengthen
 
 **Institutional Legacy and Continuing Impact:**
 
-The H5P interactive video platform developed through this research will continue serving the VNU-HCM community long after the completion of this thesis. The platform's integration with the university's existing learning management infrastructure ensures that it will support hundreds of educators and thousands of students in creating and experiencing interactive educational content. The comprehensive documentation and open-source release of the platform code will enable continuous improvement and adaptation by future students and faculty members.
+The AI-ActivEdu developed through this research will continue serving the VNU-HCM community long after the completion of this thesis. The platform's integration with the university's existing learning management infrastructure ensures that it will support hundreds of educators and thousands of students in creating and experiencing interactive educational content. The comprehensive documentation and open-source release of the platform code will enable continuous improvement and adaptation by future students and faculty members.
 
 The research has also established valuable partnerships between the Computer Science department and the Education faculty, creating a foundation for continued collaboration on educational technology research and development. These interdisciplinary connections reflect the broader need for collaboration between technical and pedagogical expertise in developing effective educational technology solutions.
 
@@ -1542,7 +1545,7 @@ The ultimate measure of this research's success will be its impact on teaching a
 
 Educational technology, at its core, is about human connection and learning facilitation. The technical sophistication of platforms and systems matters only insofar as it supports the fundamental human processes of teaching, learning, and knowledge creation. This research has sought to maintain focus on these human elements while leveraging advanced technology to remove barriers and create opportunities.
 
-The H5P interactive video platform developed through this research serves as both a practical tool for educational improvement and a demonstration of how thoughtful technology development can support the educational mission of universities. As Vietnamese higher education continues to evolve and modernize, research projects like this one will contribute to ensuring that technological advancement serves the deeper purposes of education: developing human potential, advancing knowledge, and contributing to social progress.
+The AI-ActivEdu developed through this research serves as both a practical tool for educational improvement and a demonstration of how thoughtful technology development can support the educational mission of universities. As Vietnamese higher education continues to evolve and modernize, research projects like this one will contribute to ensuring that technological advancement serves the deeper purposes of education: developing human potential, advancing knowledge, and contributing to social progress.
 
 The journey from identifying educational challenges to developing technological solutions to evaluating impact has been both personally rewarding and academically rigorous. The research contributes to the growing body of knowledge about educational technology development while providing immediate practical benefits to the VNU-HCM community and the broader Vietnamese higher education system.
 
