@@ -1,18 +1,51 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-  ArrowLeft, CheckCircle2, ChevronRight, UploadCloud, Youtube,
-  Sparkles, Plus, Play, Info, Share2, Save, X, Lightbulb,
-  FileText, Check, Trash2, Edit3, Loader2, AlertCircle,
-  ChevronDown, Download, RefreshCw, Clock, Package
+  ArrowLeft, CheckCircle2, ChevronRight, ChevronDown, UploadCloud, Youtube,
+  Sparkles, Plus, Save, X, Loader2, AlertCircle,
+  Download, Clock, Package, Trash2, Edit3,
+  ChevronLeft, FileText, Play, Pause, Pencil
 } from "lucide-react";
 import { useEditorStore } from "../../lib/editorStore";
 import { useAuthStore } from "../../lib/authStore";
 import {
-  fetchVideo, uploadVideo, importYoutube, parseTranscript, extractTranscriptFromVideo, whisperTranscribeVideo, exportH5P, uploadH5PFile
+  fetchVideo, uploadVideo, importYoutube, parseTranscript,
+  extractTranscriptFromVideo, whisperTranscribeVideo, exportH5P,
+  uploadH5PFile, createH5PContent, updateH5PContent, updateVideoTitle,
 } from "../../lib/api";
-import type { AISuggestion } from "../../lib/api";
+import type { H5PContent, TopicNode } from "../../lib/api";
 import { recordVideoVisit } from "../../lib/videoVisit";
+
+// YouTube IFrame API types
+declare global {
+  interface Window {
+    YT: {
+      Player: new (elementId: string | HTMLElement, options: YTPlayerOptions) => YTPlayer;
+      PlayerState: { PLAYING: number; PAUSED: number; ENDED: number; BUFFERING: number };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+interface YTPlayer {
+  getCurrentTime(): number;
+  getDuration(): number;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  pauseVideo(): void;
+  playVideo(): void;
+  destroy(): void;
+}
+interface YTPlayerOptions {
+  videoId: string;
+  width?: string | number;
+  height?: string | number;
+  playerVars?: Record<string, unknown>;
+  events?: {
+    onReady?: (e: { target: YTPlayer }) => void;
+    onStateChange?: (e: { data: number; target: YTPlayer }) => void;
+  };
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -20,226 +53,986 @@ function formatTime(s: number): string {
   return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
-const TYPE_LABELS: Record<string, string> = {
+function parseTimeInput(val: string): number {
+  const parts = val.split(":").map(Number);
+  if (parts.length === 2) return (parts[0] || 0) * 60 + (parts[1] || 0);
+  return Number(val) || 0;
+}
+
+const H5P_LIBRARIES: Record<H5PType, string> = {
+  MultiChoice: "H5P.MultiChoice 1.16",
+  TrueFalse: "H5P.TrueFalse 1.6",
+  FillBlanks: "H5P.Blanks 1.14",
+};
+
+const TYPE_LABELS: Record<H5PType, string> = {
   MultiChoice: "Multiple Choice",
   TrueFalse: "True / False",
   FillBlanks: "Fill in Blanks",
-  Hotspot: "Hotspot",
-  DragDrop: "Drag & Drop",
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  MultiChoice: "bg-blue-100 text-blue-800",
-  TrueFalse: "bg-purple-100 text-purple-800",
-  FillBlanks: "bg-green-100 text-green-800",
-  Hotspot: "bg-amber-100 text-amber-800",
-  DragDrop: "bg-pink-100 text-pink-800",
+const TYPE_COLORS: Record<H5PType, string> = {
+  MultiChoice: "bg-blue-100 text-blue-800 border-blue-200",
+  TrueFalse: "bg-purple-100 text-purple-800 border-purple-200",
+  FillBlanks: "bg-green-100 text-green-800 border-green-200",
 };
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
-function SuggestionCard({
-  suggestion,
-  isNew,
-  onAccept,
-  onReject,
-  onEdit,
+type H5PType = "MultiChoice" | "TrueFalse" | "FillBlanks";
+
+interface H5PForm {
+  editingId: string | null;      // null = new, string = editing existing
+  type: H5PType;
+  timestamp: number;
+  // MultiChoice
+  question: string;
+  choices: [string, string, string, string];
+  correctIndex: number;
+  // TrueFalse
+  statement: string;
+  tfCorrect: boolean;
+  // FillBlanks  (text with *blank* markers)
+  fillText: string;
+}
+
+function blankForm(type: H5PType, timestamp: number): H5PForm {
+  return {
+    editingId: null, type, timestamp,
+    question: "", choices: ["", "", "", ""], correctIndex: 0,
+    statement: "", tfCorrect: true, fillText: "",
+  };
+}
+
+function inferType(libraryOrType: string): H5PType {
+  const s = (libraryOrType || "").toLowerCase();
+  if (s.includes("multichoice") || s.includes("multiple")) return "MultiChoice";
+  if (s.includes("truefalse") || s.includes("true")) return "TrueFalse";
+  if (s.includes("blank") || s.includes("fill")) return "FillBlanks";
+  return "MultiChoice";
+}
+
+function contentToForm(c: H5PContent): H5PForm {
+  const type = inferType(c.library || "");
+  const p = (c.params || {}) as Record<string, unknown>;
+  const base = blankForm(type, c.timestamp);
+  base.editingId = c.id;
+
+  if (type === "MultiChoice") {
+    const answers = (p.answers as Array<{ text: string; correct: boolean }>) || [];
+    return {
+      ...base,
+      question: (p.question as string) || "",
+      choices: [
+        answers[0]?.text || "", answers[1]?.text || "",
+        answers[2]?.text || "", answers[3]?.text || "",
+      ],
+      correctIndex: Math.max(0, answers.findIndex((a) => a.correct)),
+    };
+  }
+  if (type === "TrueFalse") {
+    return {
+      ...base,
+      statement: ((p.question || p.statement) as string) || "",
+      tfCorrect: p.correct === "true" || p.correct === true,
+    };
+  }
+  // FillBlanks
+  return { ...base, fillText: (p.text as string) || "" };
+}
+
+function formToContentData(f: H5PForm) {
+  let params: Record<string, unknown>;
+
+  if (f.type === "MultiChoice") {
+    params = {
+      question: f.question,
+      answers: f.choices
+        .filter((c) => c.trim())
+        .map((text, i) => ({ text, correct: i === f.correctIndex })),
+    };
+  } else if (f.type === "TrueFalse") {
+    params = { question: f.statement, correct: f.tfCorrect ? "true" : "false" };
+  } else {
+    params = { text: f.fillText, showSolutions: "end", autoCheck: false };
+  }
+
+  return {
+    library: H5P_LIBRARIES[f.type],
+    params,
+    metadata: { title: `${TYPE_LABELS[f.type]} @ ${formatTime(f.timestamp)}`, license: "U" },
+  };
+}
+
+// ─── H5P Editor Panel ──────────────────────────────────────────────────────────
+
+function H5PEditorPanel({
+  h5pContents,
+  currentTime,
+  videoId,
+  onSaved,
+  onDeleted,
   onSeek,
+  openForContent,
+  clearOpen,
 }: {
-  suggestion: AISuggestion;
-  isNew: boolean;
-  onAccept: () => void;
-  onReject: () => void;
-  onEdit: () => void;
+  h5pContents: H5PContent[];
+  currentTime: number;
+  videoId: string;
+  onSaved: () => void;
+  onDeleted: (id: string) => void;
   onSeek: (t: number) => void;
+  openForContent: H5PContent | null;
+  clearOpen: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const colorClass = TYPE_COLORS[suggestion.type] || "bg-slate-100 text-slate-700";
+  const [form, setForm] = useState<H5PForm | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const borderColor =
-    suggestion.status === "accepted"
-      ? "border-green-400 bg-green-50/30"
-      : suggestion.status === "rejected"
-      ? "border-red-300 bg-red-50/20 opacity-50"
-      : "border-slate-200 bg-white";
+  // Open editor when a dot is clicked
+  useEffect(() => {
+    if (openForContent) {
+      setForm(contentToForm(openForContent));
+      setSaveError(null);
+    }
+  }, [openForContent]);
 
-  const question =
-    (suggestion.config?.question as string) ||
-    (suggestion.config?.text as string) ||
-    JSON.stringify(suggestion.config).slice(0, 100);
+  const startNew = (type: H5PType) => {
+    setForm(blankForm(type, Math.floor(currentTime)));
+    setSaveError(null);
+    clearOpen();
+  };
 
-  return (
-    <div className={`rounded-xl border transition-all mb-3 ${borderColor}`}>
-      <div className="p-4">
-        <div className="flex items-start gap-3 mb-2">
-          <button
-            onClick={() => onSeek(suggestion.timestamp)}
-            className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-mono font-semibold text-slate-700 transition-colors shrink-0"
-            title="Jump to this timestamp"
-          >
-            <Clock className="w-3 h-3" />
-            {formatTime(suggestion.timestamp)}
-          </button>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${colorClass} shrink-0`}>
-            {TYPE_LABELS[suggestion.type] || suggestion.type}
-          </span>
-          {isNew && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 shrink-0">
-              New
-            </span>
-          )}
-          {suggestion.status !== "pending" && (
-            <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
-              suggestion.status === "accepted" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-            }`}>
-              {suggestion.status === "accepted" ? "✓ Accepted" : "✗ Rejected"}
-            </span>
-          )}
+  const cancel = () => {
+    setForm(null);
+    setSaveError(null);
+    clearOpen();
+  };
+
+  const handleSave = async () => {
+    if (!form) return;
+    setSaveError(null);
+
+    // Validate
+    if (form.type === "MultiChoice") {
+      if (!form.question.trim()) { setSaveError("Question is required."); return; }
+      if (form.choices.filter((c) => c.trim()).length < 2) { setSaveError("At least 2 options required."); return; }
+    } else if (form.type === "TrueFalse") {
+      if (!form.statement.trim()) { setSaveError("Statement is required."); return; }
+    } else {
+      if (!form.fillText.trim()) { setSaveError("Text with blanks is required (use *word* for blanks)."); return; }
+      if (!form.fillText.includes("*")) { setSaveError("Mark at least one blank with *asterisks*."); return; }
+    }
+
+    // Block duplicate timestamps (same second)
+    const sameSecond = h5pContents.some(
+      (c) => c.id !== form.editingId && Math.floor(c.timestamp) === Math.floor(form.timestamp)
+    );
+    if (sameSecond) {
+      setSaveError(`An interaction already exists at ${formatTime(form.timestamp)}. Choose a different second.`);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const contentData = formToContentData(form);
+      if (form.editingId) {
+        await updateH5PContent(form.editingId, contentData, form.timestamp);
+      } else {
+        await createH5PContent(videoId, contentData, form.timestamp);
+      }
+      onSaved();
+      setForm(null);
+      clearOpen();
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!form?.editingId) return;
+    const id = form.editingId;
+    onDeleted(id);
+    setForm(null);
+    clearOpen();
+  };
+
+  const setField = <K extends keyof H5PForm>(key: K, val: H5PForm[K]) =>
+    setForm((f) => f ? { ...f, [key]: val } : f);
+
+  const setChoice = (i: number, val: string) =>
+    setForm((f) => {
+      if (!f) return f;
+      const choices = [...f.choices] as H5PForm["choices"];
+      choices[i] = val;
+      return { ...f, choices };
+    });
+
+  // ── Idle state ────────────────────────────────────────────────────────────
+  if (!form) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+        <div className="p-5 border-b border-slate-100">
+          <h3 className="font-bold text-slate-800 text-base">H5P Editor</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Add or edit interactive questions on your video</p>
         </div>
 
-        {/* Preview */}
-        <p
-          className="text-sm text-slate-800 leading-relaxed cursor-pointer"
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? question : question.slice(0, 120) + (question.length > 120 ? "…" : "")}
-        </p>
+        {/* Add buttons */}
+        <div className="p-5 border-b border-slate-100">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Add Interaction</p>
+          <div className="grid grid-cols-3 gap-2">
+            {(["MultiChoice", "TrueFalse", "FillBlanks"] as H5PType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => startNew(type)}
+                className={`flex flex-col items-center justify-center gap-2 p-4 border rounded-xl font-semibold text-xs transition-all hover:scale-[1.02] ${TYPE_COLORS[type]} hover:shadow-sm`}
+              >
+                <Plus className="w-5 h-5" />
+                {TYPE_LABELS[type]}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-2 text-center">
+            Uses current video time: <span className="font-mono font-bold">{formatTime(currentTime)}</span>
+          </p>
+        </div>
 
-        {expanded && (
-          <pre className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-slate-700 overflow-x-auto max-h-40 whitespace-pre-wrap">
-            {JSON.stringify(suggestion.config, null, 2)}
-          </pre>
-        )}
+        {/* Existing interactions list */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {h5pContents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
+              <Sparkles className="w-10 h-10 mb-3 text-slate-200" />
+              <p className="font-semibold text-sm">No interactions yet</p>
+              <p className="text-xs mt-1 text-center">Add one above, or run AI to generate them automatically.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                Interactions ({h5pContents.length})
+              </p>
+              {[...h5pContents]
+                .sort((a, b) => a.timestamp - b.timestamp)
+                .map((c, i) => {
+                  const type = inferType(c.library || "");
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
+                        {i + 1}
+                      </div>
+                      <button
+                        onClick={() => onSeek(c.timestamp)}
+                        className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-mono text-xs font-bold text-slate-700 transition-colors shrink-0"
+                      >
+                        <Clock className="w-3 h-3" />
+                        {formatTime(c.timestamp)}
+                      </button>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${TYPE_COLORS[type]}`}>
+                        {TYPE_LABELS[type]}
+                      </span>
+                      <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => setForm(contentToForm(c))}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onDeleted(c.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
-        {suggestion.reason && (
-          <p className="mt-2 text-xs text-slate-500 italic">💡 {suggestion.reason}</p>
-        )}
+  // ── Form state (adding / editing) ──────────────────────────────────────────
+  const isEditing = Boolean(form.editingId);
 
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="mt-1 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
-        >
-          <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
-          {expanded ? "Collapse" : "Show config"}
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div className="p-5 border-b border-slate-100 flex items-center gap-3">
+        <button onClick={cancel} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+          <ChevronLeft className="w-4 h-4" />
         </button>
+        <div>
+          <h3 className="font-bold text-slate-800 text-base">
+            {isEditing ? "Edit" : "New"} {TYPE_LABELS[form.type]}
+          </h3>
+          <p className="text-xs text-slate-500">
+            {isEditing ? "Update the interaction below" : "Fill in the details below"}
+          </p>
+        </div>
+        <span className={`ml-auto text-xs font-bold px-2.5 py-1 rounded-full border ${TYPE_COLORS[form.type]}`}>
+          {TYPE_LABELS[form.type]}
+        </span>
+      </div>
+
+      {/* Form fields */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {/* Timestamp */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
+            Timestamp
+          </label>
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={formatTime(form.timestamp)}
+              onChange={(e) => setField("timestamp", parseTimeInput(e.target.value))}
+              placeholder="MM:SS"
+              className="w-28 px-3 py-2 font-mono text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+            <button
+              type="button"
+              onClick={() => setField("timestamp", Math.floor(currentTime))}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 transition-colors"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Use current ({formatTime(currentTime)})
+            </button>
+          </div>
+        </div>
+
+        {/* Multiple Choice */}
+        {form.type === "MultiChoice" && (
+          <>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Question</label>
+              <textarea
+                value={form.question}
+                onChange={(e) => setField("question", e.target.value)}
+                rows={3}
+                placeholder="What is the main idea of this segment?"
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
+                Options <span className="text-slate-400 normal-case font-normal">(select the correct one)</span>
+              </label>
+              <div className="space-y-2">
+                {form.choices.map((choice, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <button
+                      type="button"
+                      onClick={() => setField("correctIndex", i)}
+                      className={`w-6 h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
+                        form.correctIndex === i
+                          ? "border-green-500 bg-green-500"
+                          : "border-slate-300 hover:border-slate-400"
+                      }`}
+                    >
+                      {form.correctIndex === i && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                      )}
+                    </button>
+                    <input
+                      type="text"
+                      value={choice}
+                      onChange={(e) => setChoice(i, e.target.value)}
+                      placeholder={`Option ${i + 1}`}
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* True / False */}
+        {form.type === "TrueFalse" && (
+          <>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Statement</label>
+              <textarea
+                value={form.statement}
+                onChange={(e) => setField("statement", e.target.value)}
+                rows={3}
+                placeholder="Write a statement that is either true or false..."
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Correct Answer</label>
+              <div className="flex gap-3">
+                {[true, false].map((val) => (
+                  <button
+                    key={String(val)}
+                    type="button"
+                    onClick={() => setField("tfCorrect", val)}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm border-2 transition-all ${
+                      form.tfCorrect === val
+                        ? val
+                          ? "border-green-500 bg-green-50 text-green-800"
+                          : "border-red-400 bg-red-50 text-red-800"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    {val ? "True" : "False"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Fill in Blanks */}
+        {form.type === "FillBlanks" && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
+              Text with Blanks
+            </label>
+            <textarea
+              value={form.fillText}
+              onChange={(e) => setField("fillText", e.target.value)}
+              rows={5}
+              placeholder="The mitochondria is the *powerhouse* of the cell, and it produces *ATP*."
+              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none font-mono"
+            />
+            <p className="text-xs text-slate-500 mt-1.5">
+              Wrap words that should be blank with <code className="bg-slate-100 px-1 rounded font-mono">*asterisks*</code>
+            </p>
+            {form.fillText && (
+              <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700">
+                <span className="text-xs font-semibold text-slate-500 block mb-1">Preview:</span>
+                {form.fillText.split(/\*([^*]+)\*/).map((part, i) =>
+                  i % 2 === 0
+                    ? <span key={i}>{part}</span>
+                    : <span key={i} className="inline-block min-w-16 border-b-2 border-blue-500 text-transparent bg-blue-100 rounded px-1 mx-0.5 text-xs">____</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {saveError && (
+          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            {saveError}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
-      {suggestion.status === "pending" ? (
-        <div className="px-4 pb-3 flex gap-2">
+      <div className="p-5 border-t border-slate-100 flex items-center gap-2">
+        {isEditing && (
           <button
-            onClick={onAccept}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg transition-colors"
+            type="button"
+            onClick={handleDelete}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-red-600 hover:bg-red-50 border border-red-200 hover:border-red-300 font-semibold rounded-xl transition-colors text-sm"
           >
-            <Check className="w-3.5 h-3.5" /> Accept
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete
+          </button>
+        )}
+        <div className="flex gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={cancel}
+            className="px-4 py-2.5 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl transition-colors text-sm"
+          >
+            Cancel
           </button>
           <button
-            onClick={onReject}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-700 text-sm font-semibold rounded-lg transition-colors"
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
           >
-            <X className="w-3.5 h-3.5" /> Reject
-          </button>
-          <button
-            onClick={onEdit}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 text-sm font-semibold rounded-lg transition-colors"
-          >
-            <Edit3 className="w-3.5 h-3.5" /> Edit
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {isSaving ? "Saving..." : "Save Interaction"}
           </button>
         </div>
-      ) : (
-        <div className="px-4 pb-3 flex gap-2">
-          {suggestion.status === "accepted" && (
-            <button onClick={onReject} className="text-xs text-slate-400 hover:text-red-600 transition-colors">
-              Undo accept
-            </button>
-          )}
-          {suggestion.status === "rejected" && (
-            <button onClick={onAccept} className="text-xs text-slate-400 hover:text-green-600 transition-colors">
-              Restore
-            </button>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function SuggestionEditModal({
-  suggestion,
-  onSave,
-  onClose,
-}: {
-  suggestion: AISuggestion;
-  onSave: (config: Record<string, unknown>) => void;
-  onClose: () => void;
-}) {
-  const [json, setJson] = useState(JSON.stringify(suggestion.config, null, 2));
-  const [error, setError] = useState<string | null>(null);
+// ─── Transcript Panel ──────────────────────────────────────────────────────────
 
-  const handleSave = () => {
-    try {
-      const parsed = JSON.parse(json);
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        setError("Config must be a JSON object");
-        return;
-      }
-      onSave(parsed);
-    } catch {
-      setError("Invalid JSON syntax");
-    }
-  };
+function TranscriptPanel({
+  segments,
+  onSeek,
+}: {
+  segments: { start: number; end: number; text: string }[];
+  onSeek: (t: number) => void;
+}) {
+  if (segments.length === 0) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">Edit Suggestion Config</h3>
-            <p className="text-sm text-slate-500">
-              {formatTime(suggestion.timestamp)} — {TYPE_LABELS[suggestion.type] || suggestion.type}
-            </p>
+    <div className="space-y-0.5">
+      {segments.map((seg, i) => (
+        <button
+          key={i}
+          onClick={() => onSeek(seg.start)}
+          className="w-full text-left flex gap-2.5 px-3 py-2 rounded-lg transition-colors text-sm hover:bg-slate-50 border border-transparent group"
+        >
+          <span className="font-mono text-[11px] font-bold shrink-0 mt-0.5 text-slate-400 group-hover:text-slate-600">
+            {formatTime(seg.start)}
+          </span>
+          <span className="leading-snug text-slate-700">{seg.text}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Topics Panel ─────────────────────────────────────────────────────────────
+
+function TopicsPanel({
+  topics,
+  segments,
+  onSeek,
+}: {
+  topics: TopicNode[];
+  segments: { start: number; end: number; text: string }[];
+  onSeek: (t: number) => void;
+}) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggle = (key: string) =>
+    setExpanded((prev) => {
+      const s = new Set(prev);
+      s.has(key) ? s.delete(key) : s.add(key);
+      return s;
+    });
+
+  if (topics.length === 0) return null;
+
+  return (
+    <div className="space-y-0.5 px-1">
+      {topics.map((topic, ti) => {
+        const tKey = `t${ti}`;
+        const isTopicOpen = expanded.has(tKey);
+        return (
+          <div key={ti}>
+            <button
+              onClick={() => { toggle(tKey); onSeek(topic.start); }}
+              className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-bold hover:bg-slate-50 text-slate-800"
+            >
+              {isTopicOpen ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+              <span className="font-mono text-[11px] shrink-0 text-slate-400">{formatTime(topic.start)}</span>
+              <span className="truncate">{topic.title}</span>
+            </button>
+            {isTopicOpen && (
+              <div className="ml-4 border-l border-slate-200 pl-2 space-y-0.5 mb-1">
+                {topic.subtopics && topic.subtopics.length > 0 ? (
+                  topic.subtopics.map((sub, si) => {
+                    const sKey = `t${ti}s${si}`;
+                    const isSubOpen = expanded.has(sKey);
+                    const subSegs = segments.filter((seg) => seg.start >= sub.start && seg.start <= sub.end + 1);
+                    return (
+                      <div key={si}>
+                        <button
+                          onClick={() => { toggle(sKey); onSeek(sub.start); }}
+                          className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-xs font-semibold hover:bg-slate-50 text-slate-700"
+                        >
+                          {isSubOpen ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+                          <span className="font-mono text-[10px] text-slate-400 shrink-0">{formatTime(sub.start)}</span>
+                          <span className="truncate">{sub.title}</span>
+                        </button>
+                        {isSubOpen && subSegs.map((seg, gi) => (
+                          <button
+                            key={gi}
+                            onClick={() => onSeek(seg.start)}
+                            className="w-full text-left flex gap-2 px-2 py-1 rounded text-[11px] transition-colors text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                          >
+                            <span className="font-mono text-[10px] shrink-0 mt-0.5 text-slate-400">{formatTime(seg.start)}</span>
+                            <span className="leading-snug">{seg.text}</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })
+                ) : (
+                  segments
+                    .filter((seg) => seg.start >= topic.start && seg.start <= topic.end + 1)
+                    .map((seg, gi) => (
+                      <button
+                        key={gi}
+                        onClick={() => onSeek(seg.start)}
+                        className="w-full text-left flex gap-2 px-2 py-1 rounded text-[11px] transition-colors text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                      >
+                        <span className="font-mono text-[10px] shrink-0 mt-0.5 text-slate-400">{formatTime(seg.start)}</span>
+                        <span className="leading-snug">{seg.text}</span>
+                      </button>
+                    ))
+                )}
+              </div>
+            )}
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Interaction Preview (student-facing popup) ────────────────────────────────
+
+function InteractionPreview({
+  content,
+  onContinue,
+}: {
+  content: H5PContent;
+  onContinue: () => void;
+}) {
+  const type = inferType(content.library || "");
+  const p = (content.params || {}) as Record<string, unknown>;
+
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [tfAnswer, setTfAnswer] = useState<boolean | null>(null);
+  const [fillAnswer, setFillAnswer] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+
+  const handleSubmit = () => {
+    if (type === "MultiChoice") {
+      const answers = (p.answers as Array<{ text: string; correct: boolean }>) || [];
+      setIsCorrect(selectedAnswer !== null && answers[selectedAnswer]?.correct === true);
+    } else if (type === "TrueFalse") {
+      const correct = p.correct === true || p.correct === "true";
+      setIsCorrect(tfAnswer === correct);
+    } else {
+      const text = (p.text as string) || "";
+      const blanks = [...text.matchAll(/\*([^*]+)\*/g)].map((m) => m[1].trim().toLowerCase());
+      const userParts = fillAnswer.trim().split(/\s+/);
+      setIsCorrect(blanks.length > 0 && blanks.every((b) => userParts.some((u) => u.toLowerCase() === b)));
+    }
+    setSubmitted(true);
+  };
+
+  const canSubmit =
+    (type === "MultiChoice" && selectedAnswer !== null) ||
+    (type === "TrueFalse" && tfAnswer !== null) ||
+    (type === "FillBlanks" && fillAnswer.trim().length > 0);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[90%] overflow-y-auto">
+      <div>
+        {/* Header */}
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${TYPE_COLORS[type]}`}>{TYPE_LABELS[type]}</span>
+            <span className="text-xs text-slate-500 ml-auto font-mono">{formatTime(content.timestamp)}</span>
+          </div>
         </div>
 
-        <div className="p-6 flex-1 overflow-y-auto">
-          {suggestion.reason && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">
-              <strong>AI reasoning:</strong> {suggestion.reason}
+        {/* Question */}
+        <div className="p-6 space-y-4">
+          {type === "MultiChoice" && (
+            <>
+              <p className="font-semibold text-slate-800 text-[15px] leading-snug">{(p.question as string) || ""}</p>
+              <div className="space-y-2">
+                {((p.answers as Array<{ text: string; correct: boolean }>) || []).map((ans, i) => (
+                  <button
+                    key={i}
+                    disabled={submitted}
+                    onClick={() => setSelectedAnswer(i)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                      submitted
+                        ? ans.correct
+                          ? "border-green-500 bg-green-50 text-green-800"
+                          : selectedAnswer === i
+                          ? "border-red-400 bg-red-50 text-red-800"
+                          : "border-slate-200 text-slate-500"
+                        : selectedAnswer === i
+                        ? "border-blue-500 bg-blue-50 text-blue-800"
+                        : "border-slate-200 hover:border-slate-300 text-slate-700"
+                    }`}
+                  >
+                    {ans.text}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {type === "TrueFalse" && (
+            <>
+              <p className="font-semibold text-slate-800 text-[15px] leading-snug">{(p.question as string) || (p.statement as string) || ""}</p>
+              <div className="flex gap-3">
+                {[true, false].map((val) => {
+                  const correct = p.correct === true || p.correct === "true";
+                  const isThisCorrect = val === correct;
+                  return (
+                    <button
+                      key={String(val)}
+                      disabled={submitted}
+                      onClick={() => setTfAnswer(val)}
+                      className={`flex-1 py-3 rounded-xl font-bold text-sm border-2 transition-all ${
+                        submitted
+                          ? isThisCorrect
+                            ? "border-green-500 bg-green-50 text-green-800"
+                            : tfAnswer === val
+                            ? "border-red-400 bg-red-50 text-red-800"
+                            : "border-slate-200 text-slate-400"
+                          : tfAnswer === val
+                          ? val ? "border-green-400 bg-green-50 text-green-800" : "border-red-400 bg-red-50 text-red-800"
+                          : "border-slate-200 hover:border-slate-300 text-slate-700"
+                      }`}
+                    >
+                      {val ? "True" : "False"}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {type === "FillBlanks" && (
+            <>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Fill in the blank(s)</p>
+              <div className="text-[15px] text-slate-800 leading-relaxed">
+                {((p.text as string) || "").split(/\*([^*]+)\*/).map((part, i) =>
+                  i % 2 === 0
+                    ? <span key={i}>{part}</span>
+                    : <span key={i} className="inline-block bg-slate-100 border-b-2 border-blue-500 px-2 min-w-16 text-slate-400 text-sm">___</span>
+                )}
+              </div>
+              <input
+                type="text"
+                value={fillAnswer}
+                onChange={(e) => setFillAnswer(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && canSubmit && !submitted && handleSubmit()}
+                disabled={submitted}
+                placeholder="Type your answer..."
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
+              />
+            </>
+          )}
+
+          {/* Feedback */}
+          {submitted && (
+            <div className={`flex items-start gap-2.5 p-3.5 rounded-xl text-sm font-medium ${
+              isCorrect ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"
+            }`}>
+              {isCorrect ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <X className="w-4 h-4 shrink-0 mt-0.5" />}
+              {isCorrect ? "Correct! Well done." : "Not quite — review the material and try again."}
             </div>
           )}
-          <label className="block text-sm font-semibold text-slate-700 mb-2">H5P Config JSON</label>
-          <textarea
-            value={json}
-            onChange={(e) => { setJson(e.target.value); setError(null); }}
-            rows={14}
-            className="w-full font-mono text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
-          />
-          {error && (
-            <p className="mt-2 text-sm text-red-600 flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4" /> {error}
-            </p>
-          )}
         </div>
 
-        <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-between gap-3">
+        {/* Actions */}
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center">
           <button
-            onClick={() => { try { setJson(JSON.stringify(JSON.parse(json), null, 2)); setError(null); } catch { setError("Invalid JSON"); } }}
-            className="px-4 py-2.5 text-slate-600 font-semibold hover:bg-slate-200 rounded-xl transition-colors text-sm"
+            onClick={onContinue}
+            className="text-sm text-slate-500 hover:text-slate-700 font-medium"
           >
-            Format JSON
+            Skip
           </button>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm">
-              Cancel
+          {!submitted ? (
+            <button
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="px-5 py-2.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white font-bold rounded-xl text-sm transition-colors"
+            >
+              Submit
             </button>
-            <button onClick={handleSave} className="px-6 py-2.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl shadow-sm transition-colors text-sm">
-              Save Changes
+          ) : (
+            <button
+              onClick={onContinue}
+              className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center gap-1.5"
+            >
+              <ChevronRight className="w-4 h-4" /> Continue
             </button>
-          </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Progress Bar ──────────────────────────────────────────────────────────────
+
+function ProgressBar({ value, label, color = "bg-blue-600" }: { value: number; label: string; color?: string }) {
+  return (
+    <div className="mt-3">
+      <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+        <span className="font-medium truncate pr-2">{label}</span>
+        <span className="font-mono font-bold shrink-0">{value}%</span>
+      </div>
+      <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+        <div
+          className={`${color} h-full rounded-full transition-all duration-500 ease-out`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Video Controls ────────────────────────────────────────────────────────────
+
+function VideoControls({
+  currentTime,
+  duration,
+  isPlaying,
+  sortedContents,
+  onSeek,
+  onTogglePlay,
+  onDotClick,
+}: {
+  currentTime: number;
+  duration: number;
+  isPlaying: boolean;
+  sortedContents: H5PContent[];
+  onSeek: (t: number) => void;
+  onTogglePlay: () => void;
+  onDotClick: (c: H5PContent) => void;
+}) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [hoverX, setHoverX] = useState(0);
+  const currentTimeRef = useRef(currentTime);
+  useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+
+  const getPctFromClientX = (clientX: number): number => {
+    if (!barRef.current) return 0;
+    const rect = barRef.current.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  };
+
+  const handleBarMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    if (duration > 0) onSeek(getPctFromClientX(e.clientX) * duration);
+  };
+
+  const handleBarMouseMove = (e: React.MouseEvent) => {
+    if (!barRef.current) return;
+    const rect = barRef.current.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    setHoverTime(duration > 0 ? pct * duration : null);
+    setHoverX(e.clientX - rect.left);
+    if (isDragging && duration > 0) onSeek(pct * duration);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      if (duration > 0) onSeek(getPctFromClientX(e.clientX) * duration);
+    };
+    const onUp = () => setIsDragging(false);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [isDragging, duration, onSeek]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.code === "Space") { e.preventDefault(); onTogglePlay(); }
+      if (e.code === "ArrowLeft") { e.preventDefault(); onSeek(Math.max(0, currentTimeRef.current - 5)); }
+      if (e.code === "ArrowRight") { e.preventDefault(); onSeek(Math.min(duration, currentTimeRef.current + 5)); }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [duration, onTogglePlay, onSeek]);
+
+  const progress = duration > 0 ? currentTime / duration : 0;
+
+  return (
+    <div className="bg-slate-800 rounded-b-2xl border border-slate-700 border-t-0 px-4 py-3 shadow-sm select-none">
+      <div className="flex items-center gap-3">
+        {/* Play/Pause */}
+        <button
+          onClick={onTogglePlay}
+          className="shrink-0 w-8 h-8 flex items-center justify-center text-white hover:text-orange-400 transition-colors"
+          title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+        >
+          {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+        </button>
+
+        {/* Current time */}
+        <span className="text-slate-300 text-[11px] font-mono shrink-0 w-10 text-center">
+          {formatTime(currentTime)}
+        </span>
+
+        {/* Progress bar */}
+        <div
+          ref={barRef}
+          className="relative flex-1 h-2 bg-slate-600 rounded-full cursor-pointer group"
+          onMouseDown={handleBarMouseDown}
+          onMouseMove={handleBarMouseMove}
+          onMouseLeave={() => { setHoverTime(null); if (isDragging) setIsDragging(false); }}
+        >
+          {/* Filled portion */}
+          <div
+            className="absolute top-0 left-0 h-full bg-slate-400 rounded-full pointer-events-none transition-[width] duration-100"
+            style={{ width: `${Math.min(100, progress * 100)}%` }}
+          />
+          {/* Playhead thumb */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow pointer-events-none transition-opacity"
+            style={{
+              left: `${Math.min(100, progress * 100)}%`,
+              opacity: hoverTime !== null || isDragging ? 1 : 0,
+            }}
+          />
+          {/* Hover time tooltip */}
+          {hoverTime !== null && duration > 0 && (
+            <div
+              className="absolute bottom-full mb-2 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded pointer-events-none -translate-x-1/2 whitespace-nowrap border border-slate-700 shadow-lg"
+              style={{ left: `${hoverX}px` }}
+            >
+              {formatTime(hoverTime)}
+            </div>
+          )}
+          {/* H5P numbered dots */}
+          {duration > 0 && sortedContents.map((c, i) => {
+            const pct = Math.min(97, Math.max(3, (c.timestamp / duration) * 100));
+            return (
+              <button
+                key={c.id}
+                style={{ left: `${pct}%` }}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 group/dot"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onSeek(c.timestamp); onDotClick(c); }}
+                title={`#${i + 1} ${TYPE_LABELS[inferType(c.library || "")]} @ ${formatTime(c.timestamp)}`}
+              >
+                <div className="w-5 h-5 rounded-full bg-orange-500 border-2 border-white text-white text-[9px] font-bold flex items-center justify-center shadow-lg hover:scale-125 transition-transform hover:bg-orange-400">
+                  {i + 1}
+                </div>
+                <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
+                  {formatTime(c.timestamp)} — {TYPE_LABELS[inferType(c.library || "")]}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Duration */}
+        <span className="text-slate-500 text-[11px] font-mono shrink-0 w-10 text-center">
+          {duration > 0 ? formatTime(duration) : "--:--"}
+        </span>
+
+        {/* Interaction count badge */}
+        {sortedContents.length > 0 && (
+          <span className="text-orange-400 text-[11px] font-semibold shrink-0">
+            {sortedContents.length}&nbsp;Q
+          </span>
+        )}
       </div>
     </div>
   );
@@ -253,7 +1046,6 @@ export default function Editor() {
   const { token } = useAuthStore();
   const store = useEditorStore();
 
-  // UI state
   const [currentStep, setCurrentStep] = useState(1);
   const [youtubeLink, setYoutubeLink] = useState("");
   const [activeUploadTab, setActiveUploadTab] = useState<"file" | "youtube" | "h5p">("file");
@@ -261,51 +1053,133 @@ export default function Editor() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isExtractingTranscript, setIsExtractingTranscript] = useState(false);
-  const [editingSuggestion, setEditingSuggestion] = useState<AISuggestion | null>(null);
-  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+  const [isImportingH5P, setIsImportingH5P] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [notification, setNotification] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
-
-  const [isImportingH5P, setIsImportingH5P] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [openForContent, setOpenForContent] = useState<H5PContent | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
-  const h5pFileInputRef = useRef<HTMLInputElement>(null);
   const h5pStep1InputRef = useRef<HTMLInputElement>(null);
   const analysisCleanupRef = useRef<(() => void) | null>(null);
 
-  // Redirect if not logged in
-  useEffect(() => {
-    if (!token) navigate("/");
-  }, [token, navigate]);
+  // YouTube IFrame API
+  const ytPlayerRef = useRef<YTPlayer | null>(null);
+  const ytPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ytContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load existing video if editing
+  // Interaction preview (student-facing popup)
+  const [previewContent, setPreviewContent] = useState<H5PContent | null>(null);
+  const triggeredTimestampsRef = useRef<Set<number>>(new Set());
+  const prevTimeRef = useRef(0);
+
+  // Ref to latest h5pContents so YouTube polling never reads stale closure
+  const h5pContentsRef = useRef(store.h5pContents);
+  useEffect(() => { h5pContentsRef.current = store.h5pContents; }, [store.h5pContents]);
+
+  // Ref to latest videoDuration so YouTube polling doesn't keep the initial 0
+  const videoDurationRef = useRef(0);
+
+  useEffect(() => { if (!token) navigate("/"); }, [token, navigate]);
+
   useEffect(() => {
     if (!id) return;
     const load = async () => {
+      store.setVideo(null);
+      store.setSegments([]);
+      store.setTopics([]);
+      store.resetAnalysis();
       try {
         const video = await fetchVideo(id);
         store.setVideo(video);
         recordVideoVisit(id);
         await store.loadH5PContents(id);
-        setCurrentStep(2); // jump to edit step if video already exists
+        setCurrentStep(2);
       } catch {
-        setNotification({ msg: "Could not load video.", type: "error" });
+        notify("Could not load video.", "error");
       }
     };
     load();
   }, [id]);
 
-  // Cleanup analysis stream on unmount
   useEffect(() => () => { analysisCleanupRef.current?.(); }, []);
+
+  // YouTube IFrame API setup
+  useEffect(() => {
+    const youtubeId = store.video?.youtubeId;
+    if (!youtubeId || currentStep !== 2) return;
+
+    const startPolling = (player: YTPlayer) => {
+      if (ytPollRef.current) clearInterval(ytPollRef.current);
+      ytPollRef.current = setInterval(() => {
+        const t = player.getCurrentTime();
+        store.setCurrentTime(t);
+        // Use ref so we always have latest h5pContents — avoids stale closure
+        checkInteractionTriggerWithRef(t);
+
+        if (videoDurationRef.current === 0) {
+          const dur = player.getDuration();
+          if (dur > 0) { setVideoDuration(dur); videoDurationRef.current = dur; }
+        }
+      }, 300);
+    };
+
+    const initPlayer = () => {
+      if (!ytContainerRef.current) return;
+      if (ytPlayerRef.current) { ytPlayerRef.current.destroy(); }
+      ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
+        videoId: youtubeId,
+        width: "100%",
+        height: "100%",
+        playerVars: { rel: 0, modestbranding: 1, controls: 0, disablekb: 1 },
+        events: {
+          onReady: ({ target }) => {
+            const dur = target.getDuration();
+            if (dur > 0) setVideoDuration(dur);
+          },
+          onStateChange: ({ data, target }) => {
+            if (data === window.YT.PlayerState.PLAYING) {
+              setIsPlaying(true);
+              startPolling(target);
+            } else {
+              setIsPlaying(false);
+              if (ytPollRef.current) clearInterval(ytPollRef.current);
+            }
+          },
+        },
+      });
+    };
+
+    if (window.YT?.Player) {
+      initPlayer();
+    } else {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { prev?.(); initPlayer(); };
+      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.body.appendChild(tag);
+      }
+    }
+
+    return () => {
+      if (ytPollRef.current) clearInterval(ytPollRef.current);
+      ytPlayerRef.current?.destroy();
+      ytPlayerRef.current = null;
+    };
+  }, [store.video?.youtubeId, currentStep]);
 
   const notify = (msg: string, type: "success" | "error" | "info" = "info") => {
     setNotification({ msg, type });
-    setTimeout(() => setNotification(null), 5000);
+    setTimeout(() => setNotification(null), 4000);
   };
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────────
+  // ─── Handlers ─────────────────────────────────────────────────────────────
 
   const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -320,7 +1194,6 @@ export default function Editor() {
       store.setVideo(video);
       await store.loadH5PContents(video.id);
       setCurrentStep(2);
-      notify("Video uploaded successfully!", "success");
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -352,7 +1225,7 @@ export default function Editor() {
     try {
       const segments = await parseTranscript(file);
       store.setSegments(segments);
-      notify(`Parsed ${segments.length} transcript segments from "${file.name}"`, "success");
+      notify(`Parsed ${segments.length} segments from "${file.name}"`, "success");
     } catch (err: unknown) {
       notify(err instanceof Error ? err.message : "Failed to parse transcript", "error");
     }
@@ -382,33 +1255,16 @@ export default function Editor() {
     setCurrentStep(2);
   };
 
-  const handleH5PFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !store.video?.id) return;
-    e.target.value = "";
-    setIsImportingH5P(true);
-    try {
-      await uploadH5PFile(file, store.video.id, Math.floor(store.currentTime));
-      await store.loadH5PContents(store.video.id);
-      notify(`Imported "${file.name}" as H5P interaction`, "success");
-    } catch (err: unknown) {
-      notify(err instanceof Error ? err.message : "H5P import failed", "error");
-    } finally {
-      setIsImportingH5P(false);
-    }
-  };
-
   const handleTranscriptExtraction = async () => {
     if (!store.video?.id) return;
-
     setIsExtractingTranscript(true);
     try {
       const segments = await extractTranscriptFromVideo(store.video.id);
       store.setSegments(segments);
-      store.setTranscriptFilename("Auto-extracted from video");
-      notify(`Extracted ${segments.length} transcript segments with timestamps.`, "success");
+      store.setTranscriptFilename("Auto-extracted from YouTube");
+      notify(`Extracted ${segments.length} segments`, "success");
     } catch (err: unknown) {
-      notify(err instanceof Error ? err.message : "Failed to extract transcript from video", "error");
+      notify(err instanceof Error ? err.message : "Extraction failed", "error");
     } finally {
       setIsExtractingTranscript(false);
     }
@@ -420,8 +1276,8 @@ export default function Editor() {
     try {
       const segments = await whisperTranscribeVideo(store.video.id);
       store.setSegments(segments);
-      store.setTranscriptFilename("Auto-transcribed with faster-whisper AI");
-      notify(`Transcribed ${segments.length} segments using faster-whisper.`, "success");
+      store.setTranscriptFilename("Transcribed with Whisper AI");
+      notify(`Transcribed ${segments.length} segments`, "success");
     } catch (err: unknown) {
       notify(err instanceof Error ? err.message : "Whisper transcription failed", "error");
     } finally {
@@ -436,23 +1292,31 @@ export default function Editor() {
     analysisCleanupRef.current = cleanup;
   };
 
-  const handleApply = async () => {
+  // Combined: transcribe → then AI analyze → then inject
+  const handleTranscribeAndGenerate = async () => {
     if (!store.video?.id) return;
-    await store.injectAccepted(store.video.id);
-    if (store.injectError) {
-      notify(store.injectError, "error");
-    } else {
-      notify(`Successfully injected ${store.lastInjectCount} H5P element${store.lastInjectCount !== 1 ? "s" : ""}!`, "success");
-      setShowSuccessBanner(true);
+    setIsExtractingTranscript(true);
+    try {
+      let segments;
+      if (store.video.youtubeId) {
+        segments = await extractTranscriptFromVideo(store.video.id);
+        store.setTranscriptFilename("Extracted from YouTube captions");
+      } else {
+        segments = await whisperTranscribeVideo(store.video.id);
+        store.setTranscriptFilename("Transcribed with Whisper AI");
+      }
+      store.setSegments(segments);
+    } catch (err: unknown) {
+      notify(err instanceof Error ? err.message : "Transcription failed", "error");
+      setIsExtractingTranscript(false);
+      return;
     }
+    setIsExtractingTranscript(false);
+    // Segments are now in store — kick off AI analysis
+    analysisCleanupRef.current?.();
+    const cleanup = store.runAnalysis(store.video.id);
+    analysisCleanupRef.current = cleanup;
   };
-
-  const seekTo = useCallback((time: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      videoRef.current.play().catch(() => {});
-    }
-  }, []);
 
   const handleExport = async () => {
     if (!store.video?.id) return;
@@ -473,59 +1337,126 @@ export default function Editor() {
     }
   };
 
-  // ─── Derived values ────────────────────────────────────────────────────────────
+  // Core logic — reads from ref so it's always fresh regardless of when called
+  const checkInteractionTriggerWithRef = useCallback((t: number) => {
+    const prev = prevTimeRef.current;
+    if (t < prev - 1) {
+      triggeredTimestampsRef.current.forEach((ts) => {
+        if (ts > t) triggeredTimestampsRef.current.delete(ts);
+      });
+    }
+    prevTimeRef.current = t;
+
+    for (const c of h5pContentsRef.current) {
+      const ts = Math.floor(c.timestamp);
+      if (!triggeredTimestampsRef.current.has(ts) && Math.floor(t) >= ts && Math.floor(t) < ts + 2) {
+        triggeredTimestampsRef.current.add(ts);
+        if (videoRef.current) videoRef.current.pause();
+        if (ytPlayerRef.current) ytPlayerRef.current.pauseVideo();
+        setPreviewContent(c);
+        break;
+      }
+    }
+  }, []); // stable — reads h5pContentsRef.current at call time
+
+  // Alias used by local video onTimeUpdate (same function, named for clarity)
+  const checkInteractionTrigger = checkInteractionTriggerWithRef;
+
+  const togglePlay = useCallback(() => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
+      }
+      // isPlaying updated via onPlay/onPause events
+    } else if (ytPlayerRef.current) {
+      if (isPlaying) {
+        ytPlayerRef.current.pauseVideo();
+      } else {
+        ytPlayerRef.current.playVideo();
+      }
+    }
+  }, [isPlaying]);
+
+  const seekTo = useCallback((time: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      videoRef.current.play().catch(() => {});
+    }
+    if (ytPlayerRef.current) {
+      ytPlayerRef.current.seekTo(time, true);
+      ytPlayerRef.current.playVideo();
+    }
+    // Clear triggers for times after the seek target
+    triggeredTimestampsRef.current.forEach((ts) => {
+      if (ts >= time) triggeredTimestampsRef.current.delete(ts);
+    });
+  }, []);
 
   const videoSrc = store.video?.filePath
-    ? `/api/uploads/${store.video.filePath}`
+    ? `/api/uploads/${store.video.filePath.replace(/^uploads[\\/]/, "")}`
     : null;
-
-  const youtubeEmbedSrc = store.video?.youtubeId
-    ? `https://www.youtube.com/embed/${store.video.youtubeId}`
-    : null;
-
-  const acceptedCount = store.suggestions.filter((s) => s.status === "accepted").length;
-  const pendingCount = store.suggestions.filter((s) => s.status === "pending").length;
-  const previousIds = new Set(store.previousSuggestions.map((s) => s.id));
-
-  const videoThumbnail = store.video?.youtubeId
-    ? `https://img.youtube.com/vi/${store.video.youtubeId}/hqdefault.jpg`
-    : store.video?.thumbnailPath
-    ? `/api/uploads/${store.video.thumbnailPath}`
-    : null;
-
-  // ─── Render ────────────────────────────────────────────────────────────────────
 
   const steps = [
     { id: 1, name: "Add Video", desc: "Upload or link" },
-    { id: 2, name: "Add Interactions", desc: "Questions & info" },
+    { id: 2, name: "Add Interactions", desc: "Questions & editing" },
     { id: 3, name: "Finish & Share", desc: "Preview & export" },
   ];
 
+  // Sorted h5p contents for numbered dots
+  const sortedContents = [...store.h5pContents].sort((a, b) => a.timestamp - b.timestamp);
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
-      {/* ── Header ─────────────────────────────────────────────────────────────── */}
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate("/app/dashboard")}
-            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-          >
+          <button onClick={() => navigate("/app/dashboard")} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="h-6 w-px bg-slate-300 hidden sm:block" />
           <div>
-            <h2 className="text-xl font-bold text-slate-800">
-              {store.video?.title || "New Interactive Video"}
-            </h2>
-            <p className="text-xs text-slate-500 hidden sm:block">
-              {store.video ? `ID: ${store.video.id}` : "No video loaded"}
-            </p>
+            {isTitleEditing ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={async () => {
+                  if (store.video && titleDraft.trim() && titleDraft.trim() !== store.video.title) {
+                    try {
+                      const updated = await updateVideoTitle(store.video.id, titleDraft.trim());
+                      store.setVideo(updated);
+                      notify("Title updated!", "success");
+                    } catch (err) {
+                      notify(err instanceof Error ? err.message : "Failed to update title", "error");
+                    }
+                  }
+                  setIsTitleEditing(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") setIsTitleEditing(false);
+                }}
+                className="text-xl font-bold text-slate-800 border-b-2 border-blue-500 bg-transparent outline-none px-1 w-64"
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-slate-800">{store.video?.title || "New Interactive Video"}</h2>
+                {store.video && (
+                  <button
+                    onClick={() => { setTitleDraft(store.video!.title || ""); setIsTitleEditing(true); }}
+                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                    title="Rename video"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-slate-500 hidden sm:block">{store.video ? `ID: ${store.video.id}` : "No video loaded"}</p>
           </div>
-          <span className={`hidden sm:inline px-2.5 py-1 text-xs font-semibold rounded-md ${
-            store.video?.status === "ready" ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"
-          }`}>
-            {store.video?.status === "ready" ? "Ready" : "Draft"}
-          </span>
         </div>
 
         {/* Stepper */}
@@ -533,21 +1464,21 @@ export default function Editor() {
           {steps.map((step, idx) => (
             <div key={step.id} className="flex items-center">
               <button
-                onClick={() => store.video && setCurrentStep(step.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                  currentStep === step.id
-                    ? "bg-blue-50 text-blue-800"
-                    : currentStep > step.id
-                    ? "text-slate-700 hover:bg-slate-100"
-                    : "text-slate-400"
+                onClick={() => {
+                  if (!store.video) return;
+                  // Prevent going back to step 1 once a video is uploaded
+                  if (step.id === 1 && currentStep >= 2) return;
+                  setCurrentStep(step.id);
+                }}
+                disabled={step.id === 1 && currentStep >= 2}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  currentStep === step.id ? "bg-blue-50 text-blue-800" : currentStep > step.id ? "text-slate-700 hover:bg-slate-100" : "text-slate-400"
                 }`}
               >
                 {currentStep > step.id ? (
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
                 ) : (
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    currentStep === step.id ? "bg-blue-800 text-white" : "bg-slate-200 text-slate-500"
-                  }`}>
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${currentStep === step.id ? "bg-blue-800 text-white" : "bg-slate-200 text-slate-500"}`}>
                     {step.id}
                   </span>
                 )}
@@ -559,56 +1490,48 @@ export default function Editor() {
         </div>
 
         {store.video && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExport}
-              disabled={isExporting || store.h5pContents.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl border border-transparent hover:border-slate-200 transition-colors text-sm disabled:opacity-40"
-            >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Export .h5p
-            </button>
-          </div>
+          <button
+            onClick={handleExport}
+            disabled={isExporting || store.h5pContents.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl border border-transparent hover:border-slate-200 transition-colors text-sm disabled:opacity-40"
+          >
+            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Export .h5p
+          </button>
         )}
       </header>
 
-      {/* ── Toast ──────────────────────────────────────────────────────────────── */}
+      {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-lg text-sm font-semibold animate-in slide-in-from-top-2 duration-300 ${
           notification.type === "success" ? "bg-green-600 text-white" :
-          notification.type === "error" ? "bg-red-600 text-white" :
-          "bg-slate-800 text-white"
+          notification.type === "error" ? "bg-red-600 text-white" : "bg-slate-800 text-white"
         }`}>
-          {notification.type === "success" ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {notification.type === "error" ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
           {notification.msg}
           <button onClick={() => setNotification(null)}><X className="w-4 h-4 opacity-70 hover:opacity-100" /></button>
         </div>
       )}
 
-      {/* ── Main ───────────────────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex justify-center w-full">
-        <div className="w-full max-w-5xl h-full flex flex-col">
+      {/* ── Main ───────────────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center w-full">
+        <div className="w-full max-w-6xl flex flex-col gap-5">
 
-          {/* ── STEP 1: Upload ─────────────────────────────────────────────────── */}
+          {/* ── STEP 1: Upload ───────────────────────────────────────────── */}
           {currentStep === 1 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 sm:p-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="text-center max-w-xl mx-auto mb-10">
                 <h1 className="text-3xl font-bold text-slate-900 mb-4">Let's add your video</h1>
-                <p className="text-slate-600 text-lg">
-                  Upload a video file, paste a YouTube link, or import an H5P package.
-                </p>
+                <p className="text-slate-600 text-lg">Upload a video file, paste a YouTube link, or import an H5P package.</p>
               </div>
 
-              {/* Upload Tabs */}
               <div className="flex justify-center mb-8">
                 <div className="inline-flex bg-slate-100 p-1.5 rounded-xl">
                   {(["file", "youtube", "h5p"] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveUploadTab(tab)}
-                      className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-[15px] transition-all ${
-                        activeUploadTab === tab ? "bg-white text-blue-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                      }`}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-[15px] transition-all ${activeUploadTab === tab ? "bg-white text-blue-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
                     >
                       {tab === "file" ? <UploadCloud className="w-5 h-5" /> : tab === "youtube" ? <Youtube className="w-5 h-5" /> : <Package className="w-5 h-5" />}
                       {tab === "file" ? "Upload File" : tab === "youtube" ? "YouTube Link" : "H5P Package"}
@@ -624,31 +1547,28 @@ export default function Editor() {
                 </div>
               )}
 
-              {/* File Upload */}
-              {activeUploadTab === "file" ? (
-                <div>
+              {activeUploadTab === "file" && (
+                <>
                   <input ref={fileInputRef} type="file" accept="video/*" onChange={handleVideoFileUpload} className="hidden" />
                   <div
                     onClick={() => !isUploading && fileInputRef.current?.click()}
                     className="border-2 border-dashed border-slate-300 bg-slate-50/50 rounded-2xl p-12 text-center hover:bg-slate-50 hover:border-slate-400 transition-colors cursor-pointer group"
                   >
-                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300 border border-slate-200">
-                      {isUploading ? (
-                        <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-                      ) : (
-                        <UploadCloud className="w-10 h-10 text-slate-600" />
-                      )}
+                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform border border-slate-200">
+                      {isUploading ? <Loader2 className="w-10 h-10 text-blue-600 animate-spin" /> : <UploadCloud className="w-10 h-10 text-slate-600" />}
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">
-                      {isUploading ? "Uploading..." : "Click to upload video"}
-                    </h3>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">{isUploading ? "Uploading..." : "Click to upload video"}</h3>
                     <p className="text-slate-500 mb-6">MP4, WebM, or OGG up to 5GB</p>
-                    <span className="px-6 py-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors text-[15px]">
-                      Browse Files
-                    </span>
+                    {isUploading && (
+                      <div className="w-full max-w-xs mx-auto bg-slate-200 rounded-full h-2">
+                        <div className="bg-blue-600 h-2 rounded-full animate-pulse w-1/2" />
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : activeUploadTab === "youtube" ? (
+                </>
+              )}
+
+              {activeUploadTab === "youtube" && (
                 <div className="max-w-xl mx-auto">
                   <label className="block text-[15px] font-bold text-slate-700 mb-2">Paste YouTube URL</label>
                   <div className="flex gap-3">
@@ -656,6 +1576,7 @@ export default function Editor() {
                       type="url"
                       value={youtubeLink}
                       onChange={(e) => setYoutubeLink(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleYoutubeImport()}
                       placeholder="https://www.youtube.com/watch?v=..."
                       className="flex-1 px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-[15px]"
                     />
@@ -664,13 +1585,16 @@ export default function Editor() {
                       disabled={isUploading || !youtubeLink.trim()}
                       className="px-6 py-3.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-[15px] whitespace-nowrap shadow-sm flex items-center gap-2"
                     >
-                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      Import Video
+                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Youtube className="w-4 h-4" />}
+                      Import
                     </button>
                   </div>
+                  {isUploading && <ProgressBar value={60} label="Importing YouTube video..." color="bg-blue-600" />}
                 </div>
-              ) : activeUploadTab === "h5p" ? (
-                <div>
+              )}
+
+              {activeUploadTab === "h5p" && (
+                <>
                   <input ref={h5pStep1InputRef} type="file" accept=".h5p" onChange={handleH5PFileSelect} className="hidden" />
                   <div
                     onClick={() => h5pStep1InputRef.current?.click()}
@@ -678,37 +1602,32 @@ export default function Editor() {
                   >
                     {pendingH5PFile ? (
                       <>
-                        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-green-200">
+                        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-200">
                           <CheckCircle2 className="w-10 h-10 text-green-600" />
                         </div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">{pendingH5PFile.name}</h3>
                         <p className="text-slate-500 mb-6">H5P package ready to import</p>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setPendingH5PFile(null); }}
-                          className="px-4 py-2 bg-white border border-slate-300 hover:bg-red-50 hover:border-red-300 hover:text-red-700 text-slate-600 font-semibold rounded-lg transition-colors text-sm"
-                        >
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setPendingH5PFile(null); }} className="px-4 py-2 bg-white border border-slate-300 hover:bg-red-50 hover:text-red-700 text-slate-600 font-semibold rounded-lg transition-colors text-sm">
                           Remove
                         </button>
                       </>
                     ) : (
                       <>
-                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300 border border-slate-200">
+                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform border border-slate-200">
                           <Package className="w-10 h-10 text-slate-600" />
                         </div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">Click to upload H5P package</h3>
-                        <p className="text-slate-500 mb-6">.h5p files up to 500MB</p>
-                        <span className="px-6 py-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors text-[15px]">
-                          Browse Files
-                        </span>
+                        <p className="text-slate-500">.h5p files only</p>
                       </>
                     )}
                   </div>
-                  <p className="text-center text-sm text-slate-500 mt-4">
-                    The H5P package will be imported when you continue. You still need to add a video above.
-                  </p>
-                </div>
-              ) : null}
+                  {pendingH5PFile && (
+                    <p className="text-center text-sm text-slate-500 mt-4">
+                      The H5P package will be imported when you continue. You still need to add a video first.
+                    </p>
+                  )}
+                </>
+              )}
 
               <div className="mt-12 flex justify-end">
                 <button
@@ -724,306 +1643,223 @@ export default function Editor() {
             </div>
           )}
 
-          {/* ── STEP 2: Edit / Enrich ──────────────────────────────────────────── */}
+          {/* ── STEP 2: Edit ─────────────────────────────────────────────── */}
           {currentStep === 2 && (
             <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-8 duration-500">
 
-              {/* Video Preview */}
-              <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-800 relative aspect-video flex-shrink-0">
-                {videoSrc ? (
-                  <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    controls
-                    onTimeUpdate={() => store.setCurrentTime(videoRef.current?.currentTime || 0)}
-                    className="w-full h-full object-contain"
-                  />
-                ) : youtubeEmbedSrc ? (
-                  <iframe
-                    src={youtubeEmbedSrc}
-                    title={store.video?.title || "YouTube video"}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="w-full h-full"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400">
-                    <p>Video not available</p>
-                  </div>
-                )}
+              {/* Video player */}
+              <div className="relative bg-slate-900 rounded-t-2xl shadow-sm border border-slate-800 border-b-0" style={{ aspectRatio: "16/9" }}>
+                {/* Video content — inner wrapper handles overflow-hidden for rounded corners */}
+                <div className="absolute inset-0 rounded-t-2xl overflow-hidden">
+                  {videoSrc ? (
+                    <video
+                      ref={videoRef}
+                      src={videoSrc}
+                      onTimeUpdate={() => {
+                        const t = videoRef.current?.currentTime || 0;
+                        store.setCurrentTime(t);
+                        checkInteractionTrigger(t);
+                      }}
+                      onLoadedMetadata={() => {
+                        const dur = videoRef.current?.duration || 0;
+                        setVideoDuration(dur);
+                        videoDurationRef.current = dur;
+                      }}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : store.video?.youtubeId ? (
+                    <div ref={ytContainerRef} className="w-full h-full" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      <p>Video not available</p>
+                    </div>
+                  )}
+                </div>
 
-                {/* H5P markers overlay */}
-                {store.h5pContents.length > 0 && (
-                  <div className="absolute bottom-4 left-0 right-0 px-4 flex gap-2 flex-wrap">
-                    {store.h5pContents.map((c, i) => (
-                      <div key={i} className="bg-orange-500 border-2 border-white rounded-full w-5 h-5 shadow-sm cursor-pointer hover:scale-125 transition-transform" title={`Interaction at ${formatTime(c.timestamp)}`} />
-                    ))}
+                {/* Interaction overlay — absolute inside video area only */}
+                {previewContent && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 rounded-t-2xl">
+                    <InteractionPreview
+                      content={previewContent}
+                      onContinue={() => {
+                        setPreviewContent(null);
+                        if (videoRef.current) videoRef.current.play().catch(() => {});
+                        if (ytPlayerRef.current) ytPlayerRef.current.playVideo();
+                      }}
+                    />
                   </div>
                 )}
               </div>
 
-              {/* Three-panel tools area */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-5 min-h-0">
+              {/* Custom video controls */}
+              <VideoControls
+                currentTime={store.currentTime}
+                duration={videoDuration}
+                isPlaying={isPlaying}
+                sortedContents={sortedContents}
+                onSeek={seekTo}
+                onTogglePlay={togglePlay}
+                onDotClick={(c) => setOpenForContent(c)}
+              />
 
-                {/* LEFT: Transcript + AI controls */}
-                <div className="md:col-span-4 flex flex-col gap-4">
-                  {/* Transcript Upload */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                    <h3 className="font-bold text-slate-800 text-base mb-3 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      Transcript
-                    </h3>
-                    <input
-                      ref={transcriptInputRef}
-                      type="file"
-                      accept=".vtt,.srt"
-                      onChange={handleTranscriptUpload}
-                      className="hidden"
-                    />
-                    <button
-                      onClick={() => transcriptInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 border border-dashed border-slate-300 hover:bg-blue-50 hover:border-blue-300 rounded-xl text-slate-700 font-semibold text-sm transition-colors"
-                    >
-                      <UploadCloud className="w-4 h-4" />
-                      {store.transcriptFilename || "Upload .vtt / .srt file"}
-                    </button>
-                    {/* Extract captions from YouTube or uploaded video */}
-                    {store.video?.youtubeId && (
-                      <button
-                        onClick={handleTranscriptExtraction}
-                        disabled={!store.video?.id || isExtractingTranscript}
-                        className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-blue-200 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed text-blue-800 font-semibold rounded-xl transition-colors text-sm"
-                      >
-                        {isExtractingTranscript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Youtube className="w-4 h-4" />}
-                        {isExtractingTranscript ? "Extracting captions..." : "Extract YouTube captions"}
-                      </button>
-                    )}
-                    {store.video?.filePath && (
-                      <button
-                        onClick={handleWhisperTranscribe}
-                        disabled={!store.video?.id || isExtractingTranscript}
-                        className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed text-emerald-800 font-semibold rounded-xl transition-colors text-sm"
-                      >
-                        {isExtractingTranscript ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                        {isExtractingTranscript ? "Transcribing with AI..." : "Transcribe with faster-whisper (free AI)"}
-                      </button>
-                    )}
-                    {store.segments.length > 0 && (
-                      <p className="mt-2 text-xs text-green-700 font-semibold flex items-center gap-1">
-                        <Check className="w-3 h-3" />
-                        {store.segments.length} segments parsed
-                      </p>
-                    )}
-                  </div>
+              {/* Two-panel layout */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-5" style={{ height: "600px" }}>
 
-                  {/* AI Analysis */}
-                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Sparkles className="w-5 h-5 text-blue-600" />
-                      <h3 className="font-bold text-slate-800 text-base">AI Enrichment</h3>
-                      <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">Auto-accept ON</span>
-                    </div>
-                    {store.segments.length === 0 ? (
-                      <p className="text-slate-500 text-sm mb-3">Add a transcript above to enable AI analysis.</p>
-                    ) : (
-                      <p className="text-slate-600 text-sm mb-3">
-                        {store.segments.length} segments ready. AI will generate and <strong>auto-apply</strong> H5P interactions.
-                      </p>
-                    )}
+                {/* LEFT: AI Transcribing & Applying H5P */}
+                <div className="md:col-span-4 flex flex-col">
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col flex-1 overflow-hidden">
 
-                    {store.isAnalyzing ? (
-                      <div className="flex flex-col items-center gap-2 py-3">
-                        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                        <p className="text-sm font-semibold text-slate-700">{store.progressMessage}</p>
-                        {store.streamedText && (
-                          <p className="text-xs text-slate-400 text-center line-clamp-2">{store.streamedText.slice(-100)}</p>
-                        )}
+                    {/* Panel header */}
+                    <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="w-4 h-4 text-blue-600" />
+                        <h3 className="font-bold text-slate-800 text-base">AI Transcribing &amp; Applying H5P</h3>
                       </div>
-                    ) : (
-                      <div className="flex flex-col gap-2">
+                      <p className="text-xs text-slate-500">
+                        One click: transcribe your video, generate H5P questions with AI, and apply them automatically.
+                      </p>
+                    </div>
+
+                    {/* Main action + unified progress */}
+                    <div className="px-5 py-4 border-b border-slate-100 shrink-0 space-y-3">
+                      {(() => {
+                        const isRunning = isExtractingTranscript || store.isAnalyzing || store.injectProgress > 0;
+                        const isDone = !isRunning && store.analysisProgress === 100;
+                        let unifiedProgress = 0;
+                        let unifiedMessage = "";
+                        if (isExtractingTranscript) {
+                          unifiedProgress = 20;
+                          unifiedMessage = "Transcribing video...";
+                        } else if (store.isAnalyzing) {
+                          unifiedProgress = 25 + Math.round((store.analysisProgress / 100) * 60);
+                          unifiedMessage = store.progressMessage || "AI is generating questions...";
+                        } else if (store.injectProgress > 0) {
+                          unifiedProgress = 85 + Math.round((store.injectProgress / 100) * 15);
+                          unifiedMessage = "Applying H5P interactions...";
+                        }
+                        return (
+                          <>
+                            {!isRunning && !isDone && (
+                              <button
+                                type="button"
+                                onClick={handleTranscribeAndGenerate}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                Transcribe &amp; Generate H5P with AI
+                              </button>
+                            )}
+                            {isRunning && (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                                  <span className="text-sm text-blue-800 font-semibold truncate flex-1">{unifiedMessage}</span>
+                                  <span className="font-mono text-xs text-slate-500 shrink-0">{unifiedProgress}%</span>
+                                </div>
+                                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out"
+                                    style={{ width: `${unifiedProgress}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {isDone && (
+                              <p className="text-sm font-semibold text-green-700 flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4 shrink-0" /> {store.progressMessage}
+                              </p>
+                            )}
+                            {store.analyzeError && (
+                              <p className="text-xs text-red-700 flex items-start gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                {store.analyzeError}
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
+
+                      {/* Manual transcript upload — small secondary option */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <input ref={transcriptInputRef} type="file" accept=".vtt,.srt" onChange={handleTranscriptUpload} className="hidden" />
                         <button
-                          type="button"
-                          onClick={handleRunAnalysis}
-                          disabled={store.segments.length === 0}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+                          onClick={() => transcriptInputRef.current?.click()}
+                          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-700 font-medium transition-colors"
                         >
-                          <Sparkles className="w-4 h-4" />
-                          Generate &amp; Auto-Apply H5P with AI
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          {store.transcriptFilename ? `Using: ${store.transcriptFilename}` : "Or upload transcript (.vtt/.srt)"}
                         </button>
-                        {store.suggestions.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={handleRunAnalysis}
-                            disabled={store.segments.length === 0}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-800 font-semibold rounded-xl transition-colors text-sm"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            Re-run (adds more)
-                          </button>
-                        )}
                       </div>
-                    )}
-
-                    {store.analyzeError && (
-                      <p className="mt-2 text-xs text-red-700 flex items-start gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        {store.analyzeError}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Manual Content Type Picker */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                    <h3 className="font-bold text-slate-800 text-base mb-3">Add Manually</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { icon: Info, label: "Text Info" },
-                        { icon: Lightbulb, label: "Multiple Choice" },
-                        { icon: CheckCircle2, label: "True / False" },
-                        { icon: Plus, label: "Fill in Blanks" },
-                      ].map((btn, i) => (
-                        <button key={i} className="flex flex-col items-center justify-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-blue-50 hover:border-blue-200 hover:text-blue-800 transition-all text-slate-700 font-semibold text-xs group">
-                          <btn.icon className="w-5 h-5 text-slate-500 group-hover:text-blue-700 transition-colors" />
-                          {btn.label}
-                        </button>
-                      ))}
                     </div>
-                    <input ref={h5pFileInputRef} type="file" accept=".h5p" onChange={handleH5PFileImport} className="hidden" aria-label="Import H5P file" />
-                    <button
-                      type="button"
-                      onClick={() => h5pFileInputRef.current?.click()}
-                      disabled={isImportingH5P}
-                      className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-50 border border-dashed border-slate-300 hover:bg-blue-50 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 font-semibold rounded-xl transition-colors text-sm"
-                    >
-                      {isImportingH5P ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-                      {isImportingH5P ? "Importing..." : "Import .h5p file"}
-                    </button>
-                  </div>
-                </div>
 
-                {/* RIGHT: Suggestions panel */}
-                <div className="md:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col max-h-[600px] overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-base">
-                        AI Suggestions {store.suggestions.length > 0 ? `(${store.suggestions.length})` : ""}
-                      </h3>
-                      {store.suggestions.length > 0 && (
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {acceptedCount} accepted · {pendingCount} pending
-                        </p>
+                    {/* Scrollable content — topics tree only */}
+                    <div className="flex-1 overflow-y-auto px-3 py-3">
+                      {store.topics.length > 0 ? (
+                        <TopicsPanel
+                          topics={store.topics}
+                          segments={store.segments}
+                          onSeek={seekTo}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
+                          <FileText className="w-10 h-10 mb-3 text-slate-200" />
+                          <p className="font-semibold text-sm">
+                            {isExtractingTranscript || store.isAnalyzing || store.injectProgress > 0 ? "Processing..." : "No topics yet"}
+                          </p>
+                          <p className="text-xs mt-1 text-center text-slate-400">
+                            {isExtractingTranscript || store.isAnalyzing || store.injectProgress > 0 ? "" : "Click the button above to transcribe and generate H5P questions automatically."}
+                          </p>
+                        </div>
                       )}
                     </div>
-                    {store.suggestions.length > 0 && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => store.acceptAll()}
-                          className="text-xs px-3 py-1.5 bg-green-50 text-green-700 font-bold hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
-                        >
-                          Accept All
-                        </button>
-                        <button
-                          onClick={() => store.rejectAll()}
-                          className="text-xs px-3 py-1.5 bg-slate-50 text-slate-600 font-semibold hover:bg-red-50 hover:text-red-700 rounded-lg border border-slate-200 transition-colors"
-                        >
-                          Reject All
-                        </button>
-                        <button
-                          onClick={() => store.removeRejected()}
-                          className="text-xs px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
-                        >
-                          Clear Rejected
-                        </button>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="flex-1 overflow-y-auto p-4">
-                    {store.suggestions.length === 0 && !store.isAnalyzing ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center py-12 text-slate-400">
-                        <Sparkles className="w-10 h-10 mb-3 text-slate-200" />
-                        <p className="font-semibold text-slate-500">No suggestions yet</p>
-                        <p className="text-sm mt-1">Upload a transcript and run AI analysis to generate H5P interactions.</p>
-                      </div>
-                    ) : (
-                      [...store.suggestions]
-                        .sort((a, b) => a.timestamp - b.timestamp)
-                        .map((suggestion) => (
-                          <SuggestionCard
-                            key={suggestion.id}
-                            suggestion={suggestion}
-                            isNew={!previousIds.has(suggestion.id)}
-                            onAccept={() => store.setSuggestionStatus(suggestion.id, "accepted")}
-                            onReject={() => store.setSuggestionStatus(suggestion.id, "rejected")}
-                            onEdit={() => setEditingSuggestion(suggestion)}
-                            onSeek={seekTo}
-                          />
-                        ))
-                    )}
                   </div>
+                </div>
 
-                  {/* H5P Contents already applied */}
-                  {store.h5pContents.length > 0 && (
-                    <div className="p-4 border-t border-slate-100 shrink-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Applied to video ({store.h5pContents.length})
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {store.h5pContents.map((c) => (
-                          <div key={c.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-lg text-xs font-semibold text-slate-700">
-                            <span className="font-mono">{formatTime(c.timestamp)}</span>
-                            <span>{c.library?.split(" ")[0]?.replace("H5P.", "") || "H5P"}</span>
-                            <button onClick={() => store.removeH5PContent(c.id)} className="ml-1 text-slate-400 hover:text-red-600">
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                {/* RIGHT: H5P Editor */}
+                <div className="md:col-span-8">
+                  {store.video?.id && (
+                    <H5PEditorPanel
+                      h5pContents={sortedContents}
+                      currentTime={store.currentTime}
+                      videoId={store.video.id}
+                      openForContent={openForContent}
+                      clearOpen={() => setOpenForContent(null)}
+                      onSaved={async () => {
+                        await store.loadH5PContents(store.video!.id);
+                        notify("Interaction saved!", "success");
+                      }}
+                      onDeleted={async (id) => {
+                        await store.removeH5PContent(id);
+                        notify("Interaction deleted", "info");
+                      }}
+                      onSeek={seekTo}
+                    />
                   )}
                 </div>
               </div>
 
-              {/* Bottom actions */}
-              <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+              {/* Bottom nav */}
+              <div className="flex justify-end items-center pt-4 border-t border-slate-200">
                 <button
-                  onClick={() => setCurrentStep(1)}
-                  className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors text-[15px]"
+                  onClick={() => setCurrentStep(3)}
+                  className="px-8 py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm transition-all text-[15px] flex items-center gap-2"
                 >
-                  Back
+                  Continue to Finish
+                  <ChevronRight className="w-5 h-5" />
                 </button>
-                <div className="flex items-center gap-3">
-                  {acceptedCount > 0 && (
-                    <button
-                      onClick={handleApply}
-                      disabled={store.isInjecting}
-                      className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-sm transition-colors text-[15px]"
-                    >
-                      {store.isInjecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                      Apply {acceptedCount} Interaction{acceptedCount !== 1 ? "s" : ""}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setCurrentStep(3)}
-                    className="px-8 py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm transition-all text-[15px] flex items-center gap-2"
-                  >
-                    Continue to Finish
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
               </div>
             </div>
           )}
 
-          {/* ── STEP 3: Finish & Share ─────────────────────────────────────────── */}
+          {/* ── STEP 3: Finish & Share ────────────────────────────────────── */}
           {currentStep === 3 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 sm:p-12 animate-in fade-in slide-in-from-right-8 duration-500 text-center max-w-2xl mx-auto w-full">
               <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-green-200 shadow-sm">
                 <CheckCircle2 className="w-12 h-12 text-green-600" />
               </div>
-              
               <h1 className="text-3xl font-bold text-slate-900 mb-4">Your video is ready!</h1>
               <p className="text-slate-600 text-lg mb-10">
                 <strong>"{store.video?.title || "Your Video"}"</strong> has{" "}
@@ -1031,40 +1867,13 @@ export default function Editor() {
               </p>
 
               <div className="space-y-4 mb-12 text-left">
-                {/* Share Link */}
                 <div className="p-6 border-2 border-blue-900 bg-slate-50 rounded-2xl flex gap-5 items-start shadow-sm">
                   <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-200 shrink-0">
-                    <Share2 className="w-7 h-7 text-blue-900" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-slate-900 text-lg mb-1">Share Direct Link</h3>
-                    <p className="text-slate-600 text-[15px] mb-3">Get a simple web link you can share with students.</p>
-                    {store.video && (
-                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
-                        <code className="text-xs text-slate-600 flex-1 truncate">
-                          {window.location.origin}/api/videos/{store.video.id}
-                        </code>
-                        <button
-                          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/videos/${store.video!.id}`); notify("Copied!", "success"); }}
-                          className="text-xs font-bold text-blue-600 hover:text-blue-800 shrink-0"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Export H5P */}
-                <div className="p-6 border border-slate-200 bg-white rounded-2xl flex gap-5 items-start hover:border-slate-300 hover:bg-slate-50 transition-all">
-                  <div className="p-3 bg-slate-100 rounded-xl shrink-0 border border-slate-200">
-                    <Download className="w-7 h-7 text-slate-600" />
+                    <Download className="w-7 h-7 text-blue-900" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-bold text-slate-900 text-lg mb-1">Export for LMS (.h5p)</h3>
-                    <p className="text-slate-500 text-[15px] mb-3">
-                      Export a standard package for Canvas, Moodle, or Blackboard.
-                    </p>
+                    <p className="text-slate-500 text-[15px] mb-3">Export a standard package for Canvas, Moodle, or Blackboard.</p>
                     <button
                       onClick={handleExport}
                       disabled={isExporting || store.h5pContents.length === 0}
@@ -1075,13 +1884,32 @@ export default function Editor() {
                     </button>
                   </div>
                 </div>
+
+                {store.video && (
+                  <div className="p-6 border border-slate-200 bg-white rounded-2xl flex gap-5 items-start">
+                    <div className="p-3 bg-slate-100 rounded-xl shrink-0 border border-slate-200">
+                      <CheckCircle2 className="w-7 h-7 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900 text-lg mb-1">Direct Link</h3>
+                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                        <code className="text-xs text-slate-600 flex-1 truncate">
+                          {window.location.origin}/api/videos/{store.video.id}
+                        </code>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/videos/${store.video!.id}`); notify("Copied!", "success"); }}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-800 shrink-0"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between items-center">
-                <button
-                  onClick={() => setCurrentStep(2)}
-                  className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors text-[15px]"
-                >
+                <button onClick={() => setCurrentStep(2)} className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors text-[15px]">
                   Back to Editor
                 </button>
                 <button
@@ -1097,37 +1925,6 @@ export default function Editor() {
         </div>
       </main>
 
-      {/* ── Edit Modal ─────────────────────────────────────────────────────────── */}
-      {editingSuggestion && (
-        <SuggestionEditModal
-          suggestion={editingSuggestion}
-          onSave={(config) => {
-            store.updateSuggestionConfig(editingSuggestion.id, config);
-            setEditingSuggestion(null);
-            notify("Config updated", "success");
-          }}
-          onClose={() => setEditingSuggestion(null)}
-        />
-      )}
-
-      {/* ── Floating Staging Bar ───────────────────────────────────────────────── */}
-      {currentStep === 2 && acceptedCount > 0 && !store.isInjecting && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg px-6 py-3 flex items-center justify-between z-40">
-          <div className="flex items-center gap-3 text-sm">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="font-semibold text-slate-700">
-              {acceptedCount} interaction{acceptedCount !== 1 ? "s" : ""} staged for apply
-            </span>
-          </div>
-          <button
-            onClick={handleApply}
-            className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
-          >
-            <Sparkles className="w-4 h-4" />
-            Apply to H5P
-          </button>
-        </div>
-      )}
     </div>
   );
 }

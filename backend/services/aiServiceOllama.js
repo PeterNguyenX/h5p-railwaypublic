@@ -314,7 +314,18 @@ async function analyzeTranscriptOllamaStream(segments, res, videoId, video) {
       }
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'result', suggestions, model: OLLAMA_MODEL })}\n\n`);
+    // Convert flat suggestions to topics format so frontend editorStore can handle uniformly
+    const topics = suggestions.map(s => ({
+      title: s.reason || 'Generated Topic',
+      start: Math.max(0, (s.timestamp || 0) - 30),
+      end: s.timestamp || 0,
+      question: {
+        type: s.type,
+        ...(s.config || {}),
+        feedback: (s.config && s.config.feedback) || { correct: 'Correct!', incorrect: 'Not quite — review the material.' },
+      },
+    }));
+    res.write(`data: ${JSON.stringify({ type: 'result', topics, model: OLLAMA_MODEL })}\n\n`);
     res.end();
   } catch (err) {
     res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);

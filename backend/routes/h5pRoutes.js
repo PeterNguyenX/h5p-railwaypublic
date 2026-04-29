@@ -59,40 +59,18 @@ router.get("/video/:videoId/content", auth, async (req, res) => {
 router.post("/video/:videoId", auth, async (req, res) => {
   try {
     const { contentData, timestamp } = req.body;
-    const content = await h5pService.createTimeBasedContent(
-      contentData,
-      req.params.videoId,
-      timestamp
-    );
 
-    // Update video with H5P content reference
-    const video = await Video.findOne({
-      where: {
-        id: req.params.videoId,
-        userId: req.user.id,
-      },
-    });
+    // Verify ownership before creating
+    const video = await Video.findOne({ where: { id: req.params.videoId, userId: req.user.id } });
+    if (!video) return res.status(404).json({ error: "Video not found" });
 
-    if (!video) {
-      return res.status(404).json({ error: "Video not found" });
-    }
+    // h5pService.createTimeBasedContent now persists the full content object to the DB
+    const content = await h5pService.createTimeBasedContent(contentData, req.params.videoId, timestamp);
 
-    const h5pContent = video.h5pContent || [];
-    h5pContent.push({
-      contentId: content.id,
-      timestamp,
-      type: contentData.library,
-    });
-
-    await video.update({ h5pContent });
-
-    res.json({
-      message: "H5P content added successfully",
-      content,
-    });
+    res.json({ message: "H5P content added successfully", content });
   } catch (error) {
     console.error("Error creating H5P content:", error);
-    res.status(500).json({ error: "Error creating H5P content" });
+    res.status(500).json({ error: error.message || "Error creating H5P content" });
   }
 });
 
@@ -100,44 +78,12 @@ router.post("/video/:videoId", auth, async (req, res) => {
 router.put("/content/:contentId", auth, async (req, res) => {
   try {
     const { contentData, timestamp } = req.body;
-    const contentId = req.params.contentId;
-    
-    // Update the H5P content
-    const content = await h5pService.updateContent(contentId, contentData);
-    
-    // Update the timestamp in the video's H5P content array
-    const video = await Video.findOne({
-      where: {
-        h5pContent: {
-          [Op.or]: [
-            { [Op.like]: `%"contentId":"${contentId}"%` },
-            { [Op.like]: `%"contentId":${contentId}%` }
-          ]
-        }
-      }
-    });
-
-    if (video) {
-      let h5pContent = Array.isArray(video.h5pContent) ? video.h5pContent : [];
-      
-      // Find and update the timestamp for this content
-      const contentIndex = h5pContent.findIndex(item => 
-        item.contentId === contentId || item.contentId === parseInt(contentId)
-      );
-      
-      if (contentIndex !== -1) {
-        h5pContent[contentIndex].timestamp = timestamp;
-        await video.update({ h5pContent });
-      }
-    }
-
-    res.json({
-      message: "H5P content updated successfully",
-      content,
-    });
+    // h5pService.updateContent finds the item in DB and updates library/params/metadata/timestamp
+    const content = await h5pService.updateContent(req.params.contentId, contentData, timestamp);
+    res.json({ message: "H5P content updated successfully", content });
   } catch (error) {
     console.error("Error updating H5P content:", error);
-    res.status(500).json({ error: "Error updating H5P content" });
+    res.status(500).json({ error: error.message || "Error updating H5P content" });
   }
 });
 
@@ -190,16 +136,9 @@ router.get("/status", async (req, res) => {
   }
 });
 
-// POST /api/h5p/content - Save new H5P content
-router.post("/content", auth, async (req, res) => {
-  try {
-    const { projectId, h5pData } = req.body;
-    // Save H5P content using h5p-nodejs-library
-    const contentId = await h5p.saveOrUpdateContent(h5pData, projectId);
-    res.json({ contentId });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// POST /api/h5p/content - unused legacy route (kept for compatibility)
+router.post("/content", auth, (req, res) => {
+  res.status(410).json({ error: "Use POST /api/h5p/video/:videoId instead" });
 });
 
 // GET /api/h5p/content/:id - Load H5P content

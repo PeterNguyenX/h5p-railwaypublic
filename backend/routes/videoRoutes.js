@@ -16,6 +16,7 @@ const VideoProcessingService = require("../services/videoProcessing");
 const { fetchYoutubeTranscriptSegments } = require('../services/transcriptExtraction');
 const ytdl = require('ytdl-core');
 const { v4: uuidv4 } = require('uuid');
+const { H5PContent } = require("../models");
 
 // Initialize video processing service
 const videoProcessor = new VideoProcessingService();
@@ -29,21 +30,13 @@ const storage = multer.diskStorage({
       .then(() => cb(null, uploadsDir))
       .catch(err => cb(err));
   },
-  filename: async function (req, file, cb) {
+  filename: function (req, file, cb) {
     try {
-      let baseName = req.body.title ? sanitize(req.body.title) : path.parse(file.originalname).name;
-      let ext = path.extname(file.originalname);
-      let finalName = `${baseName}${ext}`;
-      const uploadsDir = path.join(__dirname, '../uploads/videos');
-      const filePath = path.join(uploadsDir, finalName);
-      try {
-        await fs.access(filePath);
-        // File exists
-        return cb(new Error('A video with this name already exists. Please choose a different title.'));
-      } catch {
-        // File does not exist, safe to use
-        return cb(null, finalName);
-      }
+      const baseName = req.body.title ? sanitize(req.body.title) : path.parse(file.originalname).name;
+      const ext = path.extname(file.originalname);
+      // Always append timestamp so filenames are globally unique across accounts and re-uploads
+      const finalName = `${baseName}_${Date.now()}${ext}`;
+      return cb(null, finalName);
     } catch (err) {
       return cb(err);
     }
@@ -169,9 +162,22 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
       console.error(`[UPLOAD] File not found after upload: ${videoPath}`);
     }
 
-    // Create video record in database
+    // If title is provided, check for per-user uniqueness (deleted videos are gone, so no conflict)
+    if (title && title.trim()) {
+      const existingVideo = await Video.findOne({
+        where: { userId: req.user.id, title: title.trim() }
+      });
+      if (existingVideo) {
+        return res.status(409).json({ error: "A video with this name already exists for your account. Please choose a different title." });
+      }
+    }
+
+    // Generate a system title if none provided (user can edit it later)
+    const systemTitle = title && title.trim() ? title : `Video_${Date.now()}`;
+
+    // Create video record in database with auto-generated ID
     const video = await Video.create({
-      title: title || req.file.originalname,
+      title: systemTitle,
       description: description || '',
       filePath: path.relative(process.cwd(), videoPath),
       userId: req.user.id,
@@ -442,7 +448,33 @@ router.delete("/:id", auth, validateParams(idParamSchema), async (req, res) => {
       }
     }
 
-    await video.destroy();
+    // Delete all H5P content associated with this video
+    try {
+      await H5PContent.destroy({
+        where: { videoId: req.params.id },
+        force: true
+      });
+      console.log('H5P content deleted for video:', req.params.id);
+    } catch (error) {
+      console.error('Error deleting H5P content:', error);
+      // Continue with video deletion even if H5P deletion fails
+    }
+
+    // Hard delete from database - force: true ensures hard delete even if paranoid is enabled
+    await video.destroy({ force: true });
+    
+    // Verify deletion - check both hard and soft deleted records
+    const verifyDelete = await Video.findOne({
+      where: { id: req.params.id },
+      paranoid: false,  // Include soft-deleted records in check
+      logging: false
+    });
+    
+    if (verifyDelete) {
+      console.error("WARNING: Video still exists after deletion:", req.params.id);
+      return res.status(500).json({ error: "Failed to delete video from database" });
+    }
+    
     res.json({ message: "Video deleted successfully" });
   } catch (error) {
     console.error("Error deleting video:", error);

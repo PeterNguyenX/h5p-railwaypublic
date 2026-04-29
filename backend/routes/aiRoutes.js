@@ -56,8 +56,7 @@ router.get('/status', async (req, res) => {
 /**
  * POST /api/ai/analyze
  * Body: { segments: TranscriptSegment[], videoId: string }
- * Response: { suggestions: AISuggestion[] }
- * Saves suggestions to Video.h5pContent in database
+ * Response: { topics: TopicNode[] }
  */
 router.post('/analyze', auth, async (req, res) => {
   try {
@@ -69,70 +68,41 @@ router.post('/analyze', auth, async (req, res) => {
     const { segments, videoId } = parsed.data;
     const { Video } = require('../models');
 
-    // Verify video exists and user has access
     const video = await Video.findByPk(videoId);
-    if (!video) {
-      return res.status(404).json({ error: 'Video not found' });
-    }
+    if (!video) return res.status(404).json({ error: 'Video not found' });
     if (video.userId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized access to this video' });
     }
 
-    let suggestions;
+    let topics;
     let model;
 
-    // Try Ollama first (free, local), fallback to Claude
     const ollamaOk = await isOllamaAvailable();
     if (ollamaOk) {
       try {
-        console.log('Using Ollama for AI analysis');
         const result = await analyzeTranscriptOllama(segments);
-        suggestions = result.suggestions;
+        // Ollama may return old suggestions format — wrap as topics if needed
+        topics = result.topics || result.suggestions || [];
         model = result.model;
       } catch (ollamaErr) {
         console.warn('Ollama analysis failed, falling back to Claude:', ollamaErr.message);
         if (!ANTHROPIC_API_KEY) {
-          return res.status(500).json({ error: 'No AI backend available. Ollama is not running and ANTHROPIC_API_KEY is not set.' });
+          return res.status(500).json({ error: 'No AI backend available.' });
         }
         const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY);
-        suggestions = result.suggestions;
+        topics = result.topics;
         model = 'claude';
       }
     } else {
       if (!ANTHROPIC_API_KEY) {
-        return res.status(500).json({ error: 'No AI backend available. Ollama is not running and ANTHROPIC_API_KEY is not set.' });
+        return res.status(500).json({ error: 'No AI backend available.' });
       }
       const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY);
-      suggestions = result.suggestions;
+      topics = result.topics;
       model = 'claude';
     }
 
-    // Save suggestions to Video.h5pContent in database
-    const h5pContent = video.h5pContent || [];
-    if (!Array.isArray(h5pContent)) {
-      h5pContent = [];
-    }
-
-    // Add suggestions to h5pContent array
-    const newContent = suggestions.map(suggestion => ({
-      id: suggestion.id,
-      timestamp: suggestion.timestamp,
-      type: suggestion.type,
-      h5pLibrary: suggestion.h5pLibrary || suggestion.type,
-      config: suggestion.config,
-      reason: suggestion.reason || 'AI-generated interaction',
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    }));
-
-    h5pContent.push(...newContent);
-
-    // Update video with new h5pContent
-    await video.update({ h5pContent });
-
-    console.log(`Persisted ${newContent.length} H5P suggestions to video ${videoId}`);
-
-    res.json({ suggestions, count: suggestions.length, videoId, model });
+    res.json({ topics, count: topics.length, videoId, model });
   } catch (error) {
     console.error('Error in AI analysis:', error.message);
     res.status(500).json({ error: error.message });
@@ -447,5 +417,48 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no code b
     throw new Error(`Question generation failed: ${error.message}`);
   }
 }
+
+/**
+ * GET /api/ai/results/:videoId
+ * Retrieve previously saved AI analysis results for a video
+ */
+router.get('/results/:videoId', auth, async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    const { Video } = require('../models');
+    
+    const video = await Video.findOne({
+      where: { id: videoId, userId: req.user.id }
+    });
+
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    if (!video.captions) {
+      return res.status(404).json({ error: 'No AI analysis found for this video', data: null });
+    }
+
+    // Parse captions if it's a string
+    let captionData = video.captions;
+    if (typeof captionData === 'string') {
+      try {
+        captionData = JSON.parse(captionData);
+      } catch (e) {
+        console.error('Failed to parse captions:', e);
+        return res.status(500).json({ error: 'Failed to parse saved AI data' });
+      }
+    }
+
+    res.json({
+      topics: captionData.topics || [],
+      suggestions: captionData.suggestions || [],
+      generatedAt: captionData.generatedAt
+    });
+  } catch (err) {
+    console.error('Error retrieving AI results:', err);
+    res.status(500).json({ error: 'Failed to retrieve AI data' });
+  }
+});
 
 module.exports = router;

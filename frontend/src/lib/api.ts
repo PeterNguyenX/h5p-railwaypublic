@@ -104,6 +104,7 @@ export interface Video {
   captions?: unknown;
   youtubeUrl?: string;
   youtubeId?: string;
+  ltiLink?: string;
   createdAt: string;
   updatedAt: string;
 }

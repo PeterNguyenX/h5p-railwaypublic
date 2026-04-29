@@ -1,43 +1,91 @@
 import { create } from 'zustand';
-import type { AISuggestion, TranscriptSegment, Video, H5PContent } from '../lib/api';
+import type { AISuggestion, TranscriptSegment, Video, H5PContent, TopicNode, TopicQuestion } from '../lib/api';
 import { streamAnalysis, injectSuggestions, fetchH5PContent, deleteH5PContent } from '../lib/api';
 
+const COLLISION_THRESHOLD = 5; // seconds
+const WINDOW_SIZE = 30; // seconds — max 1 H5P interaction per 30-second window
+
+const H5P_TYPE_MAP: Record<string, string> = {
+  MultiChoice: 'H5P.MultiChoice 1.16',
+  TrueFalse: 'H5P.TrueFalse 1.6',
+  FillBlanks: 'H5P.Blanks 1.14',
+};
+
+function buildSuggestion(question: TopicQuestion, timestamp: number, nodeTitle: string): AISuggestion {
+  const id = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let config: Record<string, unknown>;
+
+  if (question.type === 'MultiChoice') {
+    config = { question: question.question, answers: question.answers };
+  } else if (question.type === 'TrueFalse') {
+    config = { question: question.question, correct: question.correct ? 'true' : 'false' };
+  } else {
+    config = { text: question.fillText, showSolutions: 'end', autoCheck: false };
+  }
+
+  return {
+    id,
+    timestamp,
+    type: question.type as AISuggestion['type'],
+    h5pLibrary: H5P_TYPE_MAP[question.type] || '',
+    config,
+    reason: `Generated for: ${nodeTitle}`,
+    status: 'accepted',
+  };
+}
+
+function extractSuggestions(topics: TopicNode[], existingTimestamps: number[]): AISuggestion[] {
+  const occupiedWindows = new Set(existingTimestamps.map((t) => Math.floor(t / WINDOW_SIZE)));
+  const suggestions: AISuggestion[] = [];
+
+  function walk(node: TopicNode) {
+    if (node.question) {
+      const timestamp = Math.round(node.end) + 1;
+      const bucket = Math.floor(timestamp / WINDOW_SIZE);
+      const tooClose = existingTimestamps.some((t) => Math.abs(t - timestamp) < COLLISION_THRESHOLD);
+      if (!occupiedWindows.has(bucket) && !tooClose) {
+        occupiedWindows.add(bucket);
+        suggestions.push(buildSuggestion(node.question, timestamp, node.title));
+      }
+    }
+    node.subtopics?.forEach(walk);
+  }
+
+  topics.forEach(walk);
+  return suggestions;
+}
+
 interface EditorStore {
-  // Current video
   video: Video | null;
   setVideo: (v: Video | null) => void;
 
-  // H5P content list
   h5pContents: H5PContent[];
   setH5pContents: (c: H5PContent[]) => void;
   loadH5PContents: (videoId: string) => Promise<void>;
   removeH5PContent: (id: string) => Promise<void>;
 
-  // Transcript
   segments: TranscriptSegment[];
   setSegments: (s: TranscriptSegment[]) => void;
   transcriptFilename: string | null;
   setTranscriptFilename: (n: string | null) => void;
 
+  // AI topics
+  topics: TopicNode[];
+  setTopics: (t: TopicNode[]) => void;
+
   // AI analysis
   suggestions: AISuggestion[];
-  previousSuggestions: AISuggestion[];
   isAnalyzing: boolean;
+  analysisProgress: number; // 0-100
   progressMessage: string;
   streamedText: string;
   analyzeError: string | null;
   runAnalysis: (videoId: string) => () => void;
   resetAnalysis: () => void;
 
-  // Suggestion management
-  setSuggestionStatus: (id: string, status: AISuggestion['status']) => void;
-  updateSuggestionConfig: (id: string, config: Record<string, unknown>) => void;
-  acceptAll: () => void;
-  rejectAll: () => void;
-  removeRejected: () => void;
-
   // Injection
   isInjecting: boolean;
+  injectProgress: number; // 0-100
   injectError: string | null;
   lastInjectCount: number;
   injectAccepted: (videoId: string) => Promise<void>;
@@ -48,11 +96,9 @@ interface EditorStore {
 }
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
-  // Video
   video: null,
   setVideo: (v) => set({ video: v }),
 
-  // H5P content
   h5pContents: [],
   setH5pContents: (c) => set({ h5pContents: c }),
   loadH5PContents: async (videoId) => {
@@ -68,59 +114,73 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set((state) => ({ h5pContents: state.h5pContents.filter((c) => c.id !== id) }));
   },
 
-  // Transcript
   segments: [],
   setSegments: (s) => set({ segments: s }),
   transcriptFilename: null,
   setTranscriptFilename: (n) => set({ transcriptFilename: n }),
 
-  // AI
+  topics: [],
+  setTopics: (t) => set({ topics: t }),
+
   suggestions: [],
-  previousSuggestions: [],
   isAnalyzing: false,
+  analysisProgress: 0,
   progressMessage: '',
   streamedText: '',
   analyzeError: null,
 
   runAnalysis: (videoId: string) => {
-    const { segments, suggestions } = get();
+    const { segments } = get();
     if (!segments.length) {
-      set({ analyzeError: 'Please upload a transcript file first.' });
+      set({ analyzeError: 'Please upload a transcript first.' });
       return () => {};
     }
 
-    // Save previous suggestions for diff
-    if (suggestions.length > 0) {
-      set({ previousSuggestions: suggestions });
-    }
-
-    set({ isAnalyzing: true, analyzeError: null, streamedText: '', progressMessage: 'Connecting to AI...' });
+    set({ isAnalyzing: true, analyzeError: null, streamedText: '', progressMessage: 'Connecting to AI...', analysisProgress: 5 });
 
     const cleanup = streamAnalysis(segments, videoId, (event) => {
       switch (event.type) {
         case 'progress':
-          set({ progressMessage: event.message });
+          set((s) => ({
+            progressMessage: event.message,
+            // Use explicit percent from backend when available, otherwise increment
+            analysisProgress: event.percent ?? Math.min(75, s.analysisProgress + 12),
+          }));
           break;
         case 'chunk':
-          set((s) => ({ streamedText: s.streamedText + event.text, progressMessage: 'AI is thinking...' }));
+          set((s) => ({
+            streamedText: s.streamedText + event.text,
+            progressMessage: 'AI is generating questions...',
+            analysisProgress: event.percent ?? Math.min(85, s.analysisProgress + 1),
+          }));
           break;
         case 'result': {
-          // Auto-accept all suggestions immediately
-          const autoAccepted = event.suggestions.map((s: AISuggestion) => ({ ...s, status: 'accepted' as const }));
-          set({ suggestions: autoAccepted, isAnalyzing: false, progressMessage: `Auto-accepted ${autoAccepted.length} suggestions — applying...` });
-          // Auto-inject accepted suggestions
+          const topics = (event as { type: string; topics?: TopicNode[] }).topics ?? [];
+          const existingTimestamps = get().h5pContents.map((c) => c.timestamp);
+          const suggestions = extractSuggestions(topics, existingTimestamps);
+
+          set({
+            topics,
+            suggestions,
+            analysisProgress: 90,
+            progressMessage: `Applying ${suggestions.length} interactions...`,
+          });
+
           get().injectAccepted(videoId).then(() => {
-            set({ progressMessage: `Done! ${autoAccepted.length} H5P interactions added.` });
+            set({ isAnalyzing: false, analysisProgress: 100, progressMessage: `Done! ${suggestions.length} interactions added.` });
+            setTimeout(() => set({ analysisProgress: 0, progressMessage: '' }), 2500);
           }).catch((err: unknown) => {
-            set({ progressMessage: `Suggestions ready but injection failed: ${err instanceof Error ? err.message : 'unknown error'}` });
+            set({
+              isAnalyzing: false,
+              analysisProgress: 0,
+              progressMessage: '',
+              analyzeError: err instanceof Error ? err.message : 'Injection failed',
+            });
           });
           break;
         }
         case 'error':
-          set({ analyzeError: event.message, isAnalyzing: false, progressMessage: '' });
-          break;
-        case 'usage':
-          // silently log token usage
+          set({ analyzeError: event.message, isAnalyzing: false, analysisProgress: 0, progressMessage: '' });
           break;
       }
     });
@@ -128,62 +188,42 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     return cleanup;
   },
 
-  resetAnalysis: () => set({ suggestions: [], previousSuggestions: [], progressMessage: '', analyzeError: null, streamedText: '' }),
+  resetAnalysis: () => set({ suggestions: [], progressMessage: '', analyzeError: null, streamedText: '', analysisProgress: 0 }),
 
-  // Suggestion management
-  setSuggestionStatus: (id, status) =>
-    set((s) => ({
-      suggestions: s.suggestions.map((sg) => (sg.id === id ? { ...sg, status } : sg)),
-    })),
-
-  updateSuggestionConfig: (id, config) =>
-    set((s) => ({
-      suggestions: s.suggestions.map((sg) => (sg.id === id ? { ...sg, config } : sg)),
-    })),
-
-  acceptAll: () =>
-    set((s) => ({
-      suggestions: s.suggestions.map((sg) => (sg.status === 'pending' ? { ...sg, status: 'accepted' } : sg)),
-    })),
-
-  rejectAll: () =>
-    set((s) => ({
-      suggestions: s.suggestions.map((sg) => (sg.status === 'pending' ? { ...sg, status: 'rejected' } : sg)),
-    })),
-
-  removeRejected: () =>
-    set((s) => ({ suggestions: s.suggestions.filter((sg) => sg.status !== 'rejected') })),
-
-  // Injection
   isInjecting: false,
+  injectProgress: 0,
   injectError: null,
   lastInjectCount: 0,
 
   injectAccepted: async (videoId) => {
     const accepted = get().suggestions.filter((s) => s.status === 'accepted');
-    if (!accepted.length) {
-      set({ injectError: 'No accepted suggestions to apply.' });
-      return;
-    }
+    if (!accepted.length) return;
 
-    set({ isInjecting: true, injectError: null });
+    set({ isInjecting: true, injectError: null, injectProgress: 10 });
+
+    // Fake progress animation while waiting for server
+    const progressTimer = setInterval(() => {
+      set((s) => ({ injectProgress: Math.min(85, s.injectProgress + 8) }));
+    }, 400);
 
     try {
       const result = await injectSuggestions(accepted, videoId);
+      clearInterval(progressTimer);
       const injectedIds = new Set(result.injected.map((i) => i.suggestionId));
       set((s) => ({
         isInjecting: false,
+        injectProgress: 100,
         lastInjectCount: result.injected.length,
         suggestions: s.suggestions.filter((sg) => !injectedIds.has(sg.id)),
       }));
-      // Reload H5P contents
+      setTimeout(() => set({ injectProgress: 0 }), 1500);
       await get().loadH5PContents(videoId);
     } catch (err: unknown) {
-      set({ isInjecting: false, injectError: err instanceof Error ? err.message : 'Injection failed' });
+      clearInterval(progressTimer);
+      set({ isInjecting: false, injectError: err instanceof Error ? err.message : 'Injection failed', injectProgress: 0 });
     }
   },
 
-  // Playback
   currentTime: 0,
   setCurrentTime: (t) => set({ currentTime: t }),
 }));

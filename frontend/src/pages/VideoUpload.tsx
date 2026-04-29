@@ -57,6 +57,14 @@ const VideoUpload: React.FC = () => {
     setError(null);
   };
 
+  // Reset form when component mounts to ensure fresh state
+  React.useEffect(() => {
+    setTitle('');
+    setDescription('');
+    setFile(null);
+    setYoutubeUrl('');
+  }, []);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       setFile(event.target.files[0]);
@@ -77,15 +85,23 @@ const VideoUpload: React.FC = () => {
         }
 
         const formData = new FormData();
-        formData.append('title', title);
+        // Title is optional - backend will auto-generate if not provided
+        if (title.trim()) {
+          formData.append('title', title);
+        }
         formData.append('description', description);
         formData.append('video', file);
 
-        await api.post('/videos/upload', formData, {
+        const response = await api.post('/videos/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
+
+        // Redirect to editor with the new video ID
+        if (response.data?.video?.id) {
+          navigate(`/app/editor/${response.data.video.id}`);
+        }
       } else {
         // YouTube upload
         if (!youtubeUrl) {
@@ -93,17 +109,19 @@ const VideoUpload: React.FC = () => {
           return;
         }
 
-        await api.post('/videos/youtube', {
-          title,
+        const response = await api.post('/videos/youtube', {
+          title: title || `YouTube_${Date.now()}`,
           description,
           youtubeUrl,
         });
+
+        // Redirect to editor with the new video ID
+        if (response.data?.video?.id) {
+          navigate(`/app/editor/${response.data.video.id}`);
+        }
       }
 
       setSuccess(t('upload.success'));
-      setTimeout(() => setSuccess(null), 3000);
-
-      navigate('/dashboard');
     } catch (err: any) {
       console.error('Upload error:', err);
       if (err.response && err.response.status === 409) {
@@ -140,10 +158,11 @@ const VideoUpload: React.FC = () => {
             <TextField
               fullWidth
               label={t('videoUpload.titleLabel')}
+              placeholder="Leave empty for auto-generated title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              required
               margin="normal"
+              helperText="Optional - a unique name will be auto-generated if left blank"
             />
 
             <TextField

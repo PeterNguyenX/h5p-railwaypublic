@@ -31,35 +31,30 @@ class H5PService {
     if (!this.initialized) {
       throw new Error('H5P service not initialized');
     }
-    
+
     try {
+      const { Video } = require('../models');
+      const video = await Video.findByPk(videoId);
+      if (!video) throw new Error('Video not found');
+
       const contentId = `h5p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       const content = {
         id: contentId,
         library: contentData.library,
-        params: contentData.params,
-        metadata: contentData.metadata || {
-          title: contentData.metadata?.title || 'H5P Content',
-          license: 'U'
-        },
-        videoId,
+        params: contentData.params || {},
+        metadata: contentData.metadata || { title: 'H5P Content', license: 'U' },
         timestamp,
-        createdAt: new Date().toISOString()
+        status: 'active'
       };
 
-      this.contentStorage.set(contentId, content);
+      // Persist full content object to DB
+      const h5pContent = Array.isArray(video.h5pContent) ? [...video.h5pContent] : [];
+      h5pContent.push(content);
+      await video.update({ h5pContent });
 
       console.log('Created H5P content:', { contentId, videoId, timestamp, library: contentData.library });
-      return {
-        id: contentId,
-        content: contentData,
-        library: contentData.library,
-        params: contentData.params,
-        metadata: content.metadata,
-        videoId,
-        timestamp
-      };
+      return content;
     } catch (error) {
       console.error('Error creating H5P content:', error);
       throw error;
@@ -102,35 +97,33 @@ class H5PService {
     }
   }
 
-  async updateContent(contentId, contentData) {
+  async updateContent(contentId, contentData, timestamp) {
     if (!this.initialized) {
       throw new Error('H5P service not initialized');
     }
 
     try {
-      const existingContent = this.contentStorage.get(contentId);
-      if (!existingContent) {
-        throw new Error('Content not found');
+      const { Video } = require('../models');
+      const videos = await Video.findAll();
+
+      for (const video of videos) {
+        const h5pContent = Array.isArray(video.h5pContent) ? [...video.h5pContent] : [];
+        const idx = h5pContent.findIndex(c => c.id === contentId);
+        if (idx !== -1) {
+          h5pContent[idx] = {
+            ...h5pContent[idx],
+            library: contentData.library,
+            params: contentData.params || {},
+            metadata: contentData.metadata || h5pContent[idx].metadata,
+            ...(timestamp !== undefined ? { timestamp } : {}),
+          };
+          await video.update({ h5pContent });
+          console.log('Updated H5P content:', contentId);
+          return h5pContent[idx];
+        }
       }
 
-      const updatedContent = {
-        ...existingContent,
-        library: contentData.library,
-        params: contentData.params,
-        metadata: contentData.metadata || existingContent.metadata || {},
-        updatedAt: new Date().toISOString()
-      };
-
-      this.contentStorage.set(contentId, updatedContent);
-
-      console.log('Updated H5P content:', { contentId, contentData });
-      return {
-        id: contentId,
-        library: updatedContent.library,
-        params: updatedContent.params,
-        metadata: updatedContent.metadata,
-        timestamp: existingContent.timestamp
-      };
+      throw new Error('Content not found');
     } catch (error) {
       console.error('Error updating H5P content:', error);
       throw error;
@@ -172,22 +165,21 @@ class H5PService {
       const { Video } = require('../models');
       const video = await Video.findByPk(videoId);
 
-      if (!video) {
-        console.log('Video not found:', videoId);
-        return [];
-      }
+      if (!video) return [];
 
-      // Get h5pContent from database, fall back to empty array
-      const h5pContent = video.h5pContent || [];
+      const h5pContent = video.h5pContent;
+      if (!Array.isArray(h5pContent)) return [];
 
-      // Ensure it's an array
-      if (!Array.isArray(h5pContent)) {
-        console.warn('h5pContent is not an array for video:', videoId);
-        return [];
-      }
-
-      console.log('Getting H5P content for video:', videoId, 'Found:', h5pContent.length);
-      return h5pContent;
+      // Normalize Ollama-stored content (h5pLibrary → library, config → params)
+      const valid = h5pContent
+        .filter(c => c && c.id && (c.library || c.h5pLibrary))
+        .map(c => ({
+          ...c,
+          library: c.library || c.h5pLibrary,
+          params: c.params || c.config || {},
+        }));
+      console.log(`H5P content for video ${videoId}: ${valid.length} items`);
+      return valid;
     } catch (error) {
       console.error('Error getting H5P content:', error);
       throw error;
@@ -200,9 +192,22 @@ class H5PService {
     }
 
     try {
-      const deleted = this.contentStorage.delete(contentId);
-      console.log('Deleted H5P content:', contentId);
-      return deleted;
+      const { Video } = require('../models');
+      const videos = await Video.findAll();
+
+      for (const video of videos) {
+        const h5pContent = Array.isArray(video.h5pContent) ? [...video.h5pContent] : [];
+        const idx = h5pContent.findIndex(c => c.id === contentId);
+        if (idx !== -1) {
+          h5pContent.splice(idx, 1);
+          await video.update({ h5pContent });
+          console.log('Deleted H5P content:', contentId);
+          return true;
+        }
+      }
+
+      console.warn('Delete: content not found in DB:', contentId);
+      return false;
     } catch (error) {
       console.error('Error deleting H5P content:', error);
       throw error;

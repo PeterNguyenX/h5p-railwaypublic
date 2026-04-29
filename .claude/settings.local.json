@@ -18,7 +18,19 @@
       "Bash(ollama pull:*)",
       "Bash(echo \"pulling in background, PID=$!\")",
       "Bash(ollama list:*)",
-      "Bash(ollama ps:*)"
+      "Bash(ollama ps:*)",
+      "Bash(npm run *)",
+      "Bash(node --check server.js)",
+      "Bash(node -e ' *)",
+      "Bash(node server.js)",
+      "Bash(echo \"Backend PID: $!\")",
+      "Bash(echo \"Frontend PID: $!\")",
+      "Bash(curl -s http://localhost:5001/api/health)",
+      "Bash(python3 -m json.tool)",
+      "Bash(lsof -ti:3002)",
+      "Bash(kill 36744)",
+      "Bash(nohup npx *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3002)"
     ]
   }
 }

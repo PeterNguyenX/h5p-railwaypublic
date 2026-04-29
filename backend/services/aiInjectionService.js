@@ -91,6 +91,7 @@ async function injectAll(suggestions, videoId, userId) {
   for (const suggestion of suggestions) {
     try {
       const content = await injectSuggestion(suggestion, videoId);
+      // h5pService.createTimeBasedContent already persisted to DB; just record result
       injected.push({
         suggestionId: suggestion.id,
         contentId: content.id,
@@ -105,18 +106,6 @@ async function injectAll(suggestions, videoId, userId) {
       });
     }
   }
-
-  // Update the Video's h5pContent JSON array
-  const existingH5P = video.h5pContent || [];
-  const newH5PEntries = injected.map(item => ({
-    contentId: item.contentId,
-    timestamp: item.timestamp,
-    type: item.library
-  }));
-
-  await video.update({
-    h5pContent: [...existingH5P, ...newH5PEntries]
-  });
 
   // Reload and return the updated video
   const updatedVideo = await Video.findByPk(videoId);

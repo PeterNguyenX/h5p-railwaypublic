@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   AlertCircle,
@@ -7,7 +7,7 @@ import {
   Folder,
   FolderPlus,
   Loader2,
-  PanelRight,
+  Pencil,
   Play,
   Plus,
   RotateCcw,
@@ -17,7 +17,7 @@ import {
   X,
   Link2,
 } from "lucide-react";
-import { exportH5P, fetchVideos, type Video } from "../../lib/api";
+import { exportH5P, fetchVideos, updateVideoTitle, type Video } from "../../lib/api";
 import { useAuthStore } from "../../lib/authStore";
 import { getVideoVisitCounts, getVideoVisits, recordVideoVisit } from "../../lib/videoVisit";
 
@@ -134,6 +134,10 @@ export default function Dashboard() {
 
   const [visits, setVisits] = useState<Record<string, string>>({});
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({});
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
+
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
     if (!token) {
@@ -173,6 +177,7 @@ export default function Dashboard() {
           byVideoId: validMeta,
           virtualVideos: validVirtualVideos,
         });
+        initialLoadDone.current = true;
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load videos");
       } finally {
@@ -184,7 +189,7 @@ export default function Dashboard() {
   }, [token, navigate, user?.id]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !initialLoadDone.current) return;
     saveState(user.id, { folders, byVideoId, virtualVideos });
   }, [folders, byVideoId, virtualVideos, user?.id]);
 
@@ -487,7 +492,8 @@ export default function Dashboard() {
             return (
               <div
                 key={video.id}
-                className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-shadow group"
+                className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
+                onClick={() => selectedFolder !== "trash" && openVideo(video.id)}
                 onContextMenu={(event) => {
                   event.preventDefault();
                   setContextMenu({ x: event.clientX, y: event.clientY, videoId: video.id });
@@ -502,44 +508,73 @@ export default function Dashboard() {
                       <VideoOff className="w-10 h-10 text-slate-300" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-slate-900/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      onClick={() => openVideo(video.id)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-slate-900 font-semibold"
-                    >
-                      <Play className="w-4 h-4 fill-slate-900" />
-                      Preview
-                    </button>
-                  </div>
+                  {selectedFolder !== "trash" && (
+                    <div className="absolute inset-0 bg-slate-900/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                      <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-md">
+                        <Play className="w-5 h-5 fill-slate-800 text-slate-800 ml-0.5" />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-5">
-                  <h3 className="font-bold text-[17px] text-slate-900 mb-1 line-clamp-1">{video.title}</h3>
+                  <div className="flex items-center gap-1.5 mb-1 group/title">
+                    {editingTitleId === video.id ? (
+                      <input
+                        autoFocus
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onBlur={async (e) => {
+                          e.stopPropagation();
+                          if (titleDraft.trim() && titleDraft.trim() !== video.title) {
+                            try {
+                              const updated = await updateVideoTitle(video.id, titleDraft.trim());
+                              setVideos((prev) => prev.map((v) => v.id === video.id ? updated : v));
+                            } catch { /* ignore */ }
+                          }
+                          setEditingTitleId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") e.currentTarget.blur();
+                          if (e.key === "Escape") setEditingTitleId(null);
+                        }}
+                        className="flex-1 font-bold text-[17px] text-slate-900 border-b-2 border-blue-500 bg-transparent outline-none min-w-0"
+                      />
+                    ) : (
+                      <>
+                        <h3 className="font-bold text-[17px] text-slate-900 line-clamp-1 flex-1">{video.title}</h3>
+                        {selectedFolder !== "trash" && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setTitleDraft(video.title); setEditingTitleId(video.id); }}
+                            className="shrink-0 p-1 text-slate-300 hover:text-slate-600 opacity-0 group-hover/title:opacity-100 transition-opacity"
+                            title="Rename"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-500">Opened {relativeTime(visits[video.id])}</p>
 
                   {selectedFolder === "trash" && (
                     <div className="mt-3 flex items-center gap-2">
                       <button
-                        onClick={() => restoreVideo(video.id)}
+                        onClick={(e) => { e.stopPropagation(); restoreVideo(video.id); }}
                         className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Restore
                       </button>
                       <button
-                        onClick={() => deleteVideoPermanently(video.id)}
+                        onClick={(e) => { e.stopPropagation(); deleteVideoPermanently(video.id); }}
                         className="text-xs px-2.5 py-1.5 rounded-md border border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Delete Permanently
                       </button>
                     </div>
                   )}
-
-                  <button
-                    onClick={() => openVideo(video.id)}
-                    className="mt-3 text-sm font-semibold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1"
-                  >
-                    <Play className="w-4 h-4" /> Preview
-                  </button>
                 </div>
               </div>
             );
@@ -643,7 +678,11 @@ export default function Dashboard() {
 
       {contextMenu && (
         <div
-          className="fixed z-[60] w-64 bg-white border border-slate-200 shadow-xl rounded-lg p-1 top-24 right-5"
+          className="fixed z-[60] w-64 bg-white border border-slate-200 shadow-xl rounded-lg p-1"
+          style={{
+            top: Math.min(contextMenu.y, window.innerHeight - 380),
+            left: Math.min(contextMenu.x, window.innerWidth - 270),
+          }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -651,19 +690,20 @@ export default function Dashboard() {
               openVideo(contextMenu.videoId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2 font-medium"
           >
             <Play className="w-4 h-4" /> Open
           </button>
 
           <button
             onClick={() => {
-              setDetailsVideoId(contextMenu.videoId);
+              const v = allVideos.find((v) => v.id === contextMenu.videoId);
+              if (v) { setTitleDraft(v.title); setEditingTitleId(v.id); }
               setContextMenu(null);
             }}
             className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2"
           >
-            <PanelRight className="w-4 h-4" /> Details
+            <Pencil className="w-4 h-4" /> Rename
           </button>
 
           <button

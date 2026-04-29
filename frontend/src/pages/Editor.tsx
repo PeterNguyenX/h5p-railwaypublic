@@ -519,7 +519,6 @@ export default function Editor() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [editingSuggestion, setEditingSuggestion] = useState<AISuggestion | null>(null);
-  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [notification, setNotification] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
 
@@ -638,11 +637,27 @@ export default function Editor() {
     if (!token) navigate("/");
   }, [token, navigate]);
 
+  const loadRefs = useRef({ store, prepareTranscriptForVideo, setNotification });
+  useEffect(() => {
+    loadRefs.current = { store, prepareTranscriptForVideo, setNotification };
+  });
+
   // Load existing video if editing
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      const { store } = loadRefs.current;
+      // Clear store when no ID is provided (new upload flow)
+      store.setVideo(null);
+      store.setSegments([]);
+      store.resetAnalysis();
+      store.setH5pContents([]);
+      setCurrentStep(1);
+      return;
+    }
+    
     const load = async () => {
       try {
+        const { store, prepareTranscriptForVideo } = loadRefs.current;
         const video = await fetchVideo(id);
         store.setVideo(video);
         recordVideoVisit(id);
@@ -652,14 +667,60 @@ export default function Editor() {
         }
         setCurrentStep(2); // jump to edit step if video already exists
       } catch {
-        setNotification({ msg: "Could not load video.", type: "error" });
+        loadRefs.current.setNotification({ msg: "Could not load video.", type: "error" });
       }
     };
     load();
-  }, [id, prepareTranscriptForVideo, store]);
+  }, [id]);
 
-  // Cleanup analysis stream on unmount
-  useEffect(() => () => { analysisCleanupRef.current?.(); }, []);
+  const latestDataRef = useRef({ trimStart, trimEnd, token, segments: store.segments, videoId: store.video?.id, resetAnalysis: store.resetAnalysis });
+  useEffect(() => {
+    latestDataRef.current = { 
+      trimStart, 
+      trimEnd, 
+      token, 
+      segments: store.segments, 
+      videoId: store.video?.id || latestDataRef.current.videoId, // keep last known ID
+      resetAnalysis: store.resetAnalysis 
+    };
+  });
+
+  // Cleanup all analysis streams and state on unmount or when leaving the editor
+  useEffect(() => {
+    return () => {
+      const { trimStart, trimEnd, token, segments, videoId, resetAnalysis } = latestDataRef.current;
+      
+      // Save video progress before leaving
+      if (videoId) {
+        // Save trimming, captions, and other metadata
+        const videoData = {
+          trimStart,
+          trimEnd,
+          captions: {
+            segments,
+            source: 'user-provided'
+          }
+        };
+        
+        // Fire and forget save (don't wait, just ensure it happens)
+        fetch(`/api/videos/${videoId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(videoData)
+        }).catch(err => console.log('Auto-save on exit:', err));
+      }
+      
+      // Stop any ongoing analysis
+      analysisCleanupRef.current?.();
+      // Cleanup socket connection
+      socketRef.current?.disconnect();
+      // Reset all editor state when leaving
+      resetAnalysis();
+    };
+  }, [id]);
 
   // Initialize trim end when video duration is known
   useEffect(() => {
@@ -811,7 +872,6 @@ export default function Editor() {
       notify(store.injectError, "error");
     } else {
       notify(`Successfully injected ${store.lastInjectCount} H5P element${store.lastInjectCount !== 1 ? "s" : ""}!`, "success");
-      setShowSuccessBanner(true);
       socketRef.current?.emit('h5p-added', { videoId: store.video.id });
     }
   };
@@ -868,7 +928,6 @@ export default function Editor() {
   const steps = [
     { id: 1, name: "Add Video", desc: "Upload or link" },
     { id: 2, name: "Add Interactions", desc: "Questions & info" },
-    { id: 3, name: "Finish & Share", desc: "Preview & export" },
   ];
 
   return (
@@ -1366,91 +1425,41 @@ export default function Editor() {
                     </button>
                   )}
                   <button
-                    onClick={() => setCurrentStep(3)}
+                    onClick={handleExport}
+                    disabled={isExporting || store.h5pContents.length === 0}
+                    className="flex items-center gap-2 px-6 py-3 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-sm transition-colors text-[15px]"
+                    title="Download .h5p file"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    Download
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (store.video?.ltiLink) {
+                        navigator.clipboard.writeText(store.video.ltiLink);
+                        notify("LTI link copied!", "success");
+                      } else {
+                        notify("No LTI link available", "error");
+                      }
+                    }}
+                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition-colors text-[15px]"
+                    title="Copy LTI link"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    LTI Link
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Save video progress and return to dashboard
+                      notify("Video saved", "success");
+                      navigate("/app/dashboard");
+                    }}
                     className="px-8 py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm transition-all text-[15px] flex items-center gap-2"
                   >
-                    Continue to Finish
-                    <ChevronRight className="w-5 h-5" />
+                    <Check className="w-5 h-5" />
+                    Save
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 3: Finish & Share ─────────────────────────────────────────── */}
-          {currentStep === 3 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 sm:p-12 animate-in fade-in slide-in-from-right-8 duration-500 text-center max-w-2xl mx-auto w-full">
-              <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-green-200 shadow-sm">
-                <CheckCircle2 className="w-12 h-12 text-green-600" />
-              </div>
-              
-              <h1 className="text-3xl font-bold text-slate-900 mb-4">Your video is ready!</h1>
-              <p className="text-slate-600 text-lg mb-10">
-                <strong>"{store.video?.title || "Your Video"}"</strong> has{" "}
-                {store.h5pContents.length} H5P interaction{store.h5pContents.length !== 1 ? "s" : ""}.
-              </p>
-
-              <div className="space-y-4 mb-12 text-left">
-                {/* Share Link */}
-                <div className="p-6 border-2 border-blue-900 bg-slate-50 rounded-2xl flex gap-5 items-start shadow-sm">
-                  <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-200 shrink-0">
-                    <Share2 className="w-7 h-7 text-blue-900" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-slate-900 text-lg mb-1">Share Direct Link</h3>
-                    <p className="text-slate-600 text-[15px] mb-3">Get a simple web link you can share with students.</p>
-                    {store.video && (
-                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
-                        <code className="text-xs text-slate-600 flex-1 truncate">
-                          {window.location.origin}/api/videos/{store.video.id}
-                        </code>
-                        <button
-                          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/videos/${store.video!.id}`); notify("Copied!", "success"); }}
-                          className="text-xs font-bold text-blue-600 hover:text-blue-800 shrink-0"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Export H5P */}
-                <div className="p-6 border border-slate-200 bg-white rounded-2xl flex gap-5 items-start hover:border-slate-300 hover:bg-slate-50 transition-all">
-                  <div className="p-3 bg-slate-100 rounded-xl shrink-0 border border-slate-200">
-                    <Download className="w-7 h-7 text-slate-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-slate-900 text-lg mb-1">Export for LMS (.h5p)</h3>
-                    <p className="text-slate-500 text-[15px] mb-3">
-                      Export a standard package for Canvas, Moodle, or Blackboard.
-                    </p>
-                    <button
-                      onClick={handleExport}
-                      disabled={isExporting || store.h5pContents.length === 0}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-sm"
-                    >
-                      {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      {isExporting ? "Exporting..." : `Export ${store.h5pContents.length} interactions`}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <button
-                  onClick={() => setCurrentStep(2)}
-                  className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors text-[15px]"
-                >
-                  Back to Editor
-                </button>
-                <button
-                  onClick={() => navigate("/app/dashboard")}
-                  className="px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm transition-all text-lg flex items-center gap-2"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  Go to Dashboard
-                </button>
               </div>
             </div>
           )}

@@ -1,253 +1,261 @@
 /**
- * AI Service — Claude API integration for transcript analysis.
- * Uses Anthropic Claude to generate H5P insertion suggestions from transcript segments.
+ * AI Service — Claude API integration.
+ * One Claude call: receives transcript → returns topic structure + questions.
+ * Algorithm (not AI) handles: timestamp assignment, window deduplication, H5P creation.
+ * See backend/ai-instructions.md for pedagogy rules.
  */
 
 const { z } = require('zod');
 
-const AI_SYSTEM_PROMPT = `You are an instructional design assistant. Given a video transcript segmented by timestamp, identify 4–8 moments where inserting an H5P interactive element would reinforce learning. Return ONLY a valid JSON array — no explanation, no markdown fences.
+const AI_SYSTEM_PROMPT = `You are an expert instructional designer. Analyze the timestamped lecture transcript and return a structured JSON object containing topics, subtopics, and one quiz question per node. Return ONLY a valid JSON object — no markdown, no code fences, no preamble, no trailing text.
 
-Each object must match this schema exactly:
+══════════════════════════
+STEP 1 — TOPIC SEGMENTATION
+══════════════════════════
+Identify 2–5 main topics and 1–3 subtopics per topic.
+
+Detect topic boundaries using:
+• Transition markers: "Next", "Moving on", "Now let's", "Another", "Finally", "Turning to", "Let me now"
+• Summary cues: "To summarize", "In conclusion", "To wrap up", "The key takeaway", "So in short"
+
+Use the actual segment timestamps from the transcript for start/end values.
+Topics must be non-overlapping and cover the full transcript.
+
+══════════════════════════
+STEP 2 — QUESTION GENERATION
+══════════════════════════
+Generate ONE question per topic/subtopic using this pattern matrix:
+• Definition / technical term ("X is...", "Y stands for..."): → "FillBlanks"
+• Binary fact / absolute rule ("always", "never", true/false claim): → "TrueFalse"
+• List / comparison / process / category: → "MultiChoice"
+
+ONLY these 3 types: "MultiChoice", "TrueFalse", "FillBlanks"
+
+══════════════════════════
+OUTPUT SCHEMA (follow exactly)
+══════════════════════════
 {
-  "timestamp": number,
-  "type": "MultiChoice" | "TrueFalse" | "FillBlanks" | "Hotspot" | "DragDrop" | "MarkWords",
-  "config": { ...H5P content params },
-  "reason": string
+  "topics": [
+    {
+      "title": "<topic name>",
+      "start": <number, seconds>,
+      "end": <number, seconds>,
+      "subtopics": [
+        {
+          "title": "<subtopic name>",
+          "start": <number, seconds>,
+          "end": <number, seconds>,
+          "question": {
+            "type": "MultiChoice",
+            "question": "<non-empty question string>",
+            "answers": [
+              {"text": "<correct answer>", "correct": true},
+              {"text": "<plausible distractor>", "correct": false},
+              {"text": "<plausible distractor>", "correct": false},
+              {"text": "<plausible distractor>", "correct": false}
+            ],
+            "feedback": {"correct": "<why correct>", "incorrect": "<what is right>"}
+          }
+        }
+      ],
+      "question": {
+        "type": "TrueFalse",
+        "question": "<declarative statement>",
+        "correct": true,
+        "feedback": {"correct": "<confirmation>", "incorrect": "<correction>"}
+      }
+    }
+  ]
 }
 
-Rules:
-- Space suggestions at least 30 seconds apart
-- Prefer moments after a concept is fully explained, not mid-sentence
-- For MultiChoice, always include exactly 4 options with one correct: { "question": "...", "answers": [{"text":"...","correct":true},{"text":"...","correct":false},...] }
-- For TrueFalse: { "question": "...", "correct": true|false }
-- For FillBlanks, mark the blank with *asterisks*: { "text": "The *answer* goes here.", "questions": [{"text":"answer"}] }
-- For Hotspot: { "question": "...", "imageDescription": "...", "spots": [] }
-- For DragDrop: { "question": "...", "items": [{"text":"...","category":"..."}], "categories": ["...", "..."] }
-- For MarkWords, provide a sentence where key terms should be marked: { "taskDescription": "Mark all the key concepts.", "textField": "The *photosynthesis* process uses *sunlight* to produce *glucose*." }
-- Config keys must match H5P content type specification exactly`;
+FillBlanks question format:
+{ "type": "FillBlanks", "fillText": "<sentence with *key term* in asterisks>", "feedback": {"correct": "...", "incorrect": "..."} }
 
-const suggestionSchema = z.object({
-  timestamp: z.number().nonnegative(),
-  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks', 'Hotspot', 'DragDrop', 'MarkWords']),
-  config: z.record(z.unknown()),
-  reason: z.string()
+══════════════════════════
+RULES
+══════════════════════════
+- start/end must be real numbers from the transcript segment timestamps
+- Every string field must be non-empty
+- MultiChoice: exactly 4 answers, exactly 1 correct
+- TrueFalse: "correct" must be a boolean (true or false), not a string
+- FillBlanks: wrap only the key term in *single asterisks*
+- Distractors must come from elsewhere in the transcript (plausible but wrong)`;
+
+// ─── Zod schemas ───────────────────────────────────────────────────────────────
+
+const QuestionSchema = z.object({
+  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks']),
+  question: z.string().optional(),
+  answers: z.array(z.object({ text: z.string(), correct: z.boolean() })).optional(),
+  correct: z.boolean().optional(),
+  fillText: z.string().optional(),
+  feedback: z.object({ correct: z.string(), incorrect: z.string() }),
 });
 
-const suggestionListSchema = z.array(suggestionSchema);
+// Recursive topic schema using z.lazy
+const TopicSchema = z.lazy(() =>
+  z.object({
+    title: z.string(),
+    start: z.number(),
+    end: z.number(),
+    subtopics: z.array(TopicSchema).optional(),
+    question: QuestionSchema.optional(),
+  })
+);
 
-/**
- * Map AI type strings to H5P library identifiers.
- */
+const ResponseSchema = z.object({
+  topics: z.array(TopicSchema),
+});
+
 const H5P_TYPE_MAP = {
   MultiChoice: 'H5P.MultiChoice 1.16',
   TrueFalse: 'H5P.TrueFalse 1.6',
   FillBlanks: 'H5P.Blanks 1.14',
-  Hotspot: 'H5P.ImageHotspotQuestion 1.8',
-  DragDrop: 'H5P.DragQuestion 1.14',
-  MarkWords: 'H5P.MarkTheWords 1.9'
 };
 
-/**
- * Format transcript segments into a readable string for the AI prompt.
- * @param {{ start: number, end: number, text: string }[]} segments
- * @returns {string}
- */
 function formatSegmentsForPrompt(segments) {
   return segments
     .map(seg => {
-      const startMin = Math.floor(seg.start / 60);
-      const startSec = Math.floor(seg.start % 60);
-      const endMin = Math.floor(seg.end / 60);
-      const endSec = Math.floor(seg.end % 60);
-      const startStr = `${String(startMin).padStart(2, '0')}:${String(startSec).padStart(2, '0')}`;
-      const endStr = `${String(endMin).padStart(2, '0')}:${String(endSec).padStart(2, '0')}`;
-      return `[${startStr} → ${endStr}] ${seg.text}`;
+      const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+      return `[${fmt(seg.start)} → ${fmt(seg.end)}] ${seg.text}`;
     })
     .join('\n');
 }
 
-/**
- * Analyze transcript segments using Claude API (non-streaming).
- * @param {{ start: number, end: number, text: string }[]} segments
- * @param {string} apiKey - Anthropic API key
- * @returns {Promise<object[]>} Array of H5P suggestions
- */
-async function analyzeTranscript(segments, apiKey) {
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not configured');
-  }
-
-  if (!segments || segments.length === 0) {
-    throw new Error('No transcript segments provided');
-  }
-
-  const Anthropic = require('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey });
-
-  const userMessage = `Here is the video transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nAnalyze the transcript and return H5P interactive element suggestions as a JSON array.`;
-
-  try {
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      system: AI_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }]
-    });
-
-    const textContent = response.content.find(block => block.type === 'text');
-    if (!textContent) {
-      throw new Error('No text content in Claude response');
-    }
-
-    const rawResponse = textContent.text;
-    const suggestions = suggestionListSchema.parse(JSON.parse(rawResponse));
-
-    return {
-      rawResponse,
-      suggestions: suggestions.map((suggestion, index) => ({
-        id: `ai_suggestion_${Date.now()}_${index}`,
-        timestamp: suggestion.timestamp,
-        type: suggestion.type,
-        h5pLibrary: H5P_TYPE_MAP[suggestion.type],
-        config: suggestion.config,
-        reason: suggestion.reason,
-        status: 'pending'
-      }))
-    };
-  } catch (error) {
-    if (error.status === 401) {
-      throw new Error('Invalid Anthropic API key');
-    }
-    if (error.status === 429) {
-      throw new Error('Anthropic API rate limit exceeded. Please try again later.');
-    }
-    if (error instanceof SyntaxError) {
-      throw new Error('Failed to parse Claude response as JSON. The AI returned malformed output.');
-    }
-    throw error;
-  }
+function extractJsonObject(text) {
+  try { return JSON.parse(text.trim()); } catch { /* fall through */ }
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No JSON object found in AI response');
+  return JSON.parse(match[0]);
 }
 
-/**
- * Analyze transcript using Claude API with SSE streaming.
- * Writes Server-Sent Events to the Express response object.
- * Optionally saves suggestions to Video.h5pContent if videoId and video are provided.
- * @param {{ start: number, end: number, text: string }[]} segments
- * @param {string} apiKey
- * @param {import('express').Response} res - Express response for SSE
- * @param {string} videoId - Optional video ID for persistence
- * @param {object} video - Optional video object for persistence
- * @returns {Promise<void>}
- */
-async function analyzeTranscriptStream(segments, apiKey, res, videoId, video) {
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not configured');
-  }
-
-  if (!segments || segments.length === 0) {
-    throw new Error('No transcript segments provided');
-  }
+async function analyzeTranscript(segments, apiKey) {
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured');
+  if (!segments?.length) throw new Error('No transcript segments provided');
 
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey });
 
-  const userMessage = `Here is the video transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nAnalyze the transcript and return H5P interactive element suggestions as a JSON array.`;
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 6000,
+    system: AI_SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` }]
+  });
 
-  // Set SSE headers
+  const text = response.content.find(b => b.type === 'text')?.text || '';
+  const parsed = ResponseSchema.parse(extractJsonObject(text));
+  return { topics: parsed.topics };
+}
+
+async function analyzeTranscriptStream(segments, apiKey, res, videoId, video) {
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured');
+  if (!segments?.length) throw new Error('No transcript segments provided');
+
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey });
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no'
+    'X-Accel-Buffering': 'no',
   });
+
+  const send = (payload) => res.write(`data: ${JSON.stringify(payload)}\n\n`);
 
   let fullText = '';
 
   try {
-    // Send initial progress event
-    res.write(`data: ${JSON.stringify({ type: 'progress', message: 'Starting AI analysis...' })}\n\n`);
+    send({ type: 'progress', message: 'Analyzing transcript structure...', percent: 10 });
+    send({ type: 'progress', message: 'Identifying topics and subtopics...', percent: 22 });
+    send({ type: 'progress', message: 'Mapping questions to content patterns...', percent: 35 });
 
     const stream = await client.messages.stream({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: 6000,
       system: AI_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }]
+      messages: [{ role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` }],
     });
+
+    send({ type: 'progress', message: 'Generating questions with AI...', percent: 42 });
 
     stream.on('text', (text) => {
       fullText += text;
-      res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`);
+      const percent = Math.min(82, 42 + Math.round((fullText.length / 5000) * 40));
+      send({ type: 'chunk', text, percent });
     });
 
-    const finalMessage = await stream.finalMessage();
+    await stream.finalMessage();
+    send({ type: 'progress', message: 'Organizing topic structure...', percent: 87 });
 
-    // Parse the complete response
-    let suggestions;
+    let parsed;
     try {
-      suggestions = suggestionListSchema.parse(JSON.parse(fullText));
-    } catch (parseError) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'Failed to parse AI response as JSON' })}\n\n`);
+      parsed = ResponseSchema.parse(extractJsonObject(fullText));
+    } catch (e) {
+      send({ type: 'error', message: `AI returned invalid structure: ${e.message}` });
       res.write('data: [DONE]\n\n');
       res.end();
       return;
     }
 
-    // Validate and enrich suggestions
-    const enriched = suggestions.map((suggestion, index) => {
-      if (!H5P_TYPE_MAP[suggestion.type]) {
-        return null;
+    // Convert topics to suggestions format (include both topics and their questions with correct timestamps)
+    const suggestions = [];
+    parsed.topics.forEach(topic => {
+      // Add topic as a suggestion if it has a question
+      if (topic.question) {
+        suggestions.push({
+          id: `topic-${topic.title.replace(/\s+/g, '-')}-${topic.start}`,
+          type: topic.question.type,
+          timestamp: topic.start,
+          text: topic.title,
+          status: 'pending',
+          config: topic.question,
+          isTopicLevel: true
+        });
       }
-      return {
-        id: `ai_suggestion_${Date.now()}_${index}`,
-        timestamp: suggestion.timestamp,
-        type: suggestion.type,
-        h5pLibrary: H5P_TYPE_MAP[suggestion.type],
-        config: suggestion.config,
-        reason: suggestion.reason || '',
-        status: 'pending'
-      };
-    }).filter(Boolean);
+      // Add subtopics as suggestions
+      if (topic.subtopics && Array.isArray(topic.subtopics)) {
+        topic.subtopics.forEach(subtopic => {
+          if (subtopic.question) {
+            suggestions.push({
+              id: `subtopic-${subtopic.title.replace(/\s+/g, '-')}-${subtopic.start}`,
+              type: subtopic.question.type,
+              timestamp: subtopic.start,
+              text: subtopic.title,
+              status: 'pending',
+              config: subtopic.question,
+              parentTopic: topic.title
+            });
+          }
+        });
+      }
+    });
 
-    // Save to database if video is provided
+    // Persist both raw topics and suggestions to DB as stringified JSON
     if (videoId && video) {
       try {
-        const h5pContent = video.h5pContent || [];
-        const newContent = enriched.map(suggestion => ({
-          id: suggestion.id,
-          timestamp: suggestion.timestamp,
-          type: suggestion.type,
-          h5pLibrary: suggestion.h5pLibrary,
-          config: suggestion.config,
-          reason: suggestion.reason,
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        }));
-        h5pContent.push(...newContent);
-        await video.update({ h5pContent });
-        console.log(`Persisted ${newContent.length} H5P suggestions to video ${videoId}`);
-      } catch (dbErr) {
-        console.error('Failed to persist suggestions to database:', dbErr.message);
-        // Don't fail the stream, just log the error
+        await video.update({
+          captions: JSON.stringify({
+            topics: parsed.topics,
+            suggestions: suggestions,
+            generatedAt: new Date().toISOString()
+          })
+        });
+        console.log(`[AI] Persisted AI results for video ${videoId} with ${suggestions.length} suggestions`);
+      } catch (e) {
+        console.error('Failed to persist topics snapshot:', e.message);
       }
     }
 
-    // Send final result
-    res.write(`data: ${JSON.stringify({ type: 'result', suggestions: enriched })}\n\n`);
-    res.write(`data: ${JSON.stringify({
-      type: 'usage',
-      inputTokens: finalMessage.usage?.input_tokens,
-      outputTokens: finalMessage.usage?.output_tokens
-    })}\n\n`);
+    send({ type: 'result', suggestions: suggestions });
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (error) {
-    const errorMessage = error.status === 401
-      ? 'Invalid Anthropic API key'
-      : error.status === 429
-        ? 'Rate limit exceeded'
-        : error.message || 'AI analysis failed';
-
-    res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
+    const msg = error.status === 401 ? 'Invalid Anthropic API key'
+      : error.status === 429 ? 'Rate limit exceeded — please wait and try again'
+      : error.message || 'AI analysis failed';
+    send({ type: 'error', message: msg });
     res.write('data: [DONE]\n\n');
     res.end();
   }
@@ -258,5 +266,5 @@ module.exports = {
   analyzeTranscriptStream,
   AI_SYSTEM_PROMPT,
   H5P_TYPE_MAP,
-  formatSegmentsForPrompt
+  formatSegmentsForPrompt,
 };

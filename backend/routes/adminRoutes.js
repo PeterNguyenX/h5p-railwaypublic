@@ -63,8 +63,8 @@ router.get('/users', auth, isAdmin, async (req, res) => {
 
     const whereClause = search ? {
       [Op.or]: [
-        { username: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } }
+        { username: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } }
       ]
     } : {};
 

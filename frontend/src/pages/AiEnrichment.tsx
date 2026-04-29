@@ -60,7 +60,7 @@ const AiEnrichment: React.FC = observer(() => {
     };
   }, [id]);
 
-  // Load video metadata
+  // Load video metadata and check for previously saved AI results
   useEffect(() => {
     const loadVideo = async () => {
       if (!id) return;
@@ -70,6 +70,23 @@ const AiEnrichment: React.FC = observer(() => {
           headers: { Authorization: `Bearer ${token}` }
         });
         setVideo(response.data);
+
+        // Try to load previously saved AI results
+        try {
+          const aiResponse = await axios.get(`/api/ai/results/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (aiResponse.data.suggestions && aiResponse.data.suggestions.length > 0) {
+            aiEnrichmentStore.suggestions = aiResponse.data.suggestions;
+            setSnackbar({ 
+              open: true, 
+              message: `Loaded ${aiResponse.data.suggestions.length} previously generated suggestions`, 
+              severity: 'info' 
+            });
+          }
+        } catch (err) {
+          // No saved results yet, that's fine
+        }
       } catch (err) {
         setSnackbar({ open: true, message: 'Failed to load video', severity: 'error' });
       } finally {

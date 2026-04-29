@@ -144,6 +144,19 @@ export async function fetchVideo(id: string): Promise<Video> {
   return res.json();
 }
 
+export async function updateVideoTitle(id: string, title: string): Promise<Video> {
+  const res = await fetch(`${API_BASE}/videos/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to update title');
+  }
+  return res.json();
+}
+
 export async function uploadVideo(formData: FormData): Promise<Video> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/videos/upload`, {
@@ -238,10 +251,27 @@ export interface AISuggestion {
   status: 'pending' | 'accepted' | 'rejected';
 }
 
+export interface TopicQuestion {
+  type: 'MultiChoice' | 'TrueFalse' | 'FillBlanks';
+  question?: string;
+  answers?: Array<{ text: string; correct: boolean }>;
+  correct?: boolean;
+  fillText?: string;
+  feedback: { correct: string; incorrect: string };
+}
+
+export interface TopicNode {
+  title: string;
+  start: number;
+  end: number;
+  subtopics?: TopicNode[];
+  question?: TopicQuestion;
+}
+
 export type SSEPayload =
-  | { type: 'progress'; message: string }
-  | { type: 'chunk'; text: string }
-  | { type: 'result'; suggestions: AISuggestion[] }
+  | { type: 'progress'; message: string; percent?: number }
+  | { type: 'chunk'; text: string; percent?: number }
+  | { type: 'result'; topics: TopicNode[] }
   | { type: 'usage'; inputTokens: number; outputTokens: number }
   | { type: 'error'; message: string };
 
@@ -367,6 +397,40 @@ export async function uploadH5PFile(file: File, videoId: string, timestamp = 0):
   return data.content as H5PContent;
 }
 
+export interface H5PContentData {
+  library: string;
+  params: Record<string, unknown>;
+  metadata: { title: string; license: string };
+}
+
+export async function createH5PContent(videoId: string, contentData: H5PContentData, timestamp: number): Promise<H5PContent> {
+  const res = await fetch(`${API_BASE}/h5p/video/${videoId}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ contentData, timestamp }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to create H5P content');
+  }
+  const data = await res.json();
+  return (data.content ?? data) as H5PContent;
+}
+
+export async function updateH5PContent(contentId: string, contentData: H5PContentData, timestamp: number): Promise<H5PContent> {
+  const res = await fetch(`${API_BASE}/h5p/content/${contentId}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ contentData, timestamp }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to update H5P content');
+  }
+  const data = await res.json();
+  return (data.content ?? data) as H5PContent;
+}
+
 export async function deleteH5PContent(contentId: string): Promise<void> {
   await fetch(`${API_BASE}/h5p/content/${contentId}`, {
     method: 'DELETE',
@@ -407,8 +471,9 @@ interface AdminUsersResponse {
 }
 
 export async function fetchAdminUsers(search = ''): Promise<AdminUsersResponse> {
-  const query = search ? `?search=${encodeURIComponent(search)}` : '';
-  const res = await fetch(`${API_BASE}/admin/users${query}`, {
+  const params = new URLSearchParams({ limit: '1000', page: '1' });
+  if (search) params.set('search', search);
+  const res = await fetch(`${API_BASE}/admin/users?${params}`, {
     headers: authHeaders(),
   });
   if (!res.ok) {

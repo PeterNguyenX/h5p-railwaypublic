@@ -5,7 +5,6 @@ import {
   Copy,
   Download,
   Folder,
-  FolderPlus,
   Loader2,
   PanelRight,
   Play,
@@ -244,19 +243,6 @@ export default function Dashboard() {
     navigate(`/app/editor/${sourceVideoId}`);
   };
 
-  const createFolder = () => {
-    const name = window.prompt("Folder name");
-    if (!name || !name.trim()) return;
-    setFolders((prev) => [
-      ...prev,
-      {
-        id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: name.trim(),
-        createdAt: new Date().toISOString(),
-      },
-    ]);
-  };
-
   const moveVideoToFolder = (videoId: string, folderId: string | null) => {
     setByVideoId((prev) => ({
       ...prev,
@@ -400,7 +386,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Videos</h1>
           <p className="text-slate-600 text-[15px]">
-            Welcome back, <span className="font-semibold">{profile?.displayName || user?.username || "Teacher"}</span>. You have {videos.length} video{videos.length !== 1 ? "s" : ""}.
+            Welcome back, <span className="font-semibold">{profile?.displayName || user?.username || "Teacher"}</span>. You have {visibleVideos.filter(v => !byVideoId[v.id]?.trashedAt).length} video{visibleVideos.filter(v => !byVideoId[v.id]?.trashedAt).length !== 1 ? "s" : ""}.
           </p>
         </div>
 
@@ -457,14 +443,6 @@ export default function Dashboard() {
         >
           <Trash2 className="w-4 h-4" />
           Trash
-        </button>
-
-        <button
-          onClick={createFolder}
-          className="px-3 py-2 rounded-lg border bg-white border-slate-200 text-slate-700 text-sm font-medium inline-flex items-center gap-1.5 hover:bg-slate-50"
-        >
-          <FolderPlus className="w-4 h-4" />
-          New Folder
         </button>
       </div>
 
