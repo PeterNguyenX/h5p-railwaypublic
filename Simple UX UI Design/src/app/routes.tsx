@@ -35,6 +35,27 @@ export const router = createBrowserRouter([
     path: "/reset-password",
     Component: ResetPassword,
   },
+  // Pages rendered without the Layout nav bar
+  {
+    path: "/app/account",
+    Component: Account,
+  },
+  {
+    path: "/app/admin",
+    Component: Admin,
+  },
+  {
+    path: "/app/admin/users/:id/settings",
+    Component: AdminUserSettings,
+  },
+  {
+    path: "/app/editor",
+    Component: Editor,
+  },
+  {
+    path: "/app/editor/:id",
+    Component: Editor,
+  },
   {
     path: "/app",
     Component: Layout,
@@ -43,26 +64,6 @@ export const router = createBrowserRouter([
         path: "dashboard",
         Component: Dashboard,
       },
-      {
-        path: "editor",
-        Component: Editor,
-      },
-      {
-        path: "editor/:id",
-        Component: Editor,
-      },
-      {
-        path: "account",
-        Component: Account,
-      },
-      {
-        path: "admin",
-        Component: Admin,
-      },
-      {
-        path: "admin/users/:id/settings",
-        Component: AdminUserSettings,
-      }
     ],
   },
 ]);

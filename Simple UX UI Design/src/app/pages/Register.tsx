@@ -49,7 +49,7 @@ export default function Register() {
             <div className="bg-sky-600 p-2.5 rounded-xl flex items-center justify-center">
               <Video className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold text-slate-800 tracking-tight">ReactivEdu</span>
+            <span className="text-2xl font-bold text-slate-800 tracking-tight">AI-ActivEdu</span>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h1>
           <p className="text-slate-500 text-[15px]">Start building interactive lessons in minutes.</p>

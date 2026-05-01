@@ -162,18 +162,20 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
       console.error(`[UPLOAD] File not found after upload: ${videoPath}`);
     }
 
-    // If title is provided, check for per-user uniqueness (deleted videos are gone, so no conflict)
-    if (title && title.trim()) {
-      const existingVideo = await Video.findOne({
-        where: { userId: req.user.id, title: title.trim() }
-      });
-      if (existingVideo) {
-        return res.status(409).json({ error: "A video with this name already exists for your account. Please choose a different title." });
-      }
-    }
-
     // Generate a system title if none provided (user can edit it later)
-    const systemTitle = title && title.trim() ? title : `Video_${Date.now()}`;
+    let systemTitle = title && title.trim() ? title.trim() : `Video_${Date.now()}`;
+
+    // Auto-increment title if it exists
+    let baseTitle = systemTitle;
+    let counter = 1;
+    while (true) {
+      const existingVideo = await Video.findOne({
+        where: { userId: req.user.id, title: systemTitle }
+      });
+      if (!existingVideo) break;
+      systemTitle = `${baseTitle} ${counter}`;
+      counter++;
+    }
 
     // Create video record in database with auto-generated ID
     const video = await Video.create({
@@ -281,9 +283,21 @@ router.post("/youtube", auth, validate(youtubeImportSchema), async (req, res) =>
         console.warn('⚠️  YouTube video has no captions available');
       }
       
+      let finalTitle = title || basicInfo.videoDetails.title;
+      let baseTitle = finalTitle;
+      let counter = 1;
+      while (true) {
+        const existingVideo = await Video.findOne({
+          where: { userId: req.user.id, title: finalTitle }
+        });
+        if (!existingVideo) break;
+        finalTitle = `${baseTitle} ${counter}`;
+        counter++;
+      }
+
       // Create video record with basic info
       const video = await Video.create({
-        title: title || basicInfo.videoDetails.title,
+        title: finalTitle,
         description: description || basicInfo.videoDetails.description || '',
         youtubeUrl,
         youtubeId: videoId,
@@ -315,9 +329,21 @@ router.post("/youtube", auth, validate(youtubeImportSchema), async (req, res) =>
         youtubeUrl
       });
       
+      let finalTitle = title || 'YouTube Video';
+      let baseTitle = finalTitle;
+      let counter = 1;
+      while (true) {
+        const existingVideo = await Video.findOne({
+          where: { userId: req.user.id, title: finalTitle }
+        });
+        if (!existingVideo) break;
+        finalTitle = `${baseTitle} ${counter}`;
+        counter++;
+      }
+
       // Fallback: Create video with minimal info if ytdl fails
       const video = await Video.create({
-        title: title || 'YouTube Video',
+        title: finalTitle,
         description: description || '',
         youtubeUrl,
         youtubeId: videoId,
@@ -359,6 +385,30 @@ router.get("/", auth, async (req, res) => {
   } catch (error) {
     console.error("Error fetching videos:", error);
     res.status(500).json({ error: "Error fetching videos" });
+  }
+});
+
+// Move video to trash
+router.put("/:id/trash", auth, validateParams(idParamSchema), async (req, res) => {
+  try {
+    const video = await Video.findOne({ where: { id: req.params.id, userId: req.user.id } });
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    await video.update({ trashedAt: new Date() });
+    res.json({ message: "Video moved to trash", trashedAt: video.trashedAt });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to trash video" });
+  }
+});
+
+// Restore video from trash
+router.put("/:id/restore", auth, validateParams(idParamSchema), async (req, res) => {
+  try {
+    const video = await Video.findOne({ where: { id: req.params.id, userId: req.user.id } });
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    await video.update({ trashedAt: null });
+    res.json({ message: "Video restored" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to restore video" });
   }
 });
 
@@ -505,6 +555,16 @@ router.put("/:id", auth, validateParams(idParamSchema), validate(updateVideoSche
       captions,
       language
     } = req.body;
+    
+    // Check uniqueness for rename
+    if (title && title.trim() !== video.title) {
+      const existingVideo = await Video.findOne({
+        where: { userId: req.user.id, title: title.trim() }
+      });
+      if (existingVideo && existingVideo.id !== video.id) {
+        return res.status(409).json({ error: "A video with this name already exists for your account. Please choose a different title." });
+      }
+    }
     
     await video.update({ 
       title, 

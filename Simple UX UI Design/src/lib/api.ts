@@ -138,6 +138,22 @@ export async function fetchVideos(): Promise<Video[]> {
   return res.json();
 }
 
+export async function fetchTrashedVideos(): Promise<Video[]> {
+  const res = await fetch(`${API_BASE}/videos?trashed=true`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Failed to fetch trashed videos');
+  return res.json();
+}
+
+export async function trashVideo(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/videos/${id}/trash`, { method: 'PUT', headers: authHeaders() });
+  if (!res.ok) throw new Error('Failed to trash video');
+}
+
+export async function restoreVideo(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/videos/${id}/restore`, { method: 'PUT', headers: authHeaders() });
+  if (!res.ok) throw new Error('Failed to restore video');
+}
+
 export async function fetchVideo(id: string): Promise<Video> {
   const res = await fetch(`${API_BASE}/videos/${id}`, { headers: authHeaders() });
   if (!res.ok) throw new Error('Video not found');
@@ -155,6 +171,17 @@ export async function updateVideoTitle(id: string, title: string): Promise<Video
     throw new Error(err.error || 'Failed to update title');
   }
   return res.json();
+}
+
+export async function deleteVideo(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/videos/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to delete video');
+  }
 }
 
 export async function uploadVideo(formData: FormData): Promise<Video> {
@@ -461,6 +488,7 @@ export interface AdminUser {
   updatedAt?: string;
   lastLoginAt?: string;
   lastLoginDays?: number;
+  videoCount?: number;
   suspicious?: boolean;
   suspiciousReason?: string;
   recentActivity?: string[];
@@ -555,4 +583,162 @@ export async function updateAdminUserAccount(userId: string, username: string, e
     throw new Error(err.error || 'Failed to update user account');
   }
   return res.json() as Promise<{ user: AdminUser }>;
+}
+
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+export interface AuditLog {
+  id: string;
+  adminId: string;
+  action: string;
+  targetType: string;
+  targetId?: string;
+  description?: string;
+  details?: Record<string, unknown>;
+  ipAddress?: string;
+  createdAt: string;
+}
+
+export async function fetchAuditLogs(page = 1, limit = 50, action = '') {
+  const params = new URLSearchParams({ page: page.toString(), limit: limit.toString(), action });
+  const res = await fetch(`${API_BASE}/admin/audit-logs?${params}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch audit logs');
+  }
+  return res.json() as Promise<{ logs: AuditLog[]; pagination: Record<string, unknown> }>;
+}
+
+// ─── System Settings ──────────────────────────────────────────────────────────
+
+export interface SystemSetting {
+  id: string;
+  key: string;
+  value: unknown;
+  category: string;
+  description?: string;
+  updatedAt: string;
+}
+
+export async function fetchSystemSettings() {
+  const res = await fetch(`${API_BASE}/admin/system-settings`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch settings');
+  }
+  return res.json() as Promise<SystemSetting[]>;
+}
+
+export async function updateSystemSetting(key: string, value: unknown, category = 'GENERAL', description = '') {
+  const res = await fetch(`${API_BASE}/admin/system-settings/${key}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ value, category, description }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to update setting');
+  }
+  return res.json() as Promise<{ message: string; setting: SystemSetting }>;
+}
+
+// ─── Login Attempts ───────────────────────────────────────────────────────────
+
+export interface LoginAttempt {
+  id: string;
+  userId?: string;
+  email?: string;
+  ipAddress: string;
+  success: boolean;
+  failureReason?: string;
+  timestamp: string;
+}
+
+export async function fetchLoginAttempts(page = 1, limit = 50, email = '', ipAddress = '') {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    email,
+    ipAddress,
+  });
+  const res = await fetch(`${API_BASE}/admin/login-attempts?${params}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch login attempts');
+  }
+  return res.json() as Promise<{ attempts: LoginAttempt[]; pagination: Record<string, unknown> }>;
+}
+
+// ─── Content Moderation ───────────────────────────────────────────────────────
+
+export interface ContentFlag {
+  id: string;
+  contentId: string;
+  contentType: string;
+  reportedBy?: string;
+  reason: string;
+  description?: string;
+  status: 'PENDING' | 'REVIEWED' | 'APPROVED' | 'REJECTED' | 'RESOLVED';
+  action: 'NONE' | 'WARNING' | 'REMOVE' | 'SUSPEND_USER';
+  flaggedAt: string;
+  reviewedAt?: string;
+}
+
+export async function fetchContentFlags(page = 1, limit = 20, status = 'PENDING') {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+    status,
+  });
+  const res = await fetch(`${API_BASE}/admin/content-flags?${params}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch flags');
+  }
+  return res.json() as Promise<{ flags: ContentFlag[]; pagination: Record<string, unknown> }>;
+}
+
+export async function reviewContentFlag(flagId: string, status: string, action: string, reviewNotes: string) {
+  const res = await fetch(`${API_BASE}/admin/content-flags/${flagId}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ status, action, reviewNotes }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to review flag');
+  }
+  return res.json() as Promise<{ message: string; flag: ContentFlag }>;
+}
+
+export async function fetchModerationStats() {
+  const res = await fetch(`${API_BASE}/admin/moderation-stats`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch moderation stats');
+  }
+  return res.json() as Promise<{ pending: number; reviewed: number; approved: number; rejected: number; resolved: number }>;
+}
+
+// ─── Admin Dashboard ──────────────────────────────────────────────────────────
+
+export async function fetchAdminDashboard() {
+  const res = await fetch(`${API_BASE}/admin/dashboard`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch dashboard');
+  }
+  return res.json() as Promise<Record<string, unknown>>;
 }

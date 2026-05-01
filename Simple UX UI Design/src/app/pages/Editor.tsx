@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-  ArrowLeft, CheckCircle2, ChevronRight, ChevronDown, UploadCloud, Youtube,
+  Home, CheckCircle2, ChevronRight, ChevronDown, UploadCloud, Youtube,
   Sparkles, Plus, Save, X, Loader2, AlertCircle,
-  Download, Clock, Package, Trash2, Edit3,
-  ChevronLeft, FileText, Play, Pause, Pencil
+  Download, Clock, Package, Trash2,
+  ChevronLeft, FileText, Play, Pause, Pencil, Link,
+  ListChecks, ToggleLeft, PenLine, Shuffle
 } from "lucide-react";
 import { useEditorStore } from "../../lib/editorStore";
 import { useAuthStore } from "../../lib/authStore";
@@ -63,23 +64,33 @@ const H5P_LIBRARIES: Record<H5PType, string> = {
   MultiChoice: "H5P.MultiChoice 1.16",
   TrueFalse: "H5P.TrueFalse 1.6",
   FillBlanks: "H5P.Blanks 1.14",
+  Matching: "H5P.DragText 1.10",
 };
 
 const TYPE_LABELS: Record<H5PType, string> = {
   MultiChoice: "Multiple Choice",
   TrueFalse: "True / False",
   FillBlanks: "Fill in Blanks",
+  Matching: "Matching",
 };
 
 const TYPE_COLORS: Record<H5PType, string> = {
   MultiChoice: "bg-blue-100 text-blue-800 border-blue-200",
-  TrueFalse: "bg-purple-100 text-purple-800 border-purple-200",
-  FillBlanks: "bg-green-100 text-green-800 border-green-200",
+  TrueFalse: "bg-blue-100 text-blue-800 border-blue-200",
+  FillBlanks: "bg-blue-100 text-blue-800 border-blue-200",
+  Matching: "bg-blue-100 text-blue-800 border-blue-200",
+};
+
+const TYPE_ICON_NAMES: Record<H5PType, string> = {
+  MultiChoice: "ListChecks",
+  TrueFalse:   "ToggleLeft",
+  FillBlanks:  "PenLine",
+  Matching:    "Shuffle",
 };
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type H5PType = "MultiChoice" | "TrueFalse" | "FillBlanks";
+type H5PType = "MultiChoice" | "TrueFalse" | "FillBlanks" | "Matching";
 
 interface H5PForm {
   editingId: string | null;      // null = new, string = editing existing
@@ -88,19 +99,23 @@ interface H5PForm {
   // MultiChoice
   question: string;
   choices: [string, string, string, string];
-  correctIndex: number;
+  correctIndices: number[];
+  allowMultipleCorrect: boolean;
   // TrueFalse
   statement: string;
   tfCorrect: boolean;
   // FillBlanks  (text with *blank* markers)
   fillText: string;
+  // Matching
+  matchPairs: { prompt: string; answer: string }[];
 }
 
 function blankForm(type: H5PType, timestamp: number): H5PForm {
   return {
     editingId: null, type, timestamp,
-    question: "", choices: ["", "", "", ""], correctIndex: 0,
+    question: "", choices: ["", "", "", ""], correctIndices: [0], allowMultipleCorrect: false,
     statement: "", tfCorrect: true, fillText: "",
+    matchPairs: [{ prompt: "", answer: "" }, { prompt: "", answer: "" }, { prompt: "", answer: "" }],
   };
 }
 
@@ -109,6 +124,7 @@ function inferType(libraryOrType: string): H5PType {
   if (s.includes("multichoice") || s.includes("multiple")) return "MultiChoice";
   if (s.includes("truefalse") || s.includes("true")) return "TrueFalse";
   if (s.includes("blank") || s.includes("fill")) return "FillBlanks";
+  if (s.includes("dragtext") || s.includes("matching") || s.includes("drag")) return "Matching";
   return "MultiChoice";
 }
 
@@ -120,6 +136,7 @@ function contentToForm(c: H5PContent): H5PForm {
 
   if (type === "MultiChoice") {
     const answers = (p.answers as Array<{ text: string; correct: boolean }>) || [];
+    const correctIndices = answers.map((a, i) => a.correct ? i : -1).filter(i => i !== -1);
     return {
       ...base,
       question: (p.question as string) || "",
@@ -127,7 +144,8 @@ function contentToForm(c: H5PContent): H5PForm {
         answers[0]?.text || "", answers[1]?.text || "",
         answers[2]?.text || "", answers[3]?.text || "",
       ],
-      correctIndex: Math.max(0, answers.findIndex((a) => a.correct)),
+      correctIndices: correctIndices.length > 0 ? correctIndices : [0],
+      allowMultipleCorrect: correctIndices.length > 1,
     };
   }
   if (type === "TrueFalse") {
@@ -136,6 +154,10 @@ function contentToForm(c: H5PContent): H5PForm {
       statement: ((p.question || p.statement) as string) || "",
       tfCorrect: p.correct === "true" || p.correct === true,
     };
+  }
+  if (type === "Matching") {
+    const pairs = (p.pairs as Array<{ prompt: string; answer: string }>) || [];
+    return { ...base, matchPairs: pairs.length > 0 ? pairs : base.matchPairs };
   }
   // FillBlanks
   return { ...base, fillText: (p.text as string) || "" };
@@ -149,10 +171,12 @@ function formToContentData(f: H5PForm) {
       question: f.question,
       answers: f.choices
         .filter((c) => c.trim())
-        .map((text, i) => ({ text, correct: i === f.correctIndex })),
+        .map((text, i) => ({ text, correct: f.correctIndices.includes(i) })),
     };
   } else if (f.type === "TrueFalse") {
     params = { question: f.statement, correct: f.tfCorrect ? "true" : "false" };
+  } else if (f.type === "Matching") {
+    params = { pairs: f.matchPairs.filter(p => p.prompt.trim() && p.answer.trim()) };
   } else {
     params = { text: f.fillText, showSolutions: "end", autoCheck: false };
   }
@@ -219,6 +243,9 @@ function H5PEditorPanel({
       if (form.choices.filter((c) => c.trim()).length < 2) { setSaveError("At least 2 options required."); return; }
     } else if (form.type === "TrueFalse") {
       if (!form.statement.trim()) { setSaveError("Statement is required."); return; }
+    } else if (form.type === "Matching") {
+      const valid = form.matchPairs.filter(p => p.prompt.trim() && p.answer.trim());
+      if (valid.length < 2) { setSaveError("At least 2 complete pairs are required."); return; }
     } else {
       if (!form.fillText.trim()) { setSaveError("Text with blanks is required (use *word* for blanks)."); return; }
       if (!form.fillText.includes("*")) { setSaveError("Mark at least one blank with *asterisks*."); return; }
@@ -282,17 +309,24 @@ function H5PEditorPanel({
         {/* Add buttons */}
         <div className="p-5 border-b border-slate-100">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Add Interaction</p>
-          <div className="grid grid-cols-3 gap-2">
-            {(["MultiChoice", "TrueFalse", "FillBlanks"] as H5PType[]).map((type) => (
-              <button
-                key={type}
-                onClick={() => startNew(type)}
-                className={`flex flex-col items-center justify-center gap-2 p-4 border rounded-xl font-semibold text-xs transition-all hover:scale-[1.02] ${TYPE_COLORS[type]} hover:shadow-sm`}
-              >
-                <Plus className="w-5 h-5" />
-                {TYPE_LABELS[type]}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2">
+            {(["MultiChoice", "TrueFalse", "FillBlanks", "Matching"] as H5PType[]).map((type) => {
+              const iconMap = { ListChecks, ToggleLeft, PenLine, Shuffle } as Record<string, React.ElementType>;
+              const Icon = iconMap[TYPE_ICON_NAMES[type]];
+              return (
+                <button
+                  key={type}
+                  onClick={() => startNew(type)}
+                  className={`flex flex-col items-center justify-center gap-1.5 p-3 border rounded-xl font-semibold text-xs transition-all hover:scale-[1.02] ${TYPE_COLORS[type]} hover:shadow-sm`}
+                >
+                  <div className="relative">
+                    {Icon && <Icon className="w-4 h-4" />}
+                    <Plus className="w-2.5 h-2.5 absolute -top-1 -right-1.5 text-blue-700" />
+                  </div>
+                  {TYPE_LABELS[type]}
+                </button>
+              );
+            })}
           </div>
           <p className="text-[11px] text-slate-400 mt-2 text-center">
             Uses current video time: <span className="font-mono font-bold">{formatTime(currentTime)}</span>
@@ -319,13 +353,14 @@ function H5PEditorPanel({
                   return (
                     <div
                       key={c.id}
-                      className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group"
+                      onClick={() => setForm(contentToForm(c))}
+                      className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group cursor-pointer"
                     >
                       <div className="w-7 h-7 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
                         {i + 1}
                       </div>
                       <button
-                        onClick={() => onSeek(c.timestamp)}
+                        onClick={(e) => { e.stopPropagation(); onSeek(c.timestamp); }}
                         className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-mono text-xs font-bold text-slate-700 transition-colors shrink-0"
                       >
                         <Clock className="w-3 h-3" />
@@ -336,14 +371,7 @@ function H5PEditorPanel({
                       </span>
                       <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => setForm(contentToForm(c))}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => onDeleted(c.id)}
+                          onClick={(e) => { e.stopPropagation(); onDeleted(c.id); }}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >
@@ -423,22 +451,50 @@ function H5PEditorPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
-                Options <span className="text-slate-400 normal-case font-normal">(select the correct one)</span>
-              </label>
+              <div className="flex items-center justify-between mb-2 mt-4">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Options
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="multi-correct-toggle"
+                    checked={form.allowMultipleCorrect}
+                    onChange={(e) => setField("allowMultipleCorrect", e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                  />
+                  <label htmlFor="multi-correct-toggle" className="text-xs font-semibold text-slate-600 cursor-pointer">
+                    Allow multiple correct answers
+                  </label>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 mb-2">Select the correct answer{form.allowMultipleCorrect ? "s" : ""}</p>
               <div className="space-y-2">
                 {form.choices.map((choice, i) => (
                   <div key={i} className="flex gap-2 items-center">
                     <button
                       type="button"
-                      onClick={() => setField("correctIndex", i)}
-                      className={`w-6 h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
-                        form.correctIndex === i
+                      onClick={() => {
+                        if (form.allowMultipleCorrect) {
+                          setField(
+                            "correctIndices",
+                            form.correctIndices.includes(i)
+                              ? form.correctIndices.filter((x) => x !== i)
+                              : [...form.correctIndices, i]
+                          );
+                        } else {
+                          setField("correctIndices", [i]);
+                        }
+                      }}
+                      className={`w-6 h-6 shrink-0 flex items-center justify-center transition-all ${
+                        form.allowMultipleCorrect ? "rounded-md" : "rounded-full"
+                      } border-2 ${
+                        form.correctIndices.includes(i)
                           ? "border-green-500 bg-green-500"
                           : "border-slate-300 hover:border-slate-400"
                       }`}
                     >
-                      {form.correctIndex === i && (
+                      {form.correctIndices.includes(i) && (
                         <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                       )}
                     </button>
@@ -519,6 +575,66 @@ function H5PEditorPanel({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Matching */}
+        {form.type === "Matching" && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Match Pairs</label>
+              {form.matchPairs.length < 4 && (
+                <button
+                  type="button"
+                  onClick={() => setField("matchPairs", [...form.matchPairs, { prompt: "", answer: "" }])}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add pair
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mb-3">Students drag the right column answers onto the left column prompts.</p>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 mb-1">
+                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-center">Prompt</span>
+                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-center">Answer</span>
+              </div>
+              {form.matchPairs.map((pair, i) => (
+                <div key={i} className="grid grid-cols-2 gap-2 items-center">
+                  <input
+                    type="text"
+                    value={pair.prompt}
+                    onChange={(e) => {
+                      const updated = form.matchPairs.map((p, j) => j === i ? { ...p, prompt: e.target.value } : p);
+                      setField("matchPairs", updated);
+                    }}
+                    placeholder={`Prompt ${i + 1}`}
+                    className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                  <div className="flex gap-1 items-center">
+                    <input
+                      type="text"
+                      value={pair.answer}
+                      onChange={(e) => {
+                        const updated = form.matchPairs.map((p, j) => j === i ? { ...p, answer: e.target.value } : p);
+                        setField("matchPairs", updated);
+                      }}
+                      placeholder={`Answer ${i + 1}`}
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    {form.matchPairs.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setField("matchPairs", form.matchPairs.filter((_, j) => j !== i))}
+                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -633,6 +749,12 @@ function TopicsPanel({
             </button>
             {isTopicOpen && (
               <div className="ml-4 border-l border-slate-200 pl-2 space-y-0.5 mb-1">
+                {topic.question && (
+                  <div className="px-2 py-1 mb-1 text-xs text-blue-700 bg-blue-50 rounded italic border-l-2 border-blue-400">
+                    <span className="font-semibold block mb-0.5 text-[10px] uppercase tracking-wider">Quiz Question</span>
+                    {(topic.question as any).question || (topic.question as any).fillText || (topic.question as any).statement}
+                  </div>
+                )}
                 {topic.subtopics && topic.subtopics.length > 0 ? (
                   topic.subtopics.map((sub, si) => {
                     const sKey = `t${ti}s${si}`;
@@ -648,33 +770,32 @@ function TopicsPanel({
                           <span className="font-mono text-[10px] text-slate-400 shrink-0">{formatTime(sub.start)}</span>
                           <span className="truncate">{sub.title}</span>
                         </button>
-                        {isSubOpen && subSegs.map((seg, gi) => (
-                          <button
-                            key={gi}
-                            onClick={() => onSeek(seg.start)}
-                            className="w-full text-left flex gap-2 px-2 py-1 rounded text-[11px] transition-colors text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                          >
-                            <span className="font-mono text-[10px] shrink-0 mt-0.5 text-slate-400">{formatTime(seg.start)}</span>
-                            <span className="leading-snug">{seg.text}</span>
-                          </button>
-                        ))}
+                        {isSubOpen && (
+                          <>
+                            {sub.question && (
+                              <div className="ml-2 px-2 py-1 mb-1 text-[11px] text-blue-700 bg-blue-50 rounded italic border-l-2 border-blue-400">
+                                <span className="font-semibold block mb-0.5 text-[9px] uppercase tracking-wider">Quiz Question</span>
+                                {(sub.question as any).question || (sub.question as any).fillText || (sub.question as any).statement}
+                              </div>
+                            )}
+                            {subSegs.length > 0 && (
+                              <p className="ml-2 px-2 py-1 text-[11px] text-slate-500 leading-relaxed">
+                                {subSegs.map(s => s.text).join(' ')}
+                              </p>
+                            )}
+                          </>
+                        )}
                       </div>
                     );
                   })
-                ) : (
-                  segments
-                    .filter((seg) => seg.start >= topic.start && seg.start <= topic.end + 1)
-                    .map((seg, gi) => (
-                      <button
-                        key={gi}
-                        onClick={() => onSeek(seg.start)}
-                        className="w-full text-left flex gap-2 px-2 py-1 rounded text-[11px] transition-colors text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                      >
-                        <span className="font-mono text-[10px] shrink-0 mt-0.5 text-slate-400">{formatTime(seg.start)}</span>
-                        <span className="leading-snug">{seg.text}</span>
-                      </button>
-                    ))
-                )}
+                ) : (() => {
+                  const topicSegs = segments.filter((seg) => seg.start >= topic.start && seg.start <= topic.end + 1);
+                  return topicSegs.length > 0 ? (
+                    <p className="px-2 py-1 text-[11px] text-slate-500 leading-relaxed">
+                      {topicSegs.map(s => s.text).join(' ')}
+                    </p>
+                  ) : null;
+                })()}
               </div>
             )}
           </div>
@@ -696,19 +817,36 @@ function InteractionPreview({
   const type = inferType(content.library || "");
   const p = (content.params || {}) as Record<string, unknown>;
 
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
   const [tfAnswer, setTfAnswer] = useState<boolean | null>(null);
   const [fillAnswer, setFillAnswer] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
 
+  // Matching state: map from promptIndex → selected answer string (dragged or clicked)
+  const pairs = type === "Matching" ? ((p.pairs as Array<{ prompt: string; answer: string }>) || []) : [];
+  const shuffledAnswers = useState(() => [...pairs].sort(() => Math.random() - 0.5))[0];
+  const [matchSelections, setMatchSelections] = useState<Record<number, string>>({});
+  const [draggingAnswer, setDraggingAnswer] = useState<string | null>(null);
+
   const handleSubmit = () => {
     if (type === "MultiChoice") {
       const answers = (p.answers as Array<{ text: string; correct: boolean }>) || [];
-      setIsCorrect(selectedAnswer !== null && answers[selectedAnswer]?.correct === true);
+      const correctIndices = answers.map((a, i) => a.correct ? i : -1).filter(i => i !== -1);
+      if (correctIndices.length === 0) {
+        setIsCorrect(true);
+      } else {
+        setIsCorrect(
+          selectedAnswers.length === correctIndices.length &&
+          selectedAnswers.every(i => correctIndices.includes(i))
+        );
+      }
     } else if (type === "TrueFalse") {
       const correct = p.correct === true || p.correct === "true";
       setIsCorrect(tfAnswer === correct);
+    } else if (type === "Matching") {
+      const allCorrect = pairs.every((pair, i) => matchSelections[i]?.toLowerCase() === pair.answer.toLowerCase());
+      setIsCorrect(allCorrect);
     } else {
       const text = (p.text as string) || "";
       const blanks = [...text.matchAll(/\*([^*]+)\*/g)].map((m) => m[1].trim().toLowerCase());
@@ -719,8 +857,9 @@ function InteractionPreview({
   };
 
   const canSubmit =
-    (type === "MultiChoice" && selectedAnswer !== null) ||
+    (type === "MultiChoice" && selectedAnswers.length > 0) ||
     (type === "TrueFalse" && tfAnswer !== null) ||
+    (type === "Matching" && Object.keys(matchSelections).length === pairs.length && pairs.length > 0) ||
     (type === "FillBlanks" && fillAnswer.trim().length > 0);
 
   return (
@@ -736,33 +875,38 @@ function InteractionPreview({
 
         {/* Question */}
         <div className="p-6 space-y-4">
-          {type === "MultiChoice" && (
-            <>
-              <p className="font-semibold text-slate-800 text-[15px] leading-snug">{(p.question as string) || ""}</p>
-              <div className="space-y-2">
-                {((p.answers as Array<{ text: string; correct: boolean }>) || []).map((ans, i) => (
-                  <button
-                    key={i}
-                    disabled={submitted}
-                    onClick={() => setSelectedAnswer(i)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                      submitted
-                        ? ans.correct
-                          ? "border-green-500 bg-green-50 text-green-800"
-                          : selectedAnswer === i
-                          ? "border-red-400 bg-red-50 text-red-800"
-                          : "border-slate-200 text-slate-500"
-                        : selectedAnswer === i
-                        ? "border-blue-500 bg-blue-50 text-blue-800"
-                        : "border-slate-200 hover:border-slate-300 text-slate-700"
-                    }`}
-                  >
-                    {ans.text}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          {type === "MultiChoice" && (() => {
+            const answers = ((p.answers as Array<{ text: string; correct: boolean }>) || []);
+            const isMultiple = answers.filter(a => a.correct).length > 1;
+            return (
+              <>
+                <p className="font-semibold text-slate-800 text-[15px] leading-snug">{(p.question as string) || ""}</p>
+                {isMultiple && <p className="text-xs text-blue-600 font-semibold mb-1">Please select all correct answers.</p>}
+                <div className="space-y-2">
+                  {answers.map((ans, i) => (
+                    <button
+                      key={i}
+                      disabled={submitted}
+                      onClick={() => setSelectedAnswers(prev => isMultiple ? (prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]) : [i])}
+                      className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                        submitted
+                          ? ans.correct
+                            ? "border-green-500 bg-green-50 text-green-800"
+                            : selectedAnswers.includes(i)
+                            ? "border-red-400 bg-red-50 text-red-800"
+                            : "border-slate-200 text-slate-500"
+                          : selectedAnswers.includes(i)
+                          ? "border-blue-500 bg-blue-50 text-blue-800"
+                          : "border-slate-200 hover:border-slate-300 text-slate-700"
+                      }`}
+                    >
+                      {ans.text}
+                    </button>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
 
           {type === "TrueFalse" && (
             <>
@@ -796,25 +940,125 @@ function InteractionPreview({
             </>
           )}
 
-          {type === "FillBlanks" && (
-            <>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Fill in the blank(s)</p>
-              <div className="text-[15px] text-slate-800 leading-relaxed">
-                {((p.text as string) || "").split(/\*([^*]+)\*/).map((part, i) =>
-                  i % 2 === 0
-                    ? <span key={i}>{part}</span>
-                    : <span key={i} className="inline-block bg-slate-100 border-b-2 border-blue-500 px-2 min-w-16 text-slate-400 text-sm">___</span>
+          {type === "FillBlanks" && (() => {
+            const rawText = (p.text as string) || "";
+            const parts = rawText.split(/\*([^*]+)\*/);
+            const userAnswers = fillAnswer.trim().split(/\s+/);
+            let blankIndex = 0;
+            return (
+              <>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Fill in the blank(s)</p>
+                <div className="text-[15px] text-slate-800 leading-relaxed">
+                  {parts.map((part, i) => {
+                    if (i % 2 === 0) return <span key={i}>{part}</span>;
+                    const correctWord = part.trim();
+                    const userWord = userAnswers[blankIndex++] ?? "";
+                    const wordCorrect = userWord.toLowerCase() === correctWord.toLowerCase();
+                    if (!submitted) {
+                      return <span key={i} className="inline-block bg-slate-100 border-b-2 border-blue-500 px-2 min-w-16 text-slate-400 text-sm">___</span>;
+                    }
+                    return (
+                      <span key={i} className="inline-flex flex-col items-center mx-1">
+                        {!wordCorrect && userWord && (
+                          <span className="text-xs line-through text-red-500 font-semibold">{userWord}</span>
+                        )}
+                        <span className={`px-2 py-0.5 rounded font-bold text-sm ${wordCorrect ? "bg-green-100 text-green-800" : "bg-green-100 text-green-800"}`}>
+                          {correctWord}
+                        </span>
+                      </span>
+                    );
+                  })}
+                </div>
+                {!submitted && (
+                  <input
+                    type="text"
+                    value={fillAnswer}
+                    onChange={(e) => setFillAnswer(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && canSubmit && !submitted && handleSubmit()}
+                    disabled={submitted}
+                    placeholder="Type your answer..."
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
                 )}
+              </>
+            );
+          })()}
+
+          {type === "Matching" && (
+            <>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Drag or click an answer onto each prompt</p>
+              {/* Answer bank */}
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl min-h-10">
+                {shuffledAnswers.map((pair, i) => {
+                  const used = Object.values(matchSelections).includes(pair.answer);
+                  return (
+                    <div
+                      key={i}
+                      draggable={!submitted && !used}
+                      onDragStart={() => setDraggingAnswer(pair.answer)}
+                      onDragEnd={() => setDraggingAnswer(null)}
+                      onClick={() => {
+                        if (submitted || used) return;
+                        // Find first unmatched prompt
+                        const firstEmpty = pairs.findIndex((_, pi) => matchSelections[pi] === undefined);
+                        if (firstEmpty !== -1) setMatchSelections(prev => ({ ...prev, [firstEmpty]: pair.answer }));
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold border cursor-grab transition-all select-none ${
+                        used ? "opacity-30 cursor-not-allowed" : "bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100"
+                      } ${draggingAnswer === pair.answer ? "opacity-50" : ""}`}
+                    >
+                      {pair.answer}
+                    </div>
+                  );
+                })}
               </div>
-              <input
-                type="text"
-                value={fillAnswer}
-                onChange={(e) => setFillAnswer(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && canSubmit && !submitted && handleSubmit()}
-                disabled={submitted}
-                placeholder="Type your answer..."
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-slate-50"
-              />
+              {/* Prompt drop targets */}
+              <div className="space-y-2 mt-2">
+                {pairs.map((pair, i) => {
+                  const selected = matchSelections[i];
+                  const isMatch = submitted && selected?.toLowerCase() === pair.answer.toLowerCase();
+                  return (
+                    <div
+                      key={i}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (draggingAnswer && !submitted) {
+                          // Remove this answer from any prior slot
+                          const cleared = Object.fromEntries(Object.entries(matchSelections).filter(([, v]) => v !== draggingAnswer));
+                          setMatchSelections({ ...cleared, [i]: draggingAnswer });
+                          setDraggingAnswer(null);
+                        }
+                      }}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl border-2 transition-all ${
+                        submitted
+                          ? isMatch ? "border-green-400 bg-green-50" : "border-red-300 bg-red-50"
+                          : selected ? "border-blue-300 bg-blue-50" : "border-dashed border-slate-300 bg-slate-50"
+                      }`}
+                    >
+                      <span className="text-sm font-semibold text-slate-700 flex-1">{pair.prompt}</span>
+                      <div className="flex items-center gap-1">
+                        {selected ? (
+                          <>
+                            <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${submitted ? (isMatch ? "text-green-800" : "text-red-700") : "text-blue-800"}`}>
+                              {selected}
+                            </span>
+                            {!submitted && (
+                              <button
+                                onClick={() => setMatchSelections(prev => { const n = { ...prev }; delete n[i]; return n; })}
+                                className="p-0.5 text-slate-400 hover:text-red-500"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400 px-2">Drop here</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
 
@@ -824,7 +1068,11 @@ function InteractionPreview({
               isCorrect ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"
             }`}>
               {isCorrect ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <X className="w-4 h-4 shrink-0 mt-0.5" />}
-              {isCorrect ? "Correct! Well done." : "Not quite — review the material and try again."}
+              <span>
+                {isCorrect
+                  ? ((p.feedback as any)?.correct || "Correct! Well done.")
+                  : "Incorrect"}
+              </span>
             </div>
           )}
         </div>
@@ -1001,7 +1249,7 @@ function VideoControls({
           )}
           {/* H5P numbered dots */}
           {duration > 0 && sortedContents.map((c, i) => {
-            const pct = Math.min(97, Math.max(3, (c.timestamp / duration) * 100));
+            const pct = Math.min(100, Math.max(0, (c.timestamp / duration) * 100));
             return (
               <button
                 key={c.id}
@@ -1027,12 +1275,6 @@ function VideoControls({
           {duration > 0 ? formatTime(duration) : "--:--"}
         </span>
 
-        {/* Interaction count badge */}
-        {sortedContents.length > 0 && (
-          <span className="text-orange-400 text-[11px] font-semibold shrink-0">
-            {sortedContents.length}&nbsp;Q
-          </span>
-        )}
       </div>
     </div>
   );
@@ -1059,8 +1301,11 @@ export default function Editor() {
   const [videoDuration, setVideoDuration] = useState(0);
   const [openForContent, setOpenForContent] = useState<H5PContent | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [clickFlash, setClickFlash] = useState<"play" | "pause" | null>(null);
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  const [showAIConfirm, setShowAIConfirm] = useState(false);
+  const [pendingAIAction, setPendingAIAction] = useState<(() => void) | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1088,15 +1333,24 @@ export default function Editor() {
   useEffect(() => { if (!token) navigate("/"); }, [token, navigate]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      store.resetEditor();
+      setCurrentStep(1);
+      return;
+    }
     const load = async () => {
-      store.setVideo(null);
-      store.setSegments([]);
-      store.setTopics([]);
-      store.resetAnalysis();
+      store.resetEditor();
       try {
         const video = await fetchVideo(id);
         store.setVideo(video);
+        // captions may be a JSON string or already an object
+        let captionData = video.captions;
+        if (typeof captionData === 'string') {
+          try { captionData = JSON.parse(captionData); } catch { captionData = null; }
+        }
+        if (captionData && typeof captionData === 'object' && 'topics' in (captionData as object)) {
+          store.setTopics((captionData as any).topics || []);
+        }
         recordVideoVisit(id);
         await store.loadH5PContents(id);
         setCurrentStep(2);
@@ -1107,7 +1361,10 @@ export default function Editor() {
     load();
   }, [id]);
 
-  useEffect(() => () => { analysisCleanupRef.current?.(); }, []);
+  useEffect(() => () => {
+    analysisCleanupRef.current?.();
+    store.resetAnalysis();
+  }, []);
 
   // YouTube IFrame API setup
   useEffect(() => {
@@ -1285,16 +1542,35 @@ export default function Editor() {
     }
   };
 
+  const deleteAllAndRun = async (action: () => void) => {
+    for (const c of store.h5pContents) {
+      await store.removeH5PContent(c.id);
+    }
+    action();
+  };
+
+  const guardAI = (action: () => void) => {
+    if (store.h5pContents.length > 0) {
+      setPendingAIAction(() => () => deleteAllAndRun(action));
+      setShowAIConfirm(true);
+    } else {
+      action();
+    }
+  };
+
   const handleRunAnalysis = () => {
     if (!store.video?.id) return;
-    analysisCleanupRef.current?.();
-    const cleanup = store.runAnalysis(store.video.id);
-    analysisCleanupRef.current = cleanup;
+    guardAI(() => {
+      analysisCleanupRef.current?.();
+      const cleanup = store.runAnalysis(store.video!.id);
+      analysisCleanupRef.current = cleanup;
+    });
   };
 
   // Combined: transcribe → then AI analyze → then inject
   const handleTranscribeAndGenerate = async () => {
     if (!store.video?.id) return;
+    guardAI(async () => {
     setIsExtractingTranscript(true);
     try {
       let segments;
@@ -1314,8 +1590,9 @@ export default function Editor() {
     setIsExtractingTranscript(false);
     // Segments are now in store — kick off AI analysis
     analysisCleanupRef.current?.();
-    const cleanup = store.runAnalysis(store.video.id);
+    const cleanup = store.runAnalysis(store.video!.id);
     analysisCleanupRef.current = cleanup;
+    });
   };
 
   const handleExport = async () => {
@@ -1379,6 +1656,12 @@ export default function Editor() {
     }
   }, [isPlaying]);
 
+  const flashAndToggle = useCallback(() => {
+    setClickFlash(isPlaying ? "pause" : "play");
+    setTimeout(() => setClickFlash(null), 600);
+    togglePlay();
+  }, [isPlaying, togglePlay]);
+
   const seekTo = useCallback((time: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = time;
@@ -1398,11 +1681,6 @@ export default function Editor() {
     ? `/api/uploads/${store.video.filePath.replace(/^uploads[\\/]/, "")}`
     : null;
 
-  const steps = [
-    { id: 1, name: "Add Video", desc: "Upload or link" },
-    { id: 2, name: "Add Interactions", desc: "Questions & editing" },
-    { id: 3, name: "Finish & Share", desc: "Preview & export" },
-  ];
 
   // Sorted h5p contents for numbered dots
   const sortedContents = [...store.h5pContents].sort((a, b) => a.timestamp - b.timestamp);
@@ -1413,10 +1691,13 @@ export default function Editor() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate("/app/dashboard")} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+          <button
+            onClick={() => navigate("/app/dashboard")}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            Home
           </button>
-          <div className="h-6 w-px bg-slate-300 hidden sm:block" />
           <div>
             {isTitleEditing ? (
               <input
@@ -1459,45 +1740,37 @@ export default function Editor() {
           </div>
         </div>
 
-        {/* Stepper */}
-        <div className="hidden md:flex items-center gap-2">
-          {steps.map((step, idx) => (
-            <div key={step.id} className="flex items-center">
-              <button
-                onClick={() => {
-                  if (!store.video) return;
-                  // Prevent going back to step 1 once a video is uploaded
-                  if (step.id === 1 && currentStep >= 2) return;
-                  setCurrentStep(step.id);
-                }}
-                disabled={step.id === 1 && currentStep >= 2}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                  currentStep === step.id ? "bg-blue-50 text-blue-800" : currentStep > step.id ? "text-slate-700 hover:bg-slate-100" : "text-slate-400"
-                }`}
-              >
-                {currentStep > step.id ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                ) : (
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${currentStep === step.id ? "bg-blue-800 text-white" : "bg-slate-200 text-slate-500"}`}>
-                    {step.id}
-                  </span>
-                )}
-                <span className="font-bold text-sm">{step.name}</span>
-              </button>
-              {idx < steps.length - 1 && <ChevronRight className="w-4 h-4 text-slate-300 mx-2" />}
-            </div>
-          ))}
-        </div>
-
         {store.video && (
-          <button
-            onClick={handleExport}
-            disabled={isExporting || store.h5pContents.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl border border-transparent hover:border-slate-200 transition-colors text-sm disabled:opacity-40"
-          >
-            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Export .h5p
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const ltiUrl = `${window.location.origin}/api/lti/launch/${store.video!.id}`;
+                navigator.clipboard.writeText(ltiUrl);
+                notify("LTI link copied!", "success");
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 text-slate-600 text-sm font-semibold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              title="Copy LTI embed link"
+            >
+              <Link className="w-4 h-4" />
+              Copy LTI Link
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={isExporting || store.h5pContents.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 text-slate-600 text-sm font-semibold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40"
+            >
+              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Export .h5p
+            </button>
+            <button
+              onClick={() => navigate("/app/dashboard?saved=1")}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-blue-600 rounded-xl bg-blue-600 hover:bg-blue-700 hover:border-blue-700 text-white transition-colors"
+              title="Save and go to Dashboard"
+            >
+              <Save className="w-4 h-4" />
+              Save
+            </button>
+          </div>
         )}
       </header>
 
@@ -1510,6 +1783,39 @@ export default function Editor() {
           {notification.type === "error" ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
           {notification.msg}
           <button onClick={() => setNotification(null)}><X className="w-4 h-4 opacity-70 hover:opacity-100" /></button>
+        </div>
+      )}
+
+      {/* ── AI Confirmation Dialog ─────────────────────────────────────────── */}
+      {showAIConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <h2 className="text-base font-bold text-slate-800">Replace existing questions?</h2>
+            </div>
+            <p className="text-sm text-slate-600 mb-5">
+              This will permanently delete all <strong>{store.h5pContents.length} existing question{store.h5pContents.length !== 1 ? 's' : ''}</strong> and generate a new set with AI. This cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowAIConfirm(false); setPendingAIAction(null); }}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowAIConfirm(false); pendingAIAction?.(); setPendingAIAction(null); }}
+                className="px-4 py-2 rounded-lg text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors"
+              >
+                Delete & Regenerate
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1655,6 +1961,7 @@ export default function Editor() {
                     <video
                       ref={videoRef}
                       src={videoSrc}
+                      onClick={flashAndToggle}
                       onTimeUpdate={() => {
                         const t = videoRef.current?.currentTime || 0;
                         store.setCurrentTime(t);
@@ -1667,16 +1974,30 @@ export default function Editor() {
                       }}
                       onPlay={() => setIsPlaying(true)}
                       onPause={() => setIsPlaying(false)}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-contain cursor-pointer"
                     />
                   ) : store.video?.youtubeId ? (
-                    <div ref={ytContainerRef} className="w-full h-full" />
+                    <div className="relative w-full h-full">
+                      <div ref={ytContainerRef} className="w-full h-full" />
+                      <div className="absolute inset-0 cursor-pointer" onClick={flashAndToggle} />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-400">
                       <p>Video not available</p>
                     </div>
                   )}
                 </div>
+
+                {/* Click-to-play flash overlay */}
+                {clickFlash && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                    <div className="bg-black/40 rounded-full p-5 animate-ping-once">
+                      {clickFlash === "play"
+                        ? <Play className="w-12 h-12 text-white fill-white" />
+                        : <Pause className="w-12 h-12 text-white fill-white" />}
+                    </div>
+                  </div>
+                )}
 
                 {/* Interaction overlay — absolute inside video area only */}
                 {previewContent && (
@@ -1841,87 +2162,9 @@ export default function Editor() {
                 </div>
               </div>
 
-              {/* Bottom nav */}
-              <div className="flex justify-end items-center pt-4 border-t border-slate-200">
-                <button
-                  onClick={() => setCurrentStep(3)}
-                  className="px-8 py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm transition-all text-[15px] flex items-center gap-2"
-                >
-                  Continue to Finish
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
             </div>
           )}
 
-          {/* ── STEP 3: Finish & Share ────────────────────────────────────── */}
-          {currentStep === 3 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 sm:p-12 animate-in fade-in slide-in-from-right-8 duration-500 text-center max-w-2xl mx-auto w-full">
-              <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-green-200 shadow-sm">
-                <CheckCircle2 className="w-12 h-12 text-green-600" />
-              </div>
-              <h1 className="text-3xl font-bold text-slate-900 mb-4">Your video is ready!</h1>
-              <p className="text-slate-600 text-lg mb-10">
-                <strong>"{store.video?.title || "Your Video"}"</strong> has{" "}
-                {store.h5pContents.length} H5P interaction{store.h5pContents.length !== 1 ? "s" : ""}.
-              </p>
-
-              <div className="space-y-4 mb-12 text-left">
-                <div className="p-6 border-2 border-blue-900 bg-slate-50 rounded-2xl flex gap-5 items-start shadow-sm">
-                  <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-200 shrink-0">
-                    <Download className="w-7 h-7 text-blue-900" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-slate-900 text-lg mb-1">Export for LMS (.h5p)</h3>
-                    <p className="text-slate-500 text-[15px] mb-3">Export a standard package for Canvas, Moodle, or Blackboard.</p>
-                    <button
-                      onClick={handleExport}
-                      disabled={isExporting || store.h5pContents.length === 0}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-sm"
-                    >
-                      {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      {isExporting ? "Exporting..." : `Export ${store.h5pContents.length} interactions`}
-                    </button>
-                  </div>
-                </div>
-
-                {store.video && (
-                  <div className="p-6 border border-slate-200 bg-white rounded-2xl flex gap-5 items-start">
-                    <div className="p-3 bg-slate-100 rounded-xl shrink-0 border border-slate-200">
-                      <CheckCircle2 className="w-7 h-7 text-slate-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-slate-900 text-lg mb-1">Direct Link</h3>
-                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                        <code className="text-xs text-slate-600 flex-1 truncate">
-                          {window.location.origin}/api/videos/{store.video.id}
-                        </code>
-                        <button
-                          onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/videos/${store.video!.id}`); notify("Copied!", "success"); }}
-                          className="text-xs font-bold text-blue-600 hover:text-blue-800 shrink-0"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-between items-center">
-                <button onClick={() => setCurrentStep(2)} className="px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors text-[15px]">
-                  Back to Editor
-                </button>
-                <button
-                  onClick={() => navigate("/app/dashboard")}
-                  className="px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm transition-all text-lg flex items-center gap-2"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  Go to Dashboard
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 

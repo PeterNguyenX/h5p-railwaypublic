@@ -30,7 +30,15 @@
       "Bash(lsof -ti:3002)",
       "Bash(kill 36744)",
       "Bash(nohup npx *)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3002)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3002)",
+      "Bash(kill 20623 20622 20599)",
+      "Bash(kill 9875 9854 6892 6871)",
+      "Bash(lsof -ti:5001)",
+      "Bash(xargs kill *)",
+      "Bash(python3 -c \"import sys,json; print\\('Backend:', json.load\\(sys.stdin\\).get\\('status'\\)\\)\")",
+      "Bash(curl -s http://localhost:11434/api/version)",
+      "Bash(pkill -f \"node.*server\")",
+      "Bash(npm start *)"
     ]
   }
 }

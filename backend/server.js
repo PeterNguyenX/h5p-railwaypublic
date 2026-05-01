@@ -22,6 +22,7 @@ const projectsRoutes = require("./routes/projects");
 const transcriptRoutes = require("./routes/transcriptRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const h5pService = require("./services/h5pService");
+const settingsService = require("./services/settingsService");
 const thumbnailFallbackMiddleware = require("./middleware/thumbnailFallback");
 const requestLogger = require('./middleware/requestLogger');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
@@ -406,6 +407,8 @@ async function testDatabaseConnection() {
     try {
       await sequelize.sync({ alter: false });
       console.log('✅ Database tables verified/created successfully.');
+      await settingsService.initializeDefaults();
+      console.log('✅ System settings initialized.');
     } catch (syncError) {
       console.warn('⚠️ Database sync warning:', syncError.message);
       console.log('💡 Database will work but some features may be limited');

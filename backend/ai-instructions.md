@@ -21,7 +21,7 @@ Set the trigger timestamp to exactly **1 second after the final word of the comp
 This provides a natural pause for the learner before the interaction appears.
 
 - `trigger_timestamp = segment_end_time + 1`
-- Interactions must be spaced **at least 30 seconds apart** (1 per 30-second window)
+- Interactions must be spaced **at least 60 seconds apart** (1 per 60-second window, i.e., 1 minute)
 - Never place at timestamp 0
 
 ---

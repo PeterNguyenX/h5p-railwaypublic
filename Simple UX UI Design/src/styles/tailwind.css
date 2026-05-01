@@ -2,3 +2,41 @@
 @source '../**/*.{js,ts,jsx,tsx}';
 
 @import 'tw-animate-css';
+
+@keyframes ping-once {
+  0%   { transform: scale(0.6); opacity: 1; }
+  60%  { transform: scale(1.2); opacity: 0.7; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.animate-ping-once {
+  animation: ping-once 0.55s ease-out forwards;
+}
+
+@theme {
+  /* Dark tinted orange (bright) */
+  --color-orange-50:  #fff5ec;
+  --color-orange-100: #ffe8cc;
+  --color-orange-200: #ffce99;
+  --color-orange-300: #ffab5c;
+  --color-orange-400: #f5832a;
+  --color-orange-500: #e86a18;
+  --color-orange-600: #d05510;
+  --color-orange-700: #ac420b;
+  --color-orange-800: #883309;
+  --color-orange-900: #632507;
+  --color-orange-950: #3d1503;
+
+  /* Not-so-dark navy blue */
+  --color-blue-50:  #eef3fb;
+  --color-blue-100: #d9e5f5;
+  --color-blue-200: #b3caea;
+  --color-blue-300: #7da5d6;
+  --color-blue-400: #4d80bf;
+  --color-blue-500: #3568ab;
+  --color-blue-600: #2a5494;
+  --color-blue-700: #22437a;
+  --color-blue-800: #1b3460;
+  --color-blue-900: #142648;
+  --color-blue-950: #0c1830;
+}

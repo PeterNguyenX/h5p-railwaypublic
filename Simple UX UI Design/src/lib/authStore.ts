@@ -129,7 +129,7 @@ export const useAuthStore = create<AuthState>()(
       clearError: () => set({ error: null }),
     }),
     {
-      name: 'reactivedu-auth',
+      name: 'ai-activedu-auth',
       partialState: (state) => ({
         token: state.token,
         user: state.user,

@@ -87,8 +87,14 @@ async function injectAll(suggestions, videoId, userId) {
 
   const injected = [];
   const errors = [];
+  const videoDuration = video.duration; // raw seconds from DB
 
   for (const suggestion of suggestions) {
+    // Skip questions placed past the video end
+    if (videoDuration && suggestion.timestamp >= videoDuration - 1) {
+      console.warn(`[Inject] Skipping timestamp ${suggestion.timestamp}s — exceeds video duration ${videoDuration}s`);
+      continue;
+    }
     try {
       const content = await injectSuggestion(suggestion, videoId);
       // h5pService.createTimeBasedContent already persisted to DB; just record result

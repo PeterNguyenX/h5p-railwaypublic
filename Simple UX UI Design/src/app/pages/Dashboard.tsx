@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   AlertCircle,
   Copy,
@@ -17,7 +17,7 @@ import {
   X,
   Link2,
 } from "lucide-react";
-import { exportH5P, fetchVideos, updateVideoTitle, type Video } from "../../lib/api";
+import { exportH5P, fetchVideos, trashVideo, restoreVideo as restoreVideoApi, updateVideoTitle, deleteVideo, type Video } from "../../lib/api";
 import { useAuthStore } from "../../lib/authStore";
 import { getVideoVisitCounts, getVideoVisits, recordVideoVisit } from "../../lib/videoVisit";
 
@@ -78,15 +78,22 @@ function thumbnailUrl(video: Video): string {
     if (video.thumbnailPath.startsWith("http://") || video.thumbnailPath.startsWith("https://")) {
       return video.thumbnailPath;
     }
+    if (video.thumbnailPath.startsWith("/api/")) {
+      return video.thumbnailPath;
+    }
+    if (video.thumbnailPath === "/default-thumbnail.svg" || video.thumbnailPath === "default-thumbnail.svg") {
+      return "/api/default-thumbnail.svg";
+    }
     const normalized = video.thumbnailPath.startsWith("/") ? video.thumbnailPath.slice(1) : video.thumbnailPath;
-    return `/api/uploads/${normalized}`;
+    const cleanPath = normalized.startsWith("uploads/") ? normalized.slice(8) : normalized;
+    return `/api/uploads/${cleanPath}`;
   }
   if (video.youtubeId) return `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`;
   return "";
 }
 
 function storageKey(userId?: string): string {
-  return `reactivedu-dashboard-${userId || "guest"}`;
+  return `ai-activedu-dashboard-${userId || "guest"}`;
 }
 
 function loadState(userId?: string): PersistedState {
@@ -115,6 +122,7 @@ function trashExpired(trashedAt?: string): boolean {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { token, user, getCurrentProfile } = useAuthStore();
   const profile = getCurrentProfile();
 
@@ -132,6 +140,16 @@ export default function Dashboard() {
   const [detailsVideoId, setDetailsVideoId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (searchParams.get("saved") === "1") {
+      setNotice("Video saved!");
+      setSearchParams({}, { replace: true });
+    } else if (searchParams.get("profile_saved") === "1") {
+      setNotice("Profile saved!");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const [visits, setVisits] = useState<Record<string, string>>({});
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({});
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
@@ -145,47 +163,71 @@ export default function Dashboard() {
       return;
     }
 
-    const run = async () => {
-      setIsLoading(true);
+    const run = async (silent = false) => {
+      if (!silent) setIsLoading(true);
       setError(null);
       try {
         const apiVideos = await fetchVideos();
         const serverVideos = Array.isArray(apiVideos) ? apiVideos : [];
         setVideos(serverVideos);
 
-        const persisted = loadState(user?.id);
-        const validFolders = persisted.folders.filter((f) => !trashExpired(f.trashedAt));
-
-        const validVideoIds = new Set([...serverVideos, ...persisted.virtualVideos].map((v) => v.id));
-        const validMeta = Object.fromEntries(
-          Object.entries(persisted.byVideoId).filter(([id, meta]) => validVideoIds.has(id) && !trashExpired(meta.trashedAt)),
-        );
-
-        const validVirtualVideos = persisted.virtualVideos.filter((v) => {
-          const meta = validMeta[v.id];
-          return !meta?.deletedAt;
+        // Sync server trashedAt into byVideoId so other windows see trash changes
+        setByVideoId((prev) => {
+          const next = { ...prev };
+          serverVideos.forEach((v) => {
+            const serverTrashedAt = (v as any).trashedAt ?? null;
+            next[v.id] = {
+              ...(next[v.id] || { folderId: null }),
+              trashedAt: serverTrashedAt || undefined,
+            };
+          });
+          return next;
         });
 
-        setFolders(validFolders);
-        setByVideoId(validMeta);
-        setVirtualVideos(validVirtualVideos);
-        setVisits(getVideoVisits());
-        setVisitCounts(getVideoVisitCounts());
+        if (!silent) {
+          const persisted = loadState(user?.id);
+          const validFolders = persisted.folders.filter((f) => !trashExpired(f.trashedAt));
+          const validVideoIds = new Set([...serverVideos, ...persisted.virtualVideos].map((v) => v.id));
+          const validMeta = Object.fromEntries(
+            Object.entries(persisted.byVideoId).filter(([id, meta]) => validVideoIds.has(id) && !trashExpired(meta.trashedAt)),
+          );
+          const validVirtualVideos = persisted.virtualVideos.filter((v) => !validMeta[v.id]?.deletedAt);
 
-        saveState(user?.id, {
-          folders: validFolders,
-          byVideoId: validMeta,
-          virtualVideos: validVirtualVideos,
-        });
-        initialLoadDone.current = true;
+          setFolders(validFolders);
+          setByVideoId(validMeta);
+          setVirtualVideos(validVirtualVideos);
+          setVisits(getVideoVisits());
+          setVisitCounts(getVideoVisitCounts());
+
+          saveState(user?.id, { folders: validFolders, byVideoId: validMeta, virtualVideos: validVirtualVideos });
+          initialLoadDone.current = true;
+        }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load videos");
+        if (!silent) setError(err instanceof Error ? err.message : "Failed to load videos");
       } finally {
-        setIsLoading(false);
+        if (!silent) setIsLoading(false);
       }
     };
 
     run();
+
+    // Instant sync between tabs/windows in the same browser
+    const channel = new BroadcastChannel('dashboard-sync');
+    channel.onmessage = () => run(true);
+
+    // Logo button click in same tab
+    const onLogoRefresh = () => run(true);
+    window.addEventListener('dashboard-refresh', onLogoRefresh);
+
+    // Sync when returning to this tab (covers cross-device / other browsers)
+    const onVisible = () => { if (document.visibilityState === 'visible') run(true); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      channel.close();
+      window.removeEventListener('dashboard-refresh', onLogoRefresh);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [token, navigate, user?.id]);
 
   useEffect(() => {
@@ -235,6 +277,23 @@ export default function Dashboard() {
     });
   }, [allVideos, byVideoId, selectedFolder, search, visits]);
 
+  const activeVideoCount = useMemo(() => {
+    return allVideos.filter(v => {
+      const meta = byVideoId[v.id] || { folderId: null };
+      return !meta.deletedAt && !meta.trashedAt;
+    }).length;
+  }, [allVideos, byVideoId]);
+
+  const tabVideoCount = useMemo(() => {
+    if (selectedFolder === "trash") {
+      return allVideos.filter(v => {
+        const meta = byVideoId[v.id] || { folderId: null };
+        return !meta.deletedAt && !!meta.trashedAt;
+      }).length;
+    }
+    return activeVideoCount;
+  }, [allVideos, byVideoId, selectedFolder, activeVideoCount]);
+
   const detailsVideo = useMemo(() => allVideos.find((v) => v.id === detailsVideoId) || null, [allVideos, detailsVideoId]);
 
   const touchVisit = (videoId: string) => {
@@ -274,15 +333,20 @@ export default function Dashboard() {
     setNotice(folderId ? "Video moved to folder" : "Video moved out of folder");
   };
 
-  const moveVideoToTrash = (videoId: string) => {
-    setByVideoId((prev) => ({
-      ...prev,
-      [videoId]: {
-        ...(prev[videoId] || { folderId: null }),
-        trashedAt: new Date().toISOString(),
-      },
-    }));
-    setNotice("Moved to Trash");
+  const broadcast = () => new BroadcastChannel('dashboard-sync').postMessage('refresh');
+
+  const moveVideoToTrash = async (videoId: string) => {
+    try {
+      await trashVideo(videoId);
+      setByVideoId((prev) => ({
+        ...prev,
+        [videoId]: { ...(prev[videoId] || { folderId: null }), trashedAt: new Date().toISOString() },
+      }));
+      setNotice("Moved to Trash");
+      broadcast();
+    } catch {
+      setNotice("Failed to move to trash");
+    }
   };
 
   const duplicateVideo = (videoId: string) => {
@@ -325,25 +389,32 @@ export default function Dashboard() {
     setNotice("Folder moved to Trash");
   };
 
-  const restoreVideo = (videoId: string) => {
-    setByVideoId((prev) => ({
-      ...prev,
-      [videoId]: {
-        ...(prev[videoId] || { folderId: null }),
-        trashedAt: undefined,
-        deletedAt: undefined,
-      },
-    }));
+  const restoreVideo = async (videoId: string) => {
+    try {
+      await restoreVideoApi(videoId);
+      setByVideoId((prev) => ({
+        ...prev,
+        [videoId]: { ...(prev[videoId] || { folderId: null }), trashedAt: undefined, deletedAt: undefined },
+      }));
+      broadcast();
+    } catch {
+      setNotice("Failed to restore video");
+    }
   };
 
-  const deleteVideoPermanently = (videoId: string) => {
-    setByVideoId((prev) => ({
-      ...prev,
-      [videoId]: {
-        ...(prev[videoId] || { folderId: null }),
-        deletedAt: new Date().toISOString(),
-      },
-    }));
+  const deleteVideoPermanently = async (videoId: string) => {
+    try {
+      await deleteVideo(videoId);
+      setVideos((prev) => prev.filter((v) => v.id !== videoId));
+      setByVideoId((prev) => ({
+        ...prev,
+        [videoId]: { ...(prev[videoId] || { folderId: null }), deletedAt: new Date().toISOString() },
+      }));
+      setNotice("Video deleted permanently");
+      broadcast();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Failed to delete video");
+    }
   };
 
   const restoreFolder = (folderId: FolderId) => {
@@ -405,7 +476,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Videos</h1>
           <p className="text-slate-600 text-[15px]">
-            Welcome back, <span className="font-semibold">{profile?.displayName || user?.username || "Teacher"}</span>. You have {videos.length} video{videos.length !== 1 ? "s" : ""}.
+            Welcome back, <span className="font-semibold">{profile?.displayName || user?.username || "Teacher"}</span>. You have {tabVideoCount} video{tabVideoCount !== 1 ? "s" : ""}{selectedFolder === "trash" ? " in Trash" : ""}.
           </p>
         </div>
 
@@ -464,13 +535,6 @@ export default function Dashboard() {
           Trash
         </button>
 
-        <button
-          onClick={createFolder}
-          className="px-3 py-2 rounded-lg border bg-white border-slate-200 text-slate-700 text-sm font-medium inline-flex items-center gap-1.5 hover:bg-slate-50"
-        >
-          <FolderPlus className="w-4 h-4" />
-          New Folder
-        </button>
       </div>
 
       {error && (
@@ -531,7 +595,9 @@ export default function Dashboard() {
                             try {
                               const updated = await updateVideoTitle(video.id, titleDraft.trim());
                               setVideos((prev) => prev.map((v) => v.id === video.id ? updated : v));
-                            } catch { /* ignore */ }
+                            } catch (err) {
+                              setNotice(err instanceof Error ? err.message : "Failed to rename");
+                            }
                           }
                           setEditingTitleId(null);
                         }}
@@ -716,38 +782,6 @@ export default function Dashboard() {
             <Copy className="w-4 h-4" /> Duplicate
           </button>
 
-          <button
-            onClick={() => setMenuMoveOpen((prev) => !prev)}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2"
-          >
-            <Folder className="w-4 h-4" /> Move
-          </button>
-
-          {menuMoveOpen && (
-            <div className="ml-2 border-l border-slate-200 pl-2 py-1">
-              <button
-                onClick={() => {
-                  moveVideoToFolder(contextMenu.videoId, null);
-                  setContextMenu(null);
-                }}
-                className="w-full text-left px-3 py-1.5 rounded-md hover:bg-slate-50 text-xs"
-              >
-                Move out of folder
-              </button>
-              {activeFolders.map((folder) => (
-                <button
-                  key={folder.id}
-                  onClick={() => {
-                    moveVideoToFolder(contextMenu.videoId, folder.id);
-                    setContextMenu(null);
-                  }}
-                  className="w-full text-left px-3 py-1.5 rounded-md hover:bg-slate-50 text-xs"
-                >
-                  Move to {folder.name}
-                </button>
-              ))}
-            </div>
-          )}
 
           <button
             onClick={() => {
@@ -782,7 +816,7 @@ export default function Dashboard() {
       )}
 
       {notice && (
-        <div className="fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg bg-slate-900 text-white text-sm z-[70] inline-flex items-center gap-2">
+        <div className={`fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg text-white text-sm z-[70] inline-flex items-center gap-2 ${notice === "Profile saved!" || notice === "Video saved!" ? "bg-green-600" : "bg-slate-900"}`}>
           <AlertCircle className="w-4 h-4" />
           {notice}
         </div>

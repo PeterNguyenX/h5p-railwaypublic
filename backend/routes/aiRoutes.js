@@ -134,18 +134,7 @@ router.post('/analyze-stream', auth, async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized access to this video' });
     }
 
-    // Try Ollama first (free, local), fallback to Claude
-    const ollamaOk = await isOllamaAvailable();
-    if (ollamaOk) {
-      console.log('Using Ollama for AI streaming analysis');
-      await analyzeTranscriptOllamaStream(segments, res, videoId, video);
-      return;
-    }
-
-    if (!ANTHROPIC_API_KEY) {
-      return res.status(500).json({ error: 'No AI backend available. Ollama is not running and ANTHROPIC_API_KEY is not set.' });
-    }
-
+    // Use the unified provider router: Groq → Ollama → Claude
     await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res, videoId, video);
   } catch (error) {
     console.error('Error in AI streaming analysis:', error.message);

@@ -27,7 +27,7 @@ export default function Login() {
               <div className="bg-white p-2.5 rounded-xl flex items-center justify-center shadow-sm">
                 <Video className="w-6 h-6 text-sky-600" />
               </div>
-              <span className="text-2xl font-bold tracking-tight">ReactivEdu</span>
+              <span className="text-2xl font-bold tracking-tight">AI-ActivEdu</span>
             </div>
 
             <h1 className="text-4xl font-bold mb-4 leading-tight">Interactive learning, simplified.</h1>
@@ -53,7 +53,7 @@ export default function Login() {
 
           <div className="z-10 mt-12 text-sm text-blue-300 font-medium tracking-wide flex justify-between">
             <span>For Teachers</span>
-            <span>ReactivEdu</span>
+            <span>AI-ActivEdu</span>
           </div>
         </div>
 
@@ -65,7 +65,7 @@ export default function Login() {
                 <div className="bg-sky-600 p-2.5 rounded-xl flex items-center justify-center">
                   <Video className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-2xl font-bold text-slate-800 tracking-tight">ReactivEdu</span>
+                <span className="text-2xl font-bold text-slate-800 tracking-tight">AI-ActivEdu</span>
               </div>
               <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">Welcome back</h2>
               <p className="text-slate-500 text-[15px]">Sign in to your teacher account to continue.</p>

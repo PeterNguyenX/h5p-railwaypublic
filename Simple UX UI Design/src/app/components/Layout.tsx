@@ -25,48 +25,54 @@ export default function Layout() {
       <header className="bg-white border-b border-blue-100 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <Link to="/app/dashboard" className="flex items-center gap-2">
-                <div className="bg-sky-600 p-2 rounded-lg flex items-center justify-center">
+            {/* Left — logo + home */}
+            <div className="flex items-center gap-3">
+              <Link
+                to="/app/dashboard"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                onClick={(e) => { e.preventDefault(); window.location.href = '/app/dashboard'; }}
+              >
+                <div className="bg-blue-600 p-2 rounded-lg flex items-center justify-center">
                   <Video className="w-5 h-5 text-white" />
                 </div>
-                <div className="leading-tight">
-                  <span className="text-xl font-bold text-slate-800 tracking-tight block">ReactivEdu</span>
-                  <span className="text-[11px] text-slate-400 block">A VNU AI project</span>
-                </div>
+                <h1 className="font-bold text-lg text-slate-900 tracking-tight leading-tight">AI-ActivEdu</h1>
               </Link>
+
             </div>
 
-            <div className="flex items-center gap-4">
+            {/* Right — profile, admin, logout */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => navigate("/app/account")}
-                className="hidden sm:flex items-center gap-3 pr-4 border-r border-slate-200 cursor-pointer hover:bg-slate-50 rounded-md px-3 py-2 -ml-2 transition-colors"
+                className="hidden sm:flex items-center gap-2 h-9 px-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
                 title="Account settings"
               >
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-sm">
+                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 font-bold text-[10px] shrink-0">
                   {initials}
                 </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-sm font-semibold text-slate-700 leading-none">{displayName}</span>
-                </div>
+                {displayName}
               </button>
+
               {user?.role === "admin" && (
                 <Link
                   to="/app/admin"
-                  className="text-slate-500 hover:text-blue-700 transition-colors p-2 rounded-md hover:bg-slate-100"
+                  className="flex items-center gap-1.5 h-9 px-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:text-blue-700 hover:bg-slate-50 transition-colors"
                   title="Admin console"
                 >
-                  <Shield className="w-5 h-5" />
+                  <Shield className="w-4 h-4" />
+                  Admin Console
                 </Link>
               )}
+
               <button
                 type="button"
                 onClick={handleLogout}
-                className="text-slate-500 hover:text-red-600 transition-colors p-2 rounded-md hover:bg-slate-100"
+                className="flex items-center gap-1.5 h-9 px-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors"
                 title="Log out"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4" />
+                Log out
               </button>
             </div>
           </div>

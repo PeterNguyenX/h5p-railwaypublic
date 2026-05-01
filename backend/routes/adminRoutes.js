@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { User, Video, H5PContent } = require('../models');
+const { User, Video, H5PContent, AuditLog, SystemSettings, LoginAttempt, ContentFlag } = require('../models');
 const { auth } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/admin');
 const { Op } = require('sequelize');
+const { createAuditLog } = require('../middleware/auditLog');
+const settingsService = require('../services/settingsService');
+const moderationService = require('../services/moderationService');
 
 // Get admin dashboard statistics
 router.get('/stats', auth, isAdmin, async (req, res) => {
@@ -76,9 +79,18 @@ router.get('/users', auth, isAdmin, async (req, res) => {
       attributes: ['id', 'username', 'email', 'password', 'role', 'isActive', 'createdAt', 'updatedAt']
     });
 
+    // Fetch video counts per user using a plain loop (dialect-safe)
+    const userIds = rows.map(u => u.id);
+    const videoCounts = {};
+    if (userIds.length > 0) {
+      await Promise.all(userIds.map(async (uid) => {
+        videoCounts[uid] = await Video.count({ where: { userId: uid } });
+      }));
+    }
+
     const now = Date.now();
     const users = rows.map((user) => {
-      const lastLoginAt = user.updatedAt;
+      const lastLoginAt = user.lastLoginAt || user.createdAt;
       const lastLoginDays = Math.max(0, Math.floor((now - new Date(lastLoginAt).getTime()) / (1000 * 60 * 60 * 24)));
 
       const suspiciousReasons = [];
@@ -115,6 +127,7 @@ router.get('/users', auth, isAdmin, async (req, res) => {
         updatedAt: user.updatedAt,
         lastLoginAt,
         lastLoginDays,
+        videoCount: videoCounts[user.id] || 0,
         suspicious: suspiciousReasons.length > 0,
         suspiciousReason: suspiciousReasons.join('; '),
         recentActivity,
@@ -245,6 +258,7 @@ router.put('/users/:id/role', auth, isAdmin, async (req, res) => {
     }
 
     await user.update({ role });
+    createAuditLog(req.user.id, 'UPDATE_USER_ROLE', 'User', user.id, `Changed role of ${user.username} to ${role}`, { role }, req);
     res.json({ message: 'User role updated successfully', user: {
       id: user.id,
       username: user.username,
@@ -266,8 +280,9 @@ router.put('/users/:id/status', auth, isAdmin, async (req, res) => {
     }
 
     await user.update({ isActive: !user.isActive });
-    res.json({ 
-      message: `User ${user.isActive ? 'activated' : 'deactivated'} successfully`, 
+    createAuditLog(req.user.id, user.isActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', 'User', user.id, `${user.isActive ? 'Activated' : 'Deactivated'} user ${user.username}`, null, req);
+    res.json({
+      message: `User ${user.isActive ? 'activated' : 'deactivated'} successfully`,
       user: {
         id: user.id,
         username: user.username,
@@ -368,6 +383,7 @@ router.post('/users/create', auth, isAdmin, async (req, res) => {
     }
 
     const newUser = await User.create({ username, email, password, role, isActive: true });
+    createAuditLog(req.user.id, 'CREATE_USER', 'User', newUser.id, `Created user ${username} with role ${role}`, { username, email, role }, req);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -402,7 +418,9 @@ router.delete('/users/:id', auth, isAdmin, async (req, res) => {
       }
     }
 
+    const deletedInfo = { username: user.username, email: user.email, role: user.role };
     await user.destroy();
+    createAuditLog(req.user.id, 'DELETE_USER', 'User', req.params.id, `Deleted user ${deletedInfo.username}`, deletedInfo, req);
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
@@ -425,6 +443,7 @@ router.post('/users/:id/reset-password', auth, isAdmin, async (req, res) => {
     }
 
     await user.update({ password });
+    createAuditLog(req.user.id, 'RESET_USER_PASSWORD', 'User', user.id, `Reset password for ${user.username}`, null, req);
 
     res.json({
       message: 'Password reset successfully',
@@ -802,6 +821,229 @@ router.post('/patch-videos', async (req, res) => {
       error: 'Error patching videos',
       details: error.message 
     });
+  }
+});
+
+// ==================== AUDIT LOGGING ENDPOINTS ====================
+
+// Get audit logs
+router.get('/audit-logs', auth, isAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, action = '', startDate, endDate } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereClause = {};
+    if (action) whereClause.action = action;
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) whereClause.createdAt[Op.gte] = new Date(startDate);
+      if (endDate) whereClause.createdAt[Op.lte] = new Date(endDate);
+    }
+
+    const { count, rows } = await AuditLog.findAndCountAll({
+      where: whereClause,
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    res.json({
+      logs: rows,
+      pagination: { total: count, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(count / limit) }
+    });
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    res.status(500).json({ error: 'Error fetching audit logs' });
+  }
+});
+
+// ==================== SYSTEM SETTINGS ENDPOINTS ====================
+
+// Get all system settings
+router.get('/system-settings', auth, isAdmin, async (req, res) => {
+  try {
+    const settings = await settingsService.getAllSettings();
+    res.json(settings);
+  } catch (error) {
+    console.error('Error fetching system settings:', error);
+    res.status(500).json({ error: 'Error fetching system settings' });
+  }
+});
+
+// Update system setting
+router.post('/system-settings/:key', auth, isAdmin, async (req, res) => {
+  try {
+    const { value, category = 'GENERAL', description } = req.body;
+    const { key } = req.params;
+
+    const setting = await settingsService.updateSetting(key, value, category, description, req.user.id);
+
+    // Log the setting change
+    await createAuditLog(
+      req.user.id,
+      'SETTINGS_CHANGED',
+      'SYSTEM',
+      null,
+      `System setting "${key}" updated`,
+      { key, value },
+      req
+    );
+
+    res.json({ message: 'Setting updated successfully', setting });
+  } catch (error) {
+    console.error('Error updating setting:', error);
+    res.status(500).json({ error: 'Error updating setting' });
+  }
+});
+
+// ==================== LOGIN ATTEMPTS ENDPOINTS ====================
+
+// Get login attempts
+router.get('/login-attempts', auth, isAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, email, ipAddress, successOnly = false } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereClause = {};
+    if (email) whereClause.email = email;
+    if (ipAddress) whereClause.ipAddress = ipAddress;
+    if (successOnly === 'true') whereClause.success = true;
+
+    const { count, rows } = await LoginAttempt.findAndCountAll({
+      where: whereClause,
+      order: [['timestamp', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    res.json({
+      attempts: rows,
+      pagination: { total: count, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(count / limit) }
+    });
+  } catch (error) {
+    console.error('Error fetching login attempts:', error);
+    res.status(500).json({ error: 'Error fetching login attempts' });
+  }
+});
+
+// ==================== CONTENT MODERATION ENDPOINTS ====================
+
+// Get pending content flags
+router.get('/content-flags', auth, isAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status = 'PENDING' } = req.query;
+    const offset = (page - 1) * limit;
+
+    let whereClause = {};
+    if (status) whereClause.status = status;
+
+    const { count, rows } = await ContentFlag.findAndCountAll({
+      where: whereClause,
+      order: [['flaggedAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    res.json({
+      flags: rows,
+      pagination: { total: count, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(count / limit) }
+    });
+  } catch (error) {
+    console.error('Error fetching content flags:', error);
+    res.status(500).json({ error: 'Error fetching content flags' });
+  }
+});
+
+// Flag content for moderation
+router.post('/content-flags', auth, async (req, res) => {
+  try {
+    const { contentId, contentType, reason, description } = req.body;
+
+    if (!contentId || !reason) {
+      return res.status(400).json({ error: 'contentId and reason are required' });
+    }
+
+    const flag = await moderationService.createFlag(contentId, contentType || 'H5P_CONTENT', reason, description, req.user?.id);
+
+    res.status(201).json({ message: 'Content flagged successfully', flag });
+  } catch (error) {
+    console.error('Error creating content flag:', error);
+    res.status(500).json({ error: 'Error flagging content' });
+  }
+});
+
+// Review and action a content flag
+router.put('/content-flags/:flagId', auth, isAdmin, async (req, res) => {
+  try {
+    const { status, action, reviewNotes } = req.body;
+    const { flagId } = req.params;
+
+    if (!status || !action) {
+      return res.status(400).json({ error: 'status and action are required' });
+    }
+
+    const flag = await moderationService.reviewFlag(flagId, status, action, reviewNotes, req.user.id);
+
+    // Log the moderation action
+    await createAuditLog(
+      req.user.id,
+      'CONTENT_FLAGGED',
+      'CONTENT',
+      flag.contentId,
+      `Content flag reviewed: ${status}`,
+      { action, reviewNotes },
+      req
+    );
+
+    res.json({ message: 'Flag reviewed successfully', flag });
+  } catch (error) {
+    console.error('Error reviewing content flag:', error);
+    res.status(500).json({ error: 'Error reviewing content flag' });
+  }
+});
+
+// Get moderation statistics
+router.get('/moderation-stats', auth, isAdmin, async (req, res) => {
+  try {
+    const stats = await moderationService.getModerationStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching moderation stats:', error);
+    res.status(500).json({ error: 'Error fetching moderation stats' });
+  }
+});
+
+// ==================== DASHBOARD SUMMARY ENDPOINTS ====================
+
+// Get admin dashboard summary
+router.get('/dashboard', auth, isAdmin, async (req, res) => {
+  try {
+    const totalUsers = await User.count();
+    const totalVideos = await Video.count();
+    const totalAdmins = await User.count({ where: { role: 'admin' } });
+    
+    const flaggedContent = await moderationService.getModerationStats();
+    const recentLogs = await AuditLog.findAll({ limit: 10, order: [['createdAt', 'DESC']] });
+    
+    const recentFailedLogins = await LoginAttempt.findAll({
+      where: { success: false },
+      limit: 5,
+      order: [['timestamp', 'DESC']]
+    });
+
+    res.json({
+      users: { total: totalUsers, admins: totalAdmins },
+      content: { totalVideos, flagged: flaggedContent.pending },
+      recentActivity: {
+        auditLogs: recentLogs.length,
+        failedLogins: recentFailedLogins.length
+      },
+      moderation: flaggedContent,
+      recentFailedLogins
+    });
+  } catch (error) {
+    console.error('Error fetching admin dashboard:', error);
+    res.status(500).json({ error: 'Error fetching dashboard' });
   }
 });
 

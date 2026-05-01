@@ -1,6 +1,6 @@
-const VIDEO_VISIT_KEY = 'reactivedu-video-last-visited';
+const VIDEO_VISIT_KEY = 'ai-activedu-video-last-visited';
 const LEGACY_VIDEO_VISIT_KEY = 'ai-activedu-video-last-visited';
-const VIDEO_VISIT_COUNT_KEY = 'reactivedu-video-visit-count';
+const VIDEO_VISIT_COUNT_KEY = 'ai-activedu-video-visit-count';
 
 function readObject<T extends Record<string, unknown>>(key: string): T {
   try {

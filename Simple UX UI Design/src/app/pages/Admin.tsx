@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { AlertCircle, Shield, Users, Plus, X, Ban, CheckCircle2, Trash2, AlertTriangle, Settings } from "lucide-react";
+import { AlertCircle, Home, Users, Plus, X, Ban, CheckCircle2, Trash2, AlertTriangle, Settings, FileText, LogIn } from "lucide-react";
 import { useAuthStore } from "../../lib/authStore";
 import {
   fetchAdminUsers,
@@ -8,11 +8,19 @@ import {
   toggleAdminUserStatus,
   createAdminUser,
   deleteAdminUser,
+  fetchAuditLogs,
+  fetchLoginAttempts,
+  fetchSystemSettings,
+  updateSystemSetting,
   type AdminUser,
+  type AuditLog,
+  type LoginAttempt,
+  type SystemSetting,
 } from "../../lib/api";
 
 function shortLastLoginAge(user: AdminUser, nowTs: number): string {
-  const sourceDate = user.lastLoginAt || user.updatedAt || user.createdAt;
+  if (!user.lastLoginAt) return "Never";
+  const sourceDate = user.lastLoginAt;
   const elapsedSeconds = Math.max(0, Math.floor((nowTs - new Date(sourceDate).getTime()) / 1000));
 
   if (elapsedSeconds < 60) {
@@ -51,6 +59,11 @@ function shortLastLoginAge(user: AdminUser, nowTs: number): string {
 export default function Admin() {
   const navigate = useNavigate();
   const { token, user } = useAuthStore();
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<"users" | "audit" | "logins" | "settings">("users");
+  
+  // Users tab state
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -66,6 +79,20 @@ export default function Admin() {
     role: "user" as "user" | "admin",
   });
 
+  // Audit logs tab state
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  // Login attempts tab state
+  const [loginAttempts, setLoginAttempts] = useState<LoginAttempt[]>([]);
+  const [loginPage, setLoginPage] = useState(1);
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Settings tab state
+  const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+
   useEffect(() => {
     if (!token) {
       navigate("/login");
@@ -76,32 +103,71 @@ export default function Admin() {
       return;
     }
 
-    const load = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await fetchAdminUsers();
-        setUsers(data.users);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load users");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (activeTab === "users") {
+      loadUsers();
+    } else if (activeTab === "audit") {
+      loadAuditLogs();
+    } else if (activeTab === "logins") {
+      loadLoginAttempts();
+    } else if (activeTab === "settings") {
+      loadSettings();
+    }
+  }, [token, user?.role, navigate, activeTab]);
 
-    load();
-  }, [token, user?.role, navigate]);
+  const loadUsers = async () => {
+    setIsLoading(true);
+    try {
+      const data = await fetchAdminUsers();
+      setUsers(data.users);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load users");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const data = await fetchAuditLogs(auditPage, 50);
+      setAuditLogs(data.logs);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load audit logs");
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const loadLoginAttempts = async () => {
+    setLoginLoading(true);
+    try {
+      const data = await fetchLoginAttempts(loginPage, 50);
+      setLoginAttempts(data.attempts);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load login attempts");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const loadSettings = async () => {
+    setSettingsLoading(true);
+    try {
+      const data = await fetchSystemSettings();
+      setSettings(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load settings");
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!contextMenu) return;
-
     const closeMenu = () => setContextMenu(null);
     const closeOnEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setContextMenu(null);
-      }
+      if (e.key === "Escape") setContextMenu(null);
     };
-
     window.addEventListener("click", closeMenu);
     window.addEventListener("keydown", closeOnEscape);
     return () => {
@@ -111,9 +177,7 @@ export default function Admin() {
   }, [contextMenu]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowTs(Date.now());
-    }, 60_000);
+    const timer = window.setInterval(() => setNowTs(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -122,17 +186,13 @@ export default function Admin() {
     const matchingUsers = q
       ? users.filter((u) => u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
       : users;
-
     const now = Date.now();
     const loginAgeSeconds = (u: AdminUser) => {
       const sourceDate = u.lastLoginAt || u.updatedAt || u.createdAt;
       return Math.max(0, Math.floor((now - new Date(sourceDate).getTime()) / 1000));
     };
-
     return [...matchingUsers].sort((a, b) => {
-      if (a.isActive !== b.isActive) {
-        return a.isActive ? -1 : 1;
-      }
+      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
       return loginAgeSeconds(a) - loginAgeSeconds(b);
     });
   }, [users, search]);
@@ -165,7 +225,6 @@ export default function Admin() {
   const handleDeleteUser = async (id: string) => {
     const ok = window.confirm("Delete this account permanently?");
     if (!ok) return;
-
     try {
       await deleteAdminUser(id);
       setUsers((prev) => prev.filter((u) => u.id !== id));
@@ -181,7 +240,6 @@ export default function Admin() {
       setError("All fields are required");
       return;
     }
-
     setIsCreating(true);
     try {
       const result = await createAdminUser(
@@ -201,184 +259,343 @@ export default function Admin() {
     }
   };
 
+  const handleUpdateSetting = async (key: string, value: unknown) => {
+    try {
+      await updateSystemSetting(key, value);
+      await loadSettings();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update setting");
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-      <div className="flex items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Admin Console</h1>
-          <p className="text-slate-600 text-[15px]">Manage accounts, access levels, and activation status.</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => navigate("/app/dashboard")}
+            className="flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            Home
+          </button>
+          <span className="text-base font-semibold text-slate-800">Admin Console</span>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-100 text-blue-800 px-4 py-2 font-semibold text-sm">
-          <Shield className="w-4 h-4" />
-          Administrator
-        </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border-2 border-slate-600 rounded-xl p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Total Accounts</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{summary.total}</p>
-        </div>
-        <div className="bg-white border-2 border-green-600 rounded-xl p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Active Accounts</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{summary.active}</p>
-        </div>
-        <div className="bg-white border-2 border-orange-600 rounded-xl p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Administrator Accounts</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{summary.administrators}</p>
-        </div>
-        <div className="bg-white border-2 border-blue-600 rounded-xl p-4">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Teacher Accounts</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{summary.teachers}</p>
-        </div>
-      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 font-semibold text-slate-800">
-            <Users className="w-4 h-4" />
-            Accounts Management
+        {error && (
+          <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+            <AlertCircle className="w-5 h-5" />
+            {error}
+            <button onClick={() => setError(null)} className="ml-auto text-red-600 hover:text-red-700">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search username or email"
-              className="w-[26rem] max-w-[60vw] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
-            />
+        )}
+
+        {/* Tab Navigation */}
+        <div className="mb-6 flex gap-2 border-b border-slate-200 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors whitespace-nowrap ${
+              activeTab === "users"
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Users
+          </button>
+          <button
+            onClick={() => setActiveTab("audit")}
+            className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors whitespace-nowrap ${
+              activeTab === "audit"
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Audit Logs
+          </button>
+          <button
+            onClick={() => setActiveTab("logins")}
+            className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors whitespace-nowrap ${
+              activeTab === "logins"
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <LogIn className="w-4 h-4" />
+            Login Attempts
+          </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors whitespace-nowrap ${
+              activeTab === "settings"
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </button>
+        </div>
+
+        {/* Users Tab */}
+        {activeTab === "users" && (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white border-2 border-slate-600 rounded-xl p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Total Accounts</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{summary.total}</p>
+              </div>
+              <div className="bg-white border-2 border-green-600 rounded-xl p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Active Accounts</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{summary.active}</p>
+              </div>
+              <div className="bg-white border-2 border-orange-600 rounded-xl p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Admins</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{summary.administrators}</p>
+              </div>
+              <div className="bg-white border-2 border-blue-600 rounded-xl p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Teachers</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{summary.teachers}</p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                  <Users className="w-4 h-4" />
+                  Accounts Management
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search username or email"
+                    className="w-[26rem] max-w-[60vw] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                  />
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Account
+                  </button>
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div className="p-8 text-slate-500 text-center">Loading accounts...</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold">Username</th>
+                        <th className="text-left px-4 py-3 font-semibold">Email</th>
+                        <th className="text-left px-4 py-3 font-semibold">Role</th>
+                        <th className="text-left px-4 py-3 font-semibold">Status</th>
+                        <th className="text-left px-4 py-3 font-semibold">Last Login</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((u) => (
+                        <tr
+                          key={u.id}
+                          className="border-t border-slate-100 hover:bg-slate-50/70 cursor-context-menu"
+                          onContextMenu={(e) => { e.preventDefault(); setContextMenu({ user: u }); }}
+                        >
+                          <td className="px-4 py-3 text-slate-800 font-medium">{u.username}</td>
+                          <td className="px-4 py-3 text-slate-600">{u.email}</td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u.id, e.target.value as "user" | "admin")}
+                              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
+                            >
+                              <option value="user">Teacher</option>
+                              <option value="admin">Administrator</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${u.isActive ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+                              {u.isActive ? "Active" : "Deactivated"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 font-medium">{shortLastLoginAge(u, nowTs)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Audit Logs Tab */}
+        {activeTab === "audit" && (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <div className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                <FileText className="w-4 h-4" />
+                Audit Logs
+              </div>
+            </div>
+            {auditLoading ? (
+              <div className="p-8 text-slate-500 text-center">Loading audit logs...</div>
+            ) : auditLogs.length === 0 ? (
+              <div className="p-8 text-slate-500 text-center">No audit logs found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-semibold">Admin</th>
+                      <th className="text-left px-4 py-3 font-semibold">Action</th>
+                      <th className="text-left px-4 py-3 font-semibold">Target</th>
+                      <th className="text-left px-4 py-3 font-semibold">IP Address</th>
+                      <th className="text-left px-4 py-3 font-semibold">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log) => (
+                      <tr key={log.id} className="border-t border-slate-100 hover:bg-slate-50/70">
+                        <td className="px-4 py-3 text-slate-800 font-medium">{log.adminId}</td>
+                        <td className="px-4 py-3 text-slate-700">{log.action}</td>
+                        <td className="px-4 py-3 text-slate-600">{log.targetType} {log.targetId ? `(${log.targetId})` : ""}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{log.ipAddress || "N/A"}</td>
+                        <td className="px-4 py-3 text-slate-600">{new Date(log.createdAt).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Login Attempts Tab */}
+        {activeTab === "logins" && (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <div className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                <LogIn className="w-4 h-4" />
+                Login Attempts
+              </div>
+            </div>
+            {loginLoading ? (
+              <div className="p-8 text-slate-500 text-center">Loading login attempts...</div>
+            ) : loginAttempts.length === 0 ? (
+              <div className="p-8 text-slate-500 text-center">No login attempts found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-semibold">Email</th>
+                      <th className="text-left px-4 py-3 font-semibold">IP Address</th>
+                      <th className="text-left px-4 py-3 font-semibold">Status</th>
+                      <th className="text-left px-4 py-3 font-semibold">Reason</th>
+                      <th className="text-left px-4 py-3 font-semibold">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loginAttempts.map((attempt) => (
+                      <tr key={attempt.id} className="border-t border-slate-100 hover:bg-slate-50/70">
+                        <td className="px-4 py-3 text-slate-800 font-medium">{attempt.email || "Unknown"}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{attempt.ipAddress}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${attempt.success ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+                            {attempt.success ? "Success" : "Failed"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 text-xs">{attempt.failureReason || "-"}</td>
+                        <td className="px-4 py-3 text-slate-600">{new Date(attempt.timestamp).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === "settings" && (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <div className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                <Settings className="w-4 h-4" />
+                System Settings
+              </div>
+            </div>
+            {settingsLoading ? (
+              <div className="p-8 text-slate-500 text-center">Loading settings...</div>
+            ) : settings.length === 0 ? (
+              <div className="p-8 text-slate-500 text-center">No settings found</div>
+            ) : (
+              <div className="p-6 space-y-4">
+                {settings.map((setting) => (
+                  <div key={setting.id} className="border border-slate-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="font-semibold text-slate-900">{setting.key}</h3>
+                        <p className="text-sm text-slate-600 mt-1">{setting.description || "No description"}</p>
+                      </div>
+                      <input
+                        type="text"
+                        defaultValue={String(setting.value)}
+                        onBlur={(e) => handleUpdateSetting(setting.key, e.target.value)}
+                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {contextMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setContextMenu(null)}
+        >
+          <div
+            className="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[180px]"
+            style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-2 border-b border-slate-100">
+              <p className="font-semibold text-slate-900 text-sm">{contextMenu.user.username}</p>
+              <p className="text-xs text-slate-500">{contextMenu.user.email}</p>
+            </div>
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
+              type="button"
+              onClick={() => { handleToggleStatus(contextMenu.user.id); setContextMenu(null); }}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              Create Account
+              {contextMenu.user.isActive
+                ? <><Ban className="w-4 h-4 text-orange-500" /> Deactivate</>
+                : <><CheckCircle2 className="w-4 h-4 text-green-500" /> Activate</>}
+            </button>
+            <button
+              type="button"
+              onClick={() => { handleDeleteUser(contextMenu.user.id); setContextMenu(null); }}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" /> Delete account
             </button>
           </div>
         </div>
-
-        {error && (
-          <div className="mx-4 my-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-            <AlertCircle className="w-4 h-4" />
-            {error}
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="p-8 text-slate-500 text-center">Loading accounts...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="text-left px-4 py-3 font-semibold">Username</th>
-                  <th className="text-left px-4 py-3 font-semibold">Email</th>
-                  <th className="text-left px-4 py-3 font-semibold">Role</th>
-                  <th className="text-left px-4 py-3 font-semibold">Status</th>
-                  <th className="text-left px-4 py-3 font-semibold">Last Login</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="border-t border-slate-100 hover:bg-slate-50/70"
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({ user: u });
-                    }}
-                  >
-                    <td className="px-4 py-3 text-slate-800 font-medium">
-                      <div className="relative flex flex-col gap-1">
-                        <span>{u.username}</span>
-                        {u.suspicious && (
-                          <div className="relative group w-fit">
-                            <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" />
-                              Warning: suspicious activity
-                            </p>
-                            <div className="hidden group-hover:block absolute top-full left-0 mt-1 z-20 w-72 p-3 rounded-lg border border-red-200 bg-white text-slate-700 text-xs shadow-lg">
-                              <p className="font-bold text-red-700 mb-1">Why flagged</p>
-                              <p className="mb-2">{u.suspiciousReason || "Unusual activity detected"}</p>
-                              {u.recentActivity && u.recentActivity.length > 0 && (
-                                <>
-                                  <p className="font-bold text-slate-800 mb-1">Recent activity</p>
-                                  <ul className="list-disc pl-4 space-y-0.5">
-                                    {u.recentActivity.map((item, idx) => (
-                                      <li key={`${u.id}-activity-${idx}`}>{item}</li>
-                                    ))}
-                                  </ul>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {contextMenu?.user.id === u.id && (
-                          <div
-                            className="absolute left-0 top-full mt-2 z-40 min-w-44 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              onClick={() => {
-                                navigate(`/app/admin/users/${contextMenu.user.id}/settings`);
-                                setContextMenu(null);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
-                            >
-                              <Settings className="w-4 h-4 text-slate-600" />
-                              Settings
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleToggleStatus(contextMenu.user.id);
-                                setContextMenu(null);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
-                            >
-                              {contextMenu.user.isActive ? <Ban className="w-4 h-4 text-amber-600" /> : <CheckCircle2 className="w-4 h-4 text-green-600" />}
-                              {contextMenu.user.isActive ? "Deactivate" : "Activate"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleDeleteUser(contextMenu.user.id);
-                                setContextMenu(null);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded-lg"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete account
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={u.role}
-                        onChange={(e) => handleRoleChange(u.id, e.target.value as "user" | "admin")}
-                        aria-label={`Role for ${u.username}`}
-                        title={`Role for ${u.username}`}
-                        className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
-                      >
-                        <option value="user">Teacher</option>
-                        <option value="admin">Administrator</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${u.isActive ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
-                        {u.isActive ? "Active" : "Deactivated"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 font-medium">
-                      {shortLastLoginAge(u, nowTs)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -389,24 +606,14 @@ export default function Admin() {
                 onClick={() => {
                   setShowCreateModal(false);
                   setCreateFormData({ username: "", email: "", password: "", role: "user" });
-                  setError(null);
                 }}
                 className="text-slate-400 hover:text-slate-600"
-                title="Close dialog"
-                aria-label="Close create account dialog"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateUser} className="p-6 space-y-4">
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {error}
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Username</label>
                 <input
@@ -414,11 +621,9 @@ export default function Admin() {
                   value={createFormData.username}
                   onChange={(e) => setCreateFormData({ ...createFormData, username: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
-                  placeholder="username"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
                 <input
@@ -426,11 +631,9 @@ export default function Admin() {
                   value={createFormData.email}
                   onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
-                  placeholder="email@example.com"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
                 <input
@@ -438,40 +641,31 @@ export default function Admin() {
                   value={createFormData.password}
                   onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
-                  placeholder="••••••••"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Role</label>
                 <select
                   value={createFormData.role}
                   onChange={(e) => setCreateFormData({ ...createFormData, role: e.target.value as "user" | "admin" })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
-                  title="Select user role"
-                  aria-label="User role"
                 >
                   <option value="user">Teacher</option>
                   <option value="admin">Administrator</option>
                 </select>
               </div>
-
               <div className="flex items-center gap-2 pt-2">
                 <button
                   type="submit"
                   disabled={isCreating}
                   className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold rounded-lg transition-colors"
                 >
-                  {isCreating ? "Creating..." : "Create Account"}
+                  {isCreating ? "Creating..." : "Create"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setCreateFormData({ username: "", email: "", password: "", role: "user" });
-                    setError(null);
-                  }}
+                  onClick={() => setShowCreateModal(false)}
                   className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors"
                 >
                   Cancel

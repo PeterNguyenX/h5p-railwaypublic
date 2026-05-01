@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const User = require("../models/User");
 const { auth } = require("../middleware/auth");
+const { LoginAttempt } = require("../models");
 const { validate } = require('../middleware/validate');
 const {
   registerSchema,
@@ -122,6 +123,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       },
     });
     if (!user) {
+      LoginAttempt.create({ email: usernameOrEmail, ipAddress: req.ip || req.headers['x-forwarded-for'], success: false, failureReason: 'INVALID_CREDENTIALS' }).catch(() => {});
       return res.status(401).json({
         message: "Invalid username/email or password",
       });
@@ -146,13 +148,14 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       });
     }
     if (!isMatch) {
+      LoginAttempt.create({ email: user.email, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: false, failureReason: 'INVALID_CREDENTIALS' }).catch(() => {});
       return res.status(401).json({
         message: "Invalid username/email or password",
       });
     }
 
-    // Track last successful login using updatedAt.
-    await user.update({ updatedAt: new Date() });
+    LoginAttempt.create({ email: user.email, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: true }).catch(() => {});
+    await user.update({ lastLoginAt: new Date() });
 
     // Generate token
     const token = jwt.sign(

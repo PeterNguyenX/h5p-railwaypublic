@@ -40,6 +40,11 @@ const User = sequelize.define('User', {
   resetTokenExpiry: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  lastLoginAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null
   }
 }, {
   hooks: {

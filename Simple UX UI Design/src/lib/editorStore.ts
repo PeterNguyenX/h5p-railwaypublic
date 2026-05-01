@@ -3,7 +3,7 @@ import type { AISuggestion, TranscriptSegment, Video, H5PContent, TopicNode, Top
 import { streamAnalysis, injectSuggestions, fetchH5PContent, deleteH5PContent } from '../lib/api';
 
 const COLLISION_THRESHOLD = 5; // seconds
-const WINDOW_SIZE = 30; // seconds — max 1 H5P interaction per 30-second window
+const WINDOW_SIZE = 30; // seconds — min gap between H5P interactions
 
 const H5P_TYPE_MAP: Record<string, string> = {
   MultiChoice: 'H5P.MultiChoice 1.16',
@@ -34,25 +34,27 @@ function buildSuggestion(question: TopicQuestion, timestamp: number, nodeTitle: 
   };
 }
 
-function extractSuggestions(topics: TopicNode[], existingTimestamps: number[]): AISuggestion[] {
-  const occupiedWindows = new Set(existingTimestamps.map((t) => Math.floor(t / WINDOW_SIZE)));
+function extractSuggestions(topics: TopicNode[], existingTimestamps: number[], videoDuration?: number): AISuggestion[] {
+  const allUsedTimestamps = [...existingTimestamps];
   const suggestions: AISuggestion[] = [];
 
   function walk(node: TopicNode) {
-    if (node.question) {
-      const timestamp = Math.round(node.end) + 1;
-      const bucket = Math.floor(timestamp / WINDOW_SIZE);
-      const tooClose = existingTimestamps.some((t) => Math.abs(t - timestamp) < COLLISION_THRESHOLD);
-      if (!occupiedWindows.has(bucket) && !tooClose) {
-        occupiedWindows.add(bucket);
-        suggestions.push(buildSuggestion(node.question, timestamp, node.title));
-      }
-    }
     node.subtopics?.forEach(walk);
+
+    if (node.question) {
+      let timestamp = Math.round(node.end) + 1;
+      while (allUsedTimestamps.some((t) => Math.abs(t - timestamp) < WINDOW_SIZE)) {
+        timestamp += WINDOW_SIZE;
+      }
+      // Drop if offset pushed past video end
+      if (videoDuration && timestamp >= videoDuration - 2) return;
+      allUsedTimestamps.push(timestamp);
+      suggestions.push(buildSuggestion(node.question, timestamp, node.title));
+    }
   }
 
   topics.forEach(walk);
-  return suggestions;
+  return suggestions.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 interface EditorStore {
@@ -82,6 +84,7 @@ interface EditorStore {
   analyzeError: string | null;
   runAnalysis: (videoId: string) => () => void;
   resetAnalysis: () => void;
+  resetEditor: () => void;
 
   // Injection
   isInjecting: boolean;
@@ -157,7 +160,14 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         case 'result': {
           const topics = (event as { type: string; topics?: TopicNode[] }).topics ?? [];
           const existingTimestamps = get().h5pContents.map((c) => c.timestamp);
-          const suggestions = extractSuggestions(topics, existingTimestamps);
+          // duration comes from the API as "M:SS" string — parse to seconds
+          const rawDuration = get().video?.duration as string | number | undefined;
+          const videoDurationSec = typeof rawDuration === 'number'
+            ? rawDuration
+            : typeof rawDuration === 'string'
+              ? rawDuration.split(':').reduce((acc, part, i, arr) => acc + parseInt(part) * Math.pow(60, arr.length - 1 - i), 0)
+              : undefined;
+          const suggestions = extractSuggestions(topics, existingTimestamps, videoDurationSec);
 
           set({
             topics,
@@ -188,7 +198,26 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     return cleanup;
   },
 
-  resetAnalysis: () => set({ suggestions: [], progressMessage: '', analyzeError: null, streamedText: '', analysisProgress: 0 }),
+  resetAnalysis: () => set({ suggestions: [], progressMessage: '', analyzeError: null, streamedText: '', analysisProgress: 0, isAnalyzing: false }),
+
+  resetEditor: () => set({
+    video: null,
+    h5pContents: [],
+    segments: [],
+    transcriptFilename: null,
+    topics: [],
+    suggestions: [],
+    isAnalyzing: false,
+    analysisProgress: 0,
+    progressMessage: '',
+    streamedText: '',
+    analyzeError: null,
+    isInjecting: false,
+    injectProgress: 0,
+    injectError: null,
+    lastInjectCount: 0,
+    currentTime: 0,
+  }),
 
   isInjecting: false,
   injectProgress: 0,

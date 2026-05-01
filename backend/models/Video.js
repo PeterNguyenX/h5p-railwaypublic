@@ -78,6 +78,11 @@ const Video = sequelize.define('Video', {
   language: {
     type: DataTypes.ENUM('en', 'vi'),
     defaultValue: 'en'
+  },
+  trashedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null
   }
 }, {
   // REQ-7: B-tree indexes on foreign keys and common filter/sort columns
