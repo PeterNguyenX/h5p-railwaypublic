@@ -83,6 +83,11 @@ const Video = sequelize.define('Video', {
     type: DataTypes.DATE,
     allowNull: true,
     defaultValue: null
+  },
+  aiProcessedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null
   }
 }, {
   // REQ-7: B-tree indexes on foreign keys and common filter/sort columns

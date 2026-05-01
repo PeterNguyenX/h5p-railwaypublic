@@ -76,22 +76,30 @@ router.get('/users', auth, isAdmin, async (req, res) => {
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [['createdAt', 'DESC']],
-      attributes: ['id', 'username', 'email', 'password', 'role', 'isActive', 'createdAt', 'updatedAt']
+      attributes: ['id', 'username', 'email', 'role', 'isActive', 'createdAt', 'updatedAt', 'lastLoginAt']
     });
 
-    // Fetch video counts per user using a plain loop (dialect-safe)
+    // Fetch per-user video stats
     const userIds = rows.map(u => u.id);
-    const videoCounts = {};
+    const videoStats = {};
     if (userIds.length > 0) {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
       await Promise.all(userIds.map(async (uid) => {
-        videoCounts[uid] = await Video.count({ where: { userId: uid } });
+        const [total, trashed, aiToday, aiEver] = await Promise.all([
+          Video.count({ where: { userId: uid } }),
+          Video.count({ where: { userId: uid, trashedAt: { [Op.ne]: null } } }),
+          Video.count({ where: { userId: uid, aiProcessedAt: { [Op.between]: [todayStart, todayEnd] } } }),
+          Video.count({ where: { userId: uid, aiProcessedAt: { [Op.ne]: null } } }),
+        ]);
+        videoStats[uid] = { total, trashed, aiToday, aiEver };
       }));
     }
 
     const now = Date.now();
     const users = rows.map((user) => {
-      const lastLoginAt = user.lastLoginAt || user.createdAt;
-      const lastLoginDays = Math.max(0, Math.floor((now - new Date(lastLoginAt).getTime()) / (1000 * 60 * 60 * 24)));
+      const lastLoginAt = user.lastLoginAt || null;
+      const lastLoginDays = lastLoginAt ? Math.max(0, Math.floor((now - new Date(lastLoginAt).getTime()) / (1000 * 60 * 60 * 24))) : 9999;
 
       const suspiciousReasons = [];
       const recentActivity = [];
@@ -127,7 +135,10 @@ router.get('/users', auth, isAdmin, async (req, res) => {
         updatedAt: user.updatedAt,
         lastLoginAt,
         lastLoginDays,
-        videoCount: videoCounts[user.id] || 0,
+        videoCount: videoStats[user.id]?.total || 0,
+        videoTrashCount: videoStats[user.id]?.trashed || 0,
+        aiProcessedToday: videoStats[user.id]?.aiToday || 0,
+        aiProcessedEver: videoStats[user.id]?.aiEver || 0,
         suspicious: suspiciousReasons.length > 0,
         suspiciousReason: suspiciousReasons.join('; '),
         recentActivity,

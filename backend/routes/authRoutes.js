@@ -148,13 +148,13 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       });
     }
     if (!isMatch) {
-      LoginAttempt.create({ email: user.email, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: false, failureReason: 'INVALID_CREDENTIALS' }).catch(() => {});
+      LoginAttempt.create({ email: user.email, username: user.username, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: false, failureReason: 'INVALID_CREDENTIALS' }).catch(() => {});
       return res.status(401).json({
         message: "Invalid username/email or password",
       });
     }
 
-    LoginAttempt.create({ email: user.email, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: true }).catch(() => {});
+    LoginAttempt.create({ email: user.email, username: user.username, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: true }).catch(() => {});
     await user.update({ lastLoginAt: new Date() });
 
     // Generate token

@@ -13,6 +13,7 @@ import {
   fetchVideo, uploadVideo, importYoutube, parseTranscript,
   extractTranscriptFromVideo, whisperTranscribeVideo, exportH5P,
   uploadH5PFile, createH5PContent, updateH5PContent, updateVideoTitle,
+  fetchAIUsage,
 } from "../../lib/api";
 import type { H5PContent, TopicNode } from "../../lib/api";
 import { recordVideoVisit } from "../../lib/videoVisit";
@@ -1306,6 +1307,7 @@ export default function Editor() {
   const [titleDraft, setTitleDraft] = useState("");
   const [showAIConfirm, setShowAIConfirm] = useState(false);
   const [pendingAIAction, setPendingAIAction] = useState<(() => void) | null>(null);
+  const [aiUsage, setAiUsage] = useState<{ usedToday: number; limit: number | null; isAdmin: boolean } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1331,6 +1333,18 @@ export default function Editor() {
   const videoDurationRef = useRef(0);
 
   useEffect(() => { if (!token) navigate("/"); }, [token, navigate]);
+
+  useEffect(() => {
+    fetchAIUsage().then(setAiUsage).catch(() => {});
+  }, []);
+
+  const prevIsAnalyzing = useRef(false);
+  useEffect(() => {
+    if (prevIsAnalyzing.current && !store.isAnalyzing) {
+      fetchAIUsage().then(setAiUsage).catch(() => {});
+    }
+    prevIsAnalyzing.current = store.isAnalyzing;
+  }, [store.isAnalyzing]);
 
   useEffect(() => {
     if (!id) {
@@ -2037,6 +2051,11 @@ export default function Editor() {
                       <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-4 h-4 text-blue-600" />
                         <h3 className="font-bold text-slate-800 text-base">AI Transcribing &amp; Applying H5P</h3>
+                        {aiUsage && (
+                          aiUsage.isAdmin
+                            ? <span className="ml-auto text-xs text-slate-400">Unlimited</span>
+                            : <span className={`ml-auto text-xs font-semibold ${aiUsage.usedToday >= (aiUsage.limit ?? 3) ? 'text-red-500' : 'text-slate-400'}`}>{aiUsage.usedToday}/{aiUsage.limit} today</span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500">
                         One click: transcribe your video, generate H5P questions with AI, and apply them automatically.
@@ -2063,14 +2082,16 @@ export default function Editor() {
                         return (
                           <>
                             {!isRunning && !isDone && (
-                              <button
-                                type="button"
-                                onClick={handleTranscribeAndGenerate}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
-                              >
-                                <Sparkles className="w-4 h-4" />
-                                Transcribe &amp; Generate H5P with AI
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={handleTranscribeAndGenerate}
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+                                >
+                                  <Sparkles className="w-4 h-4" />
+                                  Transcribe &amp; Generate H5P with AI
+                                </button>
+                              </>
                             )}
                             {isRunning && (
                               <div className="space-y-2">

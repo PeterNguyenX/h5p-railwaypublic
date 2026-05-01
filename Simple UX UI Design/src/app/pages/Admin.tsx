@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { AlertCircle, Home, Users, Plus, X, Ban, CheckCircle2, Trash2, AlertTriangle, Settings, FileText, LogIn } from "lucide-react";
+import { AlertCircle, Home, Users, Plus, X, Ban, CheckCircle2, Trash2, AlertTriangle, Settings, FileText, LogIn, Search } from "lucide-react";
 import { useAuthStore } from "../../lib/authStore";
 import {
   fetchAdminUsers,
@@ -66,6 +66,7 @@ export default function Admin() {
   // Users tab state
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -373,12 +374,35 @@ export default function Admin() {
                   Accounts Management
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search username or email"
-                    className="w-[26rem] max-w-[60vw] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
-                  />
+                  <div className="flex items-center">
+                    {searchOpen ? (
+                      <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 focus-within:ring-2 focus-within:ring-blue-600/20 focus-within:border-blue-600 transition-all">
+                        <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <input
+                          autoFocus
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          onBlur={() => { if (!search) setSearchOpen(false); }}
+                          placeholder="Search username or email"
+                          className="w-52 py-2 px-1 bg-transparent text-sm outline-none"
+                        />
+                        {search && (
+                          <button type="button" title="Clear search" onClick={() => { setSearch(""); }} className="text-slate-400 hover:text-slate-600">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSearchOpen(true)}
+                        className="flex items-center gap-1.5 h-9 px-3 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-colors"
+                      >
+                        <Search className="w-4 h-4" />
+                        Search
+                      </button>
+                    )}
+                  </div>
                   <button
                     onClick={() => setShowCreateModal(true)}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
@@ -396,11 +420,14 @@ export default function Admin() {
                   <table className="min-w-full text-sm">
                     <thead className="bg-slate-50 text-slate-600">
                       <tr>
-                        <th className="text-left px-4 py-3 font-semibold">Username</th>
-                        <th className="text-left px-4 py-3 font-semibold">Email</th>
+                        <th className="text-left px-4 py-3 font-semibold">Account</th>
                         <th className="text-left px-4 py-3 font-semibold">Role</th>
                         <th className="text-left px-4 py-3 font-semibold">Status</th>
                         <th className="text-left px-4 py-3 font-semibold">Last Login</th>
+                        <th className="text-right px-4 py-3 font-semibold">Videos</th>
+                        <th className="text-right px-4 py-3 font-semibold">Trash</th>
+                        <th className="text-right px-4 py-3 font-semibold">AI Today</th>
+                        <th className="text-right px-4 py-3 font-semibold">AI Ever</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -410,8 +437,10 @@ export default function Admin() {
                           className="border-t border-slate-100 hover:bg-slate-50/70 cursor-context-menu"
                           onContextMenu={(e) => { e.preventDefault(); setContextMenu({ user: u }); }}
                         >
-                          <td className="px-4 py-3 text-slate-800 font-medium">{u.username}</td>
-                          <td className="px-4 py-3 text-slate-600">{u.email}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-slate-800">{u.username}</div>
+                            <div className="text-xs text-slate-400 mt-0.5">{u.email}</div>
+                          </td>
                           <td className="px-4 py-3">
                             <select
                               value={u.role}
@@ -428,6 +457,14 @@ export default function Admin() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-slate-700 font-medium">{shortLastLoginAge(u, nowTs)}</td>
+                          <td className="px-4 py-3 text-right text-slate-700">{u.videoCount ?? 0}</td>
+                          <td className="px-4 py-3 text-right text-slate-500">{u.videoTrashCount ?? 0}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`font-semibold ${(u.aiProcessedToday ?? 0) >= 3 && u.role !== 'admin' ? 'text-red-500' : 'text-slate-700'}`}>
+                              {u.role === 'admin' ? '∞' : `${u.aiProcessedToday ?? 0}/3`}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-700">{u.aiProcessedEver ?? 0}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -498,7 +535,7 @@ export default function Admin() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
-                      <th className="text-left px-4 py-3 font-semibold">Email</th>
+                      <th className="text-left px-4 py-3 font-semibold">Account</th>
                       <th className="text-left px-4 py-3 font-semibold">IP Address</th>
                       <th className="text-left px-4 py-3 font-semibold">Status</th>
                       <th className="text-left px-4 py-3 font-semibold">Reason</th>
@@ -508,7 +545,10 @@ export default function Admin() {
                   <tbody>
                     {loginAttempts.map((attempt) => (
                       <tr key={attempt.id} className="border-t border-slate-100 hover:bg-slate-50/70">
-                        <td className="px-4 py-3 text-slate-800 font-medium">{attempt.email || "Unknown"}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-800">{attempt.username || attempt.email || "Unknown"}</div>
+                          {attempt.username && <div className="text-xs text-slate-400 mt-0.5">{attempt.email}</div>}
+                        </td>
                         <td className="px-4 py-3 text-slate-600 font-mono text-xs">{attempt.ipAddress}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${attempt.success ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>

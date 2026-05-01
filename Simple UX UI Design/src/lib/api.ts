@@ -302,6 +302,14 @@ export type SSEPayload =
   | { type: 'usage'; inputTokens: number; outputTokens: number }
   | { type: 'error'; message: string };
 
+export async function fetchAIUsage(): Promise<{ usedToday: number; limit: number | null; isAdmin: boolean }> {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/ai/usage`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.json();
+}
+
 /**
  * Stream AI analysis via SSE. Returns a cleanup function.
  */
@@ -489,6 +497,9 @@ export interface AdminUser {
   lastLoginAt?: string;
   lastLoginDays?: number;
   videoCount?: number;
+  videoTrashCount?: number;
+  aiProcessedToday?: number;
+  aiProcessedEver?: number;
   suspicious?: boolean;
   suspiciousReason?: string;
   recentActivity?: string[];
@@ -651,6 +662,7 @@ export async function updateSystemSetting(key: string, value: unknown, category 
 export interface LoginAttempt {
   id: string;
   userId?: string;
+  username?: string;
   email?: string;
   ipAddress: string;
   success: boolean;

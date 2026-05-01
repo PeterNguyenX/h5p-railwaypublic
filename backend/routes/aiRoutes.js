@@ -58,6 +58,21 @@ router.get('/status', async (req, res) => {
  * Body: { segments: TranscriptSegment[], videoId: string }
  * Response: { topics: TopicNode[] }
  */
+router.get('/usage', auth, async (req, res) => {
+  try {
+    const { Video } = require('../models');
+    const { Op } = require('sequelize');
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+    const usedToday = await Video.count({
+      where: { userId: req.user.id, aiProcessedAt: { [Op.between]: [todayStart, todayEnd] } },
+    });
+    res.json({ usedToday, limit: req.user.role === 'admin' ? null : 3, isAdmin: req.user.role === 'admin' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/analyze', auth, async (req, res) => {
   try {
     const parsed = analyzeRequestSchema.safeParse(req.body);
@@ -133,6 +148,26 @@ router.post('/analyze-stream', auth, async (req, res) => {
     if (video.userId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized access to this video' });
     }
+
+    // Daily AI limit: 3 videos/day for non-admin users
+    if (req.user.role !== 'admin') {
+      const { Op } = require('sequelize');
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+      const usedToday = await Video.count({
+        where: {
+          userId: req.user.id,
+          aiProcessedAt: { [Op.between]: [todayStart, todayEnd] },
+          id: { [Op.ne]: videoId },
+        },
+      });
+      if (usedToday >= 3) {
+        return res.status(429).json({ error: 'Daily AI limit reached. You can process up to 3 videos per day.' });
+      }
+    }
+
+    // Stamp the video immediately so concurrent requests don't bypass the limit
+    await video.update({ aiProcessedAt: new Date() });
 
     // Use the unified provider router: Groq → Ollama → Claude
     await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res, videoId, video);
