@@ -38,7 +38,12 @@
       "Bash(python3 -c \"import sys,json; print\\('Backend:', json.load\\(sys.stdin\\).get\\('status'\\)\\)\")",
       "Bash(curl -s http://localhost:11434/api/version)",
       "Bash(pkill -f \"node.*server\")",
-      "Bash(npm start *)"
+      "Bash(npm start *)",
+      "Bash(dir \"d:\\\\5 Cloud storage\\\\OneDrive\\\\1 Working Projects\\\\Other docs\\\\GitHub\\\\h5p-railwaypublic\" /ad)",
+      "Bash(Get-ChildItem -Path \"d:\\\\5 Cloud storage\\\\OneDrive\\\\1 Working Projects\\\\Other docs\\\\GitHub\\\\h5p-railwaypublic\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "PowerShell(Get-Command node -ErrorAction SilentlyContinue; Get-Command npm -ErrorAction SilentlyContinue; [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\) -split \";\" | Select-String -Pattern \"node|npm\" -SimpleMatch)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:APPDATA\\\\npm\\\\npm.cmd\" -ErrorAction SilentlyContinue; where.exe node 2>$null; where.exe npm 2>$null)"
     ]
   }
 }

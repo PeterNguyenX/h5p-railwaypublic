@@ -610,7 +610,7 @@ export default function Dashboard() {
                       />
                     ) : (
                       <>
-                        <h3 className="font-bold text-[17px] text-slate-900 line-clamp-1 flex-1">{video.title}</h3>
+                        <h3 className={`font-bold text-slate-900 leading-tight flex-1 ${video.title.length > 60 ? 'text-[11px]' : video.title.length > 40 ? 'text-[13px]' : video.title.length > 25 ? 'text-[15px]' : 'text-[17px]'}`}>{video.title}</h3>
                         {selectedFolder !== "trash" && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setTitleDraft(video.title); setEditingTitleId(video.id); }}
@@ -623,7 +623,6 @@ export default function Dashboard() {
                       </>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500">Opened {relativeTime(visits[video.id])}</p>
 
                   {selectedFolder === "trash" && (
                     <div className="mt-3 flex items-center gap-2">

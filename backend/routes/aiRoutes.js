@@ -35,8 +35,13 @@ router.get('/status', async (req, res) => {
 
   const ollamaOk = await isOllamaAvailable();
 
-  const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
-  const pythonBin = fs.existsSync(venvPython) ? venvPython : 'python3';
+  const venvPythonUnix = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
+  const venvPythonWin = path.join(__dirname, '..', '..', '.venv', 'Scripts', 'python.exe');
+  const systemPythonWin = 'C:\\Users\\ASUS\\AppData\\Local\\Programs\\Python\\Python311\\python.exe';
+  const pythonBin = fs.existsSync(venvPythonWin) ? venvPythonWin
+    : fs.existsSync(venvPythonUnix) ? venvPythonUnix
+    : fs.existsSync(systemPythonWin) ? systemPythonWin
+    : process.platform === 'win32' ? 'python' : 'python3';
   let whisperOk = false;
   try {
     execFileSync(pythonBin, ['-c', 'import faster_whisper'], { timeout: 5000 });
