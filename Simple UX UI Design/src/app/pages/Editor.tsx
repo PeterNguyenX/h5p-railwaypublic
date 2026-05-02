@@ -1338,6 +1338,9 @@ export default function Editor() {
   const analysisCleanupRef = useRef<(() => void) | null>(null);
   const shareMenuRef = useRef<HTMLDivElement>(null);
 
+  // Processing status poller (clears when component unmounts or video becomes ready)
+  const processingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // YouTube IFrame API
   const ytPlayerRef = useRef<YTPlayer | null>(null);
   const ytPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1425,6 +1428,7 @@ export default function Editor() {
         recordVideoVisit(id);
         await store.loadH5PContents(id);
         setCurrentStep(2);
+        if (video.status === 'processing') startProcessingPoll(id);
       } catch {
         notify("Could not load video.", "error");
       }
@@ -1497,6 +1501,7 @@ export default function Editor() {
 
     return () => {
       if (ytPollRef.current) clearInterval(ytPollRef.current);
+      if (processingPollRef.current) clearInterval(processingPollRef.current);
       ytPlayerRef.current?.destroy();
       ytPlayerRef.current = null;
     };
@@ -1508,6 +1513,28 @@ export default function Editor() {
   };
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
+
+  const startProcessingPoll = (videoId: string) => {
+    if (processingPollRef.current) clearInterval(processingPollRef.current);
+    const deadline = Date.now() + 10 * 60 * 1000; // stop after 10 min
+    processingPollRef.current = setInterval(async () => {
+      if (Date.now() > deadline) {
+        clearInterval(processingPollRef.current!);
+        return;
+      }
+      try {
+        const updated = await fetchVideo(videoId);
+        if (updated.status === 'ready' || updated.status === 'error') {
+          clearInterval(processingPollRef.current!);
+          processingPollRef.current = null;
+          store.setVideo(updated);
+        }
+      } catch {
+        clearInterval(processingPollRef.current!);
+        processingPollRef.current = null;
+      }
+    }, 4000);
+  };
 
   const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1522,6 +1549,7 @@ export default function Editor() {
       store.setVideo(video);
       await store.loadH5PContents(video.id);
       setCurrentStep(2);
+      if (video.status === 'processing') startProcessingPoll(video.id);
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -2202,7 +2230,7 @@ export default function Editor() {
                                 <button
                                   type="button"
                                   onClick={handleTranscribeAndGenerate}
-                                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
                                 >
                                   <Sparkles className="w-4 h-4" />
                                   Transcribe &amp; Generate H5P with AI

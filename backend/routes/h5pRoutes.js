@@ -9,6 +9,8 @@ const { Op } = require("sequelize");
 const axios = require('axios');
 const AdmZip = require('adm-zip');
 const { H5PEditor, H5PPlayer, LibraryAdministration } = require('h5p-nodejs-library');
+const VideoProcessingService = require('../services/videoProcessing');
+const videoProcessor = new VideoProcessingService();
 
 // Get H5P editor interface
 router.get("/editor", auth, async (req, res) => {
@@ -348,13 +350,27 @@ router.post("/upload", auth, h5pUpload.single('h5pFile'), async (req, res) => {
 
         targetVideo = await Video.create({
           title: finalTitle,
-          status: 'ready',
+          status: extractedFilePath ? 'processing' : 'ready',
           thumbnailPath: '/default-thumbnail.svg',
           youtubeId: youtubeId || null,
           youtubeUrl: youtubeUrl || null,
           filePath: extractedFilePath || null,
           userId: req.user.id
         });
+
+        // Generate thumbnail in the background for extracted video files
+        if (extractedFilePath) {
+          const fullVideoPath = path.join(__dirname, '..', extractedFilePath);
+          const thumbDir = path.join(__dirname, '..', 'uploads', 'h5p_imports');
+          const thumbName = `${path.basename(extractedFilePath, path.extname(extractedFilePath))}_thumb.jpg`;
+          const thumbPath = path.join(thumbDir, thumbName);
+          videoProcessor.generateThumbnail(fullVideoPath, thumbPath)
+            .then(() => targetVideo.update({
+              status: 'ready',
+              thumbnailPath: `uploads/h5p_imports/${thumbName}`
+            }))
+            .catch(() => targetVideo.update({ status: 'ready' }));
+        }
       }
 
       // Store interactions: parse individual interactions from IV content.json,

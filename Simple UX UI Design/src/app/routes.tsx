@@ -1,4 +1,5 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { useEffect } from "react";
+import { createBrowserRouter, Navigate, Outlet, useNavigate } from "react-router";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -10,9 +11,29 @@ import Admin from "./pages/Admin";
 import AdminUserSettings from "./pages/AdminUserSettings";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import { useAuthStore } from "../lib/authStore";
 
 function RootRedirect() {
   return <Navigate to="/login" replace />;
+}
+
+function ProtectedRoute() {
+  const { token, sessionChecked, validateSession } = useAuthStore();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    validateSession();
+  }, [validateSession]);
+
+  useEffect(() => {
+    if (sessionChecked && !token) {
+      navigate("/login", { replace: true });
+    }
+  }, [sessionChecked, token, navigate]);
+
+  if (!sessionChecked) return null;
+  if (!token) return null;
+  return <Outlet />;
 }
 
 export const router = createBrowserRouter([
@@ -36,38 +57,42 @@ export const router = createBrowserRouter([
     path: "/reset-password",
     Component: ResetPassword,
   },
-  // Pages rendered without the Layout nav bar
   {
-    path: "/app/account",
-    Component: Account,
-  },
-  {
-    path: "/app/settings",
-    Component: Settings,
-  },
-  {
-    path: "/app/admin",
-    Component: Admin,
-  },
-  {
-    path: "/app/admin/users/:id/settings",
-    Component: AdminUserSettings,
-  },
-  {
-    path: "/app/editor",
-    Component: Editor,
-  },
-  {
-    path: "/app/editor/:id",
-    Component: Editor,
-  },
-  {
-    path: "/app",
-    Component: Layout,
+    Component: ProtectedRoute,
     children: [
       {
-        path: "dashboard",
-        Component: Dashboard,
+        path: "/app/account",
+        Component: Account,
+      },
+      {
+        path: "/app/settings",
+        Component: Settings,
+      },
+      {
+        path: "/app/admin",
+        Component: Admin,
+      },
+      {
+        path: "/app/admin/users/:id/settings",
+        Component: AdminUserSettings,
+      },
+      {
+        path: "/app/editor",
+        Component: Editor,
+      },
+      {
+        path: "/app/editor/:id",
+        Component: Editor,
+      },
+      {
+        path: "/app",
+        Component: Layout,
+        children: [
+          {
+            path: "dashboard",
+            Component: Dashboard,
+          },
+        ],
       },
     ],
   },

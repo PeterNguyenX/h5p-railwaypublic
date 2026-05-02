@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { login as apiLogin, register as apiRegister } from './api';
+import { login as apiLogin, register as apiRegister, getCurrentUser } from './api';
 
 export type EducationRole = 'Teacher';
 
@@ -17,9 +17,11 @@ interface AuthState {
   user: { id: string; username: string; email: string; role: string } | null;
   profilesByUserId: Record<string, AccountProfile>;
   isLoading: boolean;
+  sessionChecked: boolean;
   error: string | null;
   login: (usernameOrEmail: string, password: string) => Promise<boolean>;
   register: (username: string, email: string, password: string) => Promise<boolean>;
+  validateSession: () => Promise<void>;
   getCurrentProfile: () => AccountProfile | null;
   updateCurrentProfile: (patch: Partial<AccountProfile>) => void;
   updateAuthenticatedUser: (patch: Partial<{ username: string; email: string }>) => void;
@@ -34,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       profilesByUserId: {},
       isLoading: false,
+      sessionChecked: false,
       error: null,
 
       login: async (usernameOrEmail, password) => {
@@ -45,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
             token: data.token,
             user: data.user,
             isLoading: false,
+            sessionChecked: true,
             profilesByUserId: {
               ...state.profilesByUserId,
               [data.user.id]: state.profilesByUserId[data.user.id] || defaultProfile(data.user.username),
@@ -69,6 +73,7 @@ export const useAuthStore = create<AuthState>()(
             token: data.token,
             user: data.user,
             isLoading: false,
+            sessionChecked: true,
             profilesByUserId: {
               ...state.profilesByUserId,
               [data.user.id]: state.profilesByUserId[data.user.id] || defaultProfile(data.user.username),
@@ -81,6 +86,21 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
           return false;
+        }
+      },
+
+      validateSession: async () => {
+        const state = useAuthStore.getState();
+        if (!state.token) {
+          set({ sessionChecked: true });
+          return;
+        }
+        try {
+          await getCurrentUser();
+          set({ sessionChecked: true });
+        } catch {
+          localStorage.removeItem('token');
+          set({ token: null, user: null, sessionChecked: true });
         }
       },
 
@@ -123,7 +143,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem('token');
-        set({ token: null, user: null });
+        set({ token: null, user: null, sessionChecked: true });
       },
 
       clearError: () => set({ error: null }),

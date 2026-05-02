@@ -2,15 +2,7 @@
  * API client for communicating with the Express backend.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL ?? (() => {
-  if (typeof window !== 'undefined') {
-    const { hostname, port } = window.location;
-    if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '3002') {
-      return 'http://localhost:5001/api';
-    }
-  }
-  return '/api';
-})();
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 function getToken(): string | null {
   return localStorage.getItem('token');
@@ -111,6 +103,12 @@ export async function resetPassword(token: string, newPassword: string): Promise
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || err.message || 'Failed to reset password');
   }
+}
+
+export async function getCurrentUser(): Promise<LoginResponse['user']> {
+  const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Session invalid');
+  return res.json();
 }
 
 // ─── Videos ───────────────────────────────────────────────────────────────────
