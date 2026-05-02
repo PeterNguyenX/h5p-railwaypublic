@@ -447,7 +447,7 @@ export default function Admin() {
                               onChange={(e) => handleRoleChange(u.id, e.target.value as "user" | "admin")}
                               className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
                             >
-                              <option value="user">Teacher</option>
+                              <option value="user">User</option>
                               <option value="admin">Administrator</option>
                             </select>
                           </td>
@@ -691,7 +691,7 @@ export default function Admin() {
                   onChange={(e) => setCreateFormData({ ...createFormData, role: e.target.value as "user" | "admin" })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
                 >
-                  <option value="user">Teacher</option>
+                  <option value="user">User</option>
                   <option value="admin">Administrator</option>
                 </select>
               </div>
