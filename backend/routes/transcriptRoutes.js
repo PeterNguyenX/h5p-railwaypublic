@@ -212,21 +212,50 @@ router.post('/whisper/:videoId', auth, async (req, res) => {
       return res.status(404).json({ error: 'Video not found' });
     }
 
-    if (!video.filePath) {
-      return res.status(400).json({ error: 'Video has no uploaded file. Whisper transcription requires an uploaded video file (not YouTube).' });
-    }
+    let videoFilePath;
+    let tempAudioPath = null;
 
-    const videoFilePath = path.resolve(__dirname, '..', video.filePath);
-    if (!fs.existsSync(videoFilePath)) {
-      return res.status(400).json({ error: 'Video file not found on server.' });
+    if (video.filePath) {
+      videoFilePath = path.resolve(__dirname, '..', video.filePath);
+      if (!fs.existsSync(videoFilePath)) {
+        return res.status(400).json({ error: 'Video file not found on server.' });
+      }
+    } else if (video.youtubeUrl || video.youtubeId) {
+      // Download audio from YouTube using yt-dlp
+      const ytUrl = video.youtubeUrl || `https://www.youtube.com/watch?v=${video.youtubeId}`;
+      const tmpDir = path.join(__dirname, '..', 'uploads', 'tmp');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      tempAudioPath = path.join(tmpDir, `yt_${video.id}.mp3`);
+      const ffmpegBin = 'C:\\Users\\ASUS\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin';
+      try {
+        const systemYtDlp = 'C:\\Users\\ASUS\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\yt-dlp.exe';
+        const ytDlpBin = fs.existsSync(systemYtDlp) ? systemYtDlp : 'yt-dlp';
+        await execFileAsync(ytDlpBin, [
+          '-x', '--audio-format', 'mp3',
+          '--ffmpeg-location', ffmpegBin,
+          '-o', tempAudioPath,
+          '--no-playlist',
+          ytUrl
+        ], { timeout: 5 * 60 * 1000 });
+      } catch (dlErr) {
+        return res.status(500).json({ error: 'Failed to download YouTube audio: ' + dlErr.message });
+      }
+      videoFilePath = tempAudioPath;
+    } else {
+      return res.status(400).json({ error: 'No video source available for transcription.' });
     }
 
     const scriptPath = path.join(__dirname, '..', 'scripts', 'whisper_transcribe.py');
     const modelSize = req.query.model || 'base';
 
     // Prefer the project .venv Python which has faster-whisper installed
-    const venvPython = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
-    const pythonBin = fs.existsSync(venvPython) ? venvPython : 'python3';
+    const venvPythonUnix = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
+    const venvPythonWin = path.join(__dirname, '..', '..', '.venv', 'Scripts', 'python.exe');
+    const systemPythonWin = 'C:\\Users\\ASUS\\AppData\\Local\\Programs\\Python\\Python311\\python.exe';
+    const pythonBin = fs.existsSync(venvPythonWin) ? venvPythonWin
+      : fs.existsSync(venvPythonUnix) ? venvPythonUnix
+      : fs.existsSync(systemPythonWin) ? systemPythonWin
+      : process.platform === 'win32' ? 'python' : 'python3';
 
     // Run faster-whisper via Python script
     let segments = [];
@@ -257,6 +286,11 @@ router.post('/whisper/:videoId', auth, async (req, res) => {
     await video.update({
       captions: { source, language, segments },
     });
+
+    // Clean up temp YouTube audio download
+    if (tempAudioPath && fs.existsSync(tempAudioPath)) {
+      fs.unlink(tempAudioPath, () => {});
+    }
 
     return res.json({
       segments,

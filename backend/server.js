@@ -1,7 +1,7 @@
 require('dotenv').config();
 console.log('🚀 Starting AI-ActivEdu...');
 console.log('Environment:', process.env.NODE_ENV || 'development');
-console.log('Port:', process.env.PORT || 3001);
+console.log('Port:', process.env.PORT || 5001);
 
 const express = require("express");
 const cors = require("cors");
@@ -37,11 +37,11 @@ const app = express();
 // Set LOCALHOST_ONLY_MODE=false only when you intentionally need non-local origins.
 const localhostOrigins = [
   'http://localhost:3000',
-  'http://localhost:3001',
   'http://localhost:3002',
+  'http://localhost:5001',
   'http://127.0.0.1:3000',
-  'http://127.0.0.1:3001',
   'http://127.0.0.1:3002',
+  'http://127.0.0.1:5001',
 ];
 const configuredProductionDomain = process.env.OFFICIAL_PRODUCTION_DOMAIN || process.env.FRONTEND_URL || 'https://hoclieutuongtac2.com';
 const normalizedProductionOrigin = (() => {
@@ -228,7 +228,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     message: 'Server is running',
     environment: process.env.NODE_ENV || 'development',
-    port: process.env.PORT || 3001,
+    port: process.env.PORT || 5001,
     hasDatabase: !!databaseUrl,
     hasJWT: !!process.env.JWT_SECRET,
     hasSession: !!process.env.SESSION_SECRET,
@@ -427,7 +427,7 @@ async function testDatabaseConnection() {
 const { Server: SocketIOServer } = require('socket.io');
 
 // Start the server after testing database connection
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5001;
 
 console.log('🔧 Environment check:');
 console.log('- NODE_ENV:', process.env.NODE_ENV || 'not set');

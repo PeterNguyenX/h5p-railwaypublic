@@ -395,6 +395,14 @@ class H5PService {
       // Add h5p.json to zip
       zip.addFile('h5p.json', Buffer.from(JSON.stringify(h5pManifest, null, 2)));
 
+      // Resolve video source for content.json
+      const videoFilename = video.filePath ? path.basename(video.filePath) : 'video.mp4';
+      const isYoutube = !!(video.youtubeUrl || video.youtubeId);
+      const youtubeUrl = video.youtubeUrl || (video.youtubeId ? `https://www.youtube.com/watch?v=${video.youtubeId}` : null);
+      const videoFiles = isYoutube
+        ? [{ path: youtubeUrl, mime: 'video/YouTube', copyright: { license: 'U' } }]
+        : [{ path: `videos/${videoFilename}`, mime: 'video/mp4', copyright: { license: 'U' } }];
+
       // Create content.json with interactive video structure
       const contentJson = {
         interactiveVideo: {
@@ -412,15 +420,7 @@ class H5PService {
                 }
               ]
             },
-            files: [
-              {
-                path: `videos/${video.filename || 'video.mp4'}`,
-                mime: 'video/mp4',
-                copyright: {
-                  license: 'U'
-                }
-              }
-            ]
+            files: videoFiles
           },
           assets: {
             interactions: h5pContents.map((content, index) => ({
@@ -474,10 +474,10 @@ class H5PService {
       // Add content/content.json to zip
       zip.addFile('content/content.json', Buffer.from(JSON.stringify(contentJson, null, 2)));
 
-      // Add video file if it exists
-      if (video.filePath && await fs.pathExists(video.filePath)) {
+      // Bundle the local video file (skip for YouTube — URL is referenced directly)
+      if (!isYoutube && video.filePath && await fs.pathExists(video.filePath)) {
         const videoBuffer = await fs.readFile(video.filePath);
-        zip.addFile(`content/videos/${video.filename || 'video.mp4'}`, videoBuffer);
+        zip.addFile(`content/videos/${videoFilename}`, videoBuffer);
       }
 
       // Generate and return the zip buffer

@@ -413,11 +413,11 @@ export async function fetchH5PContent(videoId: string): Promise<H5PContent[]> {
   return res.json();
 }
 
-export async function uploadH5PFile(file: File, videoId: string, timestamp = 0): Promise<H5PContent> {
+export async function uploadH5PFile(file: File, videoId?: string, timestamp = 0): Promise<{ content: H5PContent; video: Video }> {
   const token = getToken();
   const form = new FormData();
   form.append('h5pFile', file);
-  form.append('videoId', videoId);
+  if (videoId) form.append('videoId', videoId);
   form.append('timestamp', String(timestamp));
   const res = await fetch(`${API_BASE}/h5p/upload`, {
     method: 'POST',
@@ -429,7 +429,7 @@ export async function uploadH5PFile(file: File, videoId: string, timestamp = 0):
     throw new Error(err.error || 'H5P import failed');
   }
   const data = await res.json();
-  return data.content as H5PContent;
+  return { content: data.content as H5PContent, video: data.video as Video };
 }
 
 export interface H5PContentData {

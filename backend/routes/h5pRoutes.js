@@ -296,34 +296,105 @@ router.post("/upload", auth, h5pUpload.single('h5pFile'), async (req, res) => {
         timestamp: req.body.timestamp ? parseInt(req.body.timestamp) : 0
       };
 
-      // If videoId is provided, add to video
-      if (req.body.videoId) {
-        const video = await Video.findOne({
-          where: {
-            id: req.body.videoId,
-            userId: req.user.id
-          }
-        });
+      let targetVideo = null;
 
-        if (!video) {
+      if (req.body.videoId) {
+        targetVideo = await Video.findOne({
+          where: { id: req.body.videoId, userId: req.user.id }
+        });
+        if (!targetVideo) {
           return res.status(404).json({ error: 'Video not found' });
         }
+      } else {
+        // No videoId — create a video record, extracting video source from H5P content if possible
+        const baseTitle = h5pJson.title || req.file.originalname.replace(/\.h5p$/i, '') || 'Imported H5P';
+        let finalTitle = baseTitle;
+        let counter = 1;
+        while (await Video.findOne({ where: { userId: req.user.id, title: finalTitle } })) {
+          finalTitle = `${baseTitle} ${counter++}`;
+        }
 
-        // Add to video's h5pContent
-        const h5pContentArray = video.h5pContent || [];
+        // Try to extract YouTube URL from Interactive Video content.json
+        let youtubeId = null;
+        let youtubeUrl = null;
+        let extractedFilePath = null;
+        try {
+          const videoFiles = contentJson?.interactiveVideo?.video?.files || [];
+          for (const vf of videoFiles) {
+            const src = vf.path || '';
+            if (src.includes('youtube.com') || src.includes('youtu.be')) {
+              const ytMatch = src.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+              if (ytMatch) { youtubeId = ytMatch[1]; youtubeUrl = src; break; }
+            }
+          }
+        } catch (_) {}
+
+        // If no YouTube source, try to extract a bundled video file from the zip
+        if (!youtubeId) {
+          try {
+            const videoEntry = zip.getEntries().find(e =>
+              e.entryName.startsWith('content/videos/') &&
+              /\.(mp4|webm|mov|avi|mkv)$/i.test(e.entryName)
+            );
+            if (videoEntry) {
+              const importsDir = path.join(__dirname, '..', 'uploads', 'h5p_imports');
+              fs.mkdirSync(importsDir, { recursive: true });
+              const savedName = `${Date.now()}_${path.basename(videoEntry.entryName)}`;
+              fs.writeFileSync(path.join(importsDir, savedName), videoEntry.getData());
+              extractedFilePath = `uploads/h5p_imports/${savedName}`;
+            }
+          } catch (_) {}
+        }
+
+        targetVideo = await Video.create({
+          title: finalTitle,
+          status: 'ready',
+          thumbnailPath: '/default-thumbnail.svg',
+          youtubeId: youtubeId || null,
+          youtubeUrl: youtubeUrl || null,
+          filePath: extractedFilePath || null,
+          userId: req.user.id
+        });
+      }
+
+      // Store interactions: parse individual interactions from IV content.json,
+      // falling back to a single item for non-IV content types.
+      const h5pContentArray = targetVideo.h5pContent || [];
+      const ivInteractions = contentJson?.interactiveVideo?.assets?.interactions || [];
+      if (ivInteractions.length > 0) {
+        for (const interaction of ivInteractions) {
+          h5pContentArray.push({
+            id: interaction.action?.subContentId || uuidv4(),
+            title: interaction.label || interaction.action?.metadata?.title || 'Interaction',
+            library: interaction.action?.library || libraryString,
+            params: interaction.action?.params || {},
+            metadata: interaction.action?.metadata || {},
+            timestamp: interaction.duration?.from || 0,
+          });
+        }
+      } else {
         h5pContentArray.push({
           id: h5pContent.id,
           title: h5pContent.title,
+          library: h5pContent.library,
+          params: h5pContent.params,
+          metadata: h5pContent.metadata,
           timestamp: h5pContent.timestamp,
-          type: libraryString
+          type: libraryString,
         });
-
-        await video.update({ h5pContent: h5pContentArray });
       }
+      await targetVideo.update({ h5pContent: h5pContentArray });
+
+      const videoJson = targetVideo.toJSON();
 
       res.json({
         message: 'H5P file imported successfully',
-        content: h5pContent
+        content: h5pContent,
+        video: {
+          ...videoJson,
+          thumbnailPath: videoJson.thumbnailPath || '/default-thumbnail.svg',
+          duration: videoJson.duration ? String(videoJson.duration) : '0:00'
+        }
       });
     } catch (parseError) {
       console.error('Error parsing .h5p file:', parseError);

@@ -1510,21 +1510,23 @@ export default function Editor() {
   };
 
   const handleContinueToStep2 = async () => {
-    if (!store.video) return;
     if (pendingH5PFile) {
       setIsImportingH5P(true);
       try {
-        await uploadH5PFile(pendingH5PFile, store.video.id, 0);
-        await store.loadH5PContents(store.video.id);
+        const { video } = await uploadH5PFile(pendingH5PFile, store.video?.id);
+        store.setVideo(video);
+        await store.loadH5PContents(video.id);
         setPendingH5PFile(null);
       } catch (err: unknown) {
         notify(err instanceof Error ? err.message : "H5P import failed", "error");
-      } finally {
         setIsImportingH5P(false);
+        return;
       }
+      setIsImportingH5P(false);
     }
     setCurrentStep(2);
   };
+
 
   const handleTranscriptExtraction = async () => {
     if (!store.video?.id) return;
@@ -1585,12 +1587,19 @@ export default function Editor() {
   const handleTranscribeAndGenerate = async () => {
     if (!store.video?.id) return;
     guardAI(async () => {
+    notify("AI results may be inaccurate or low quality. Please review all generated content before publishing.", "info");
     setIsExtractingTranscript(true);
     try {
       let segments;
       if (store.video.youtubeId) {
-        segments = await extractTranscriptFromVideo(store.video.id);
-        store.setTranscriptFilename("Extracted from YouTube captions");
+        try {
+          segments = await extractTranscriptFromVideo(store.video.id);
+          store.setTranscriptFilename("Extracted from YouTube captions");
+        } catch {
+          // No captions — fall back to Whisper (downloads audio from YouTube)
+          segments = await whisperTranscribeVideo(store.video.id);
+          store.setTranscriptFilename("Transcribed with Whisper AI");
+        }
       } else {
         segments = await whisperTranscribeVideo(store.video.id);
         store.setTranscriptFilename("Transcribed with Whisper AI");
@@ -1810,8 +1819,11 @@ export default function Editor() {
               </div>
               <h2 className="text-base font-bold text-slate-800">Replace existing questions?</h2>
             </div>
-            <p className="text-sm text-slate-600 mb-5">
+            <p className="text-sm text-slate-600 mb-3">
               This will permanently delete all <strong>{store.h5pContents.length} existing question{store.h5pContents.length !== 1 ? 's' : ''}</strong> and generate a new set with AI. This cannot be undone.
+            </p>
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-5">
+              ⚠️ AI results may be inaccurate or low quality. Please review all generated content before publishing.
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -1952,7 +1964,7 @@ export default function Editor() {
               <div className="mt-12 flex justify-end">
                 <button
                   onClick={handleContinueToStep2}
-                  disabled={!store.video || isImportingH5P}
+                  disabled={(!store.video && !(activeUploadTab === "h5p" && pendingH5PFile)) || isImportingH5P}
                   className="px-8 py-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-sm transition-all text-lg flex items-center gap-2"
                 >
                   {isImportingH5P ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
@@ -1996,8 +2008,8 @@ export default function Editor() {
                       <div className="absolute inset-0 cursor-pointer" onClick={flashAndToggle} />
                     </div>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400">
-                      <p>Video not available</p>
+                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                      <p>No video source</p>
                     </div>
                   )}
                 </div>
