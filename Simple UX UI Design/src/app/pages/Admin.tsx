@@ -272,7 +272,8 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <span className="text-base font-semibold text-slate-800">Admin Console</span>
           <button
             type="button"
             onClick={() => navigate("/app/dashboard")}
@@ -281,7 +282,6 @@ export default function Admin() {
             <Home className="w-4 h-4" />
             Home
           </button>
-          <span className="text-base font-semibold text-slate-800">Admin Console</span>
         </div>
       </header>
 
@@ -353,7 +353,7 @@ export default function Admin() {
                 <p className="text-xs text-slate-500 uppercase tracking-wide">Total Accounts</p>
                 <p className="text-2xl font-bold text-slate-900 mt-1">{summary.total}</p>
               </div>
-              <div className="bg-white border-2 border-green-600 rounded-xl p-4">
+              <div className="bg-white border-2 border-blue-600 rounded-xl p-4">
                 <p className="text-xs text-slate-500 uppercase tracking-wide">Active Accounts</p>
                 <p className="text-2xl font-bold text-slate-900 mt-1">{summary.active}</p>
               </div>
@@ -434,7 +434,7 @@ export default function Admin() {
                       {filteredUsers.map((u) => (
                         <tr
                           key={u.id}
-                          className="border-t border-slate-100 hover:bg-slate-50/70 cursor-context-menu"
+                          className="border-t border-slate-100 hover:bg-blue-50 cursor-context-menu"
                           onContextMenu={(e) => { e.preventDefault(); setContextMenu({ user: u }); }}
                         >
                           <td className="px-4 py-3">
@@ -502,7 +502,7 @@ export default function Admin() {
                   </thead>
                   <tbody>
                     {auditLogs.map((log) => (
-                      <tr key={log.id} className="border-t border-slate-100 hover:bg-slate-50/70">
+                      <tr key={log.id} className="border-t border-slate-100 hover:bg-blue-50">
                         <td className="px-4 py-3 text-slate-800 font-medium">{log.adminId}</td>
                         <td className="px-4 py-3 text-slate-700">{log.action}</td>
                         <td className="px-4 py-3 text-slate-600">{log.targetType} {log.targetId ? `(${log.targetId})` : ""}</td>
@@ -544,7 +544,7 @@ export default function Admin() {
                   </thead>
                   <tbody>
                     {loginAttempts.map((attempt) => (
-                      <tr key={attempt.id} className="border-t border-slate-100 hover:bg-slate-50/70">
+                      <tr key={attempt.id} className="border-t border-slate-100 hover:bg-blue-50">
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-800">{attempt.username || attempt.email || "Unknown"}</div>
                           {attempt.username && <div className="text-xs text-slate-400 mt-0.5">{attempt.email}</div>}
@@ -624,12 +624,12 @@ export default function Admin() {
             >
               {contextMenu.user.isActive
                 ? <><Ban className="w-4 h-4 text-orange-500" /> Deactivate</>
-                : <><CheckCircle2 className="w-4 h-4 text-green-500" /> Activate</>}
+                : <><CheckCircle2 className="w-4 h-4 text-blue-600" /> Activate</>}
             </button>
             <button
               type="button"
               onClick={() => { handleDeleteUser(contextMenu.user.id); setContextMenu(null); }}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
             >
               <Trash2 className="w-4 h-4" /> Delete account
             </button>

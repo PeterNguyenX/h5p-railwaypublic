@@ -416,7 +416,7 @@ router.put("/:id/restore", auth, validateParams(idParamSchema), async (req, res)
 router.get("/:id", auth, validateParams(idParamSchema), async (req, res) => {
   try {
     const video = await Video.findOne({
-      where: { 
+      where: {
         id: req.params.id,
         userId: req.user.id
       }
@@ -425,6 +425,13 @@ router.get("/:id", auth, validateParams(idParamSchema), async (req, res) => {
     if (!video) {
       return res.status(404).json({ error: "Video not found" });
     }
+
+    // Touch updatedAt so "last opened" time is reflected in the dashboard.
+    // Sequelize ignores updatedAt in update(), so use a raw query.
+    await video.sequelize.query(
+      'UPDATE `Videos` SET `updatedAt` = ? WHERE `id` = ?',
+      { replacements: [new Date().toISOString(), video.id], type: video.sequelize.QueryTypes.UPDATE }
+    );
 
     res.json(mapVideoData(video));
   } catch (error) {

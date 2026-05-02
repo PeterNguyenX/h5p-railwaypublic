@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   AlertCircle,
+  Clock,
   Copy,
   Download,
   Folder,
@@ -69,8 +70,23 @@ function relativeTime(iso?: string): string {
     const n = Math.floor(delta / hour);
     return `${n} hour${n === 1 ? "" : "s"} ago`;
   }
-  const n = Math.floor(delta / day);
-  return `${n} day${n === 1 ? "" : "s"} ago`;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+  if (delta < week) {
+    const n = Math.floor(delta / day);
+    return `${n} day${n === 1 ? "" : "s"} ago`;
+  }
+  if (delta < month) {
+    const n = Math.floor(delta / week);
+    return `${n} week${n === 1 ? "" : "s"} ago`;
+  }
+  if (delta < year) {
+    const n = Math.floor(delta / month);
+    return `${n} month${n === 1 ? "" : "s"} ago`;
+  }
+  const n = Math.floor(delta / year);
+  return `${n} year${n === 1 ? "" : "s"} ago`;
 }
 
 function thumbnailUrl(video: Video): string {
@@ -90,6 +106,19 @@ function thumbnailUrl(video: Video): string {
   }
   if (video.youtubeId) return `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`;
   return "";
+}
+
+function ThumbWithFallback({ thumb, title }: { thumb: string; title: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!thumb || failed) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+        <VideoOff className="w-10 h-10 text-slate-300" />
+        <span className="text-xs text-slate-400 px-4 text-center line-clamp-2">{title}</span>
+      </div>
+    );
+  }
+  return <img src={thumb} alt={title} className="w-full h-full object-cover" onError={() => setFailed(true)} />;
 }
 
 function storageKey(userId?: string): string {
@@ -492,7 +521,7 @@ export default function Dashboard() {
           </div>
           <Link
             to="/app/editor"
-            className="inline-flex items-center gap-2.5 px-6 py-3 bg-orange-500 hover:bg-orange-400 text-white font-bold rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
+            className="inline-flex items-center gap-2.5 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
           >
             <Plus className="w-5 h-5" />
             Create New Video
@@ -520,7 +549,7 @@ export default function Dashboard() {
             <button
               onClick={() => moveFolderToTrash(folder.id)}
               title="Move folder to Trash"
-              className="px-2 py-2 rounded-r-lg border text-slate-500 hover:text-red-600 border-slate-200 bg-white"
+              className="px-2 py-2 rounded-r-lg border text-slate-500 hover:text-orange-600 border-slate-200 bg-white"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -529,7 +558,7 @@ export default function Dashboard() {
 
         <button
           onClick={() => setSelectedFolder("trash")}
-          className={`px-3 py-2 rounded-lg border text-sm font-medium inline-flex items-center gap-1.5 ${selectedFolder === "trash" ? "bg-red-50 border-red-200 text-red-700" : "bg-white border-slate-200 text-slate-600"}`}
+          className={`px-3 py-2 rounded-lg border text-sm font-medium inline-flex items-center gap-1.5 ${selectedFolder === "trash" ? "bg-orange-50 border-orange-200 text-orange-700" : "bg-white border-slate-200 text-slate-600"}`}
         >
           <Trash2 className="w-4 h-4" />
           Trash
@@ -565,13 +594,7 @@ export default function Dashboard() {
                 }}
               >
                 <div className="relative aspect-video bg-slate-100">
-                  {thumb ? (
-                    <img src={thumb} alt={video.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <VideoOff className="w-10 h-10 text-slate-300" />
-                    </div>
-                  )}
+                  <ThumbWithFallback thumb={thumb} title={video.title} />
                   {selectedFolder !== "trash" && (
                     <div className="absolute inset-0 bg-slate-900/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                       <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-md">
@@ -624,6 +647,13 @@ export default function Dashboard() {
                     )}
                   </div>
 
+                  {selectedFolder !== "trash" && (
+                    <p className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      {relativeTime(video.updatedAt)}
+                    </p>
+                  )}
+
                   {selectedFolder === "trash" && (
                     <div className="mt-3 flex items-center gap-2">
                       <button
@@ -634,7 +664,7 @@ export default function Dashboard() {
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteVideoPermanently(video.id); }}
-                        className="text-xs px-2.5 py-1.5 rounded-md border border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"
+                        className="text-xs px-2.5 py-1.5 rounded-md border border-orange-200 text-orange-700 hover:bg-orange-50 inline-flex items-center gap-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Delete Permanently
                       </button>
@@ -669,7 +699,7 @@ export default function Dashboard() {
                     </button>
                     <button
                       onClick={() => deleteFolderPermanently(folder.id)}
-                      className="text-xs px-2.5 py-1.5 rounded-md border border-red-200 text-red-700 hover:bg-red-50"
+                      className="text-xs px-2.5 py-1.5 rounded-md border border-orange-200 text-orange-700 hover:bg-orange-50"
                     >
                       Delete Permanently
                     </button>
@@ -807,7 +837,7 @@ export default function Dashboard() {
               moveVideoToTrash(contextMenu.videoId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-red-50 text-sm text-red-700 flex items-center gap-2"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-orange-50 text-sm text-orange-700 flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" /> Move to Trash
           </button>
@@ -815,7 +845,7 @@ export default function Dashboard() {
       )}
 
       {notice && (
-        <div className={`fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg text-white text-sm z-[70] inline-flex items-center gap-2 ${notice === "Profile saved!" || notice === "Video saved!" ? "bg-green-600" : "bg-slate-900"}`}>
+        <div className={`fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg text-white text-sm z-[70] inline-flex items-center gap-2 ${notice === "Profile saved!" || notice === "Video saved!" ? "bg-blue-600" : "bg-slate-900"}`}>
           <AlertCircle className="w-4 h-4" />
           {notice}
         </div>

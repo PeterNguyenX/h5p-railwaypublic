@@ -200,11 +200,13 @@ function H5PEditorPanel({
   onSeek,
   openForContent,
   clearOpen,
+  onFormDirtyChange,
 }: {
   h5pContents: H5PContent[];
   currentTime: number;
   videoId: string;
   onSaved: () => void;
+  onFormDirtyChange?: (dirty: boolean) => void;
   onDeleted: (id: string) => void;
   onSeek: (t: number) => void;
   openForContent: H5PContent | null;
@@ -213,6 +215,21 @@ function H5PEditorPanel({
   const [form, setForm] = useState<H5PForm | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setAddMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Notify parent when form open/close state changes
+  useEffect(() => {
+    onFormDirtyChange?.(form !== null);
+  }, [form, onFormDirtyChange]);
 
   // Open editor when a dot is clicked
   useEffect(() => {
@@ -302,36 +319,41 @@ function H5PEditorPanel({
   if (!form) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
-        <div className="p-5 border-b border-slate-100">
-          <h3 className="font-bold text-slate-800 text-base">H5P Editor</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Add or edit interactive questions on your video</p>
-        </div>
-
-        {/* Add buttons */}
-        <div className="p-5 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Add Interaction</p>
-          <div className="grid grid-cols-2 gap-2">
-            {(["MultiChoice", "TrueFalse", "FillBlanks", "Matching"] as H5PType[]).map((type) => {
-              const iconMap = { ListChecks, ToggleLeft, PenLine, Shuffle } as Record<string, React.ElementType>;
-              const Icon = iconMap[TYPE_ICON_NAMES[type]];
-              return (
-                <button
-                  key={type}
-                  onClick={() => startNew(type)}
-                  className={`flex flex-col items-center justify-center gap-1.5 p-3 border rounded-xl font-semibold text-xs transition-all hover:scale-[1.02] ${TYPE_COLORS[type]} hover:shadow-sm`}
-                >
-                  <div className="relative">
-                    {Icon && <Icon className="w-4 h-4" />}
-                    <Plus className="w-2.5 h-2.5 absolute -top-1 -right-1.5 text-blue-700" />
-                  </div>
-                  {TYPE_LABELS[type]}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2 text-center">
-            Uses current video time: <span className="font-mono font-bold">{formatTime(currentTime)}</span>
+        {/* Add Interaction dropdown button */}
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            {h5pContents.length > 0 ? `Interactions (${h5pContents.length})` : "Interactions"}
           </p>
+          <div ref={addMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setAddMenuOpen((v) => !v)}
+              className="flex items-center gap-1.5 h-8 px-3 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Interaction
+              <ChevronDown className={`w-3 h-3 transition-transform ${addMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+            {addMenuOpen && (
+              <div className="absolute right-0 top-9 w-48 bg-white border border-slate-200 rounded-2xl shadow-lg py-1 z-50 overflow-hidden">
+                {(["MultiChoice", "TrueFalse", "FillBlanks", "Matching"] as H5PType[]).map((type) => {
+                  const iconMap = { ListChecks, ToggleLeft, PenLine, Shuffle } as Record<string, React.ElementType>;
+                  const Icon = iconMap[TYPE_ICON_NAMES[type]];
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => { startNew(type); setAddMenuOpen(false); }}
+                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      {Icon && <Icon className="w-4 h-4 text-slate-400" />}
+                      {TYPE_LABELS[type]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Existing interactions list */}
@@ -344,9 +366,6 @@ function H5PEditorPanel({
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                Interactions ({h5pContents.length})
-              </p>
               {[...h5pContents]
                 .sort((a, b) => a.timestamp - b.timestamp)
                 .map((c, i) => {
@@ -357,7 +376,7 @@ function H5PEditorPanel({
                       onClick={() => setForm(contentToForm(c))}
                       className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group cursor-pointer"
                     >
-                      <div className="w-7 h-7 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
                         {i + 1}
                       </div>
                       <button
@@ -373,7 +392,7 @@ function H5PEditorPanel({
                       <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => { e.stopPropagation(); onDeleted(c.id); }}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -627,7 +646,7 @@ function H5PEditorPanel({
                       <button
                         type="button"
                         onClick={() => setField("matchPairs", form.matchPairs.filter((_, j) => j !== i))}
-                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-orange-600 transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -653,7 +672,7 @@ function H5PEditorPanel({
           <button
             type="button"
             onClick={handleDelete}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-red-600 hover:bg-red-50 border border-red-200 hover:border-red-300 font-semibold rounded-xl transition-colors text-sm"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-orange-600 hover:bg-orange-50 border border-orange-300 hover:border-orange-400 font-semibold rounded-xl transition-colors text-sm"
           >
             <Trash2 className="w-3.5 h-3.5" />
             Delete
@@ -1046,7 +1065,7 @@ function InteractionPreview({
                             {!submitted && (
                               <button
                                 onClick={() => setMatchSelections(prev => { const n = { ...prev }; delete n[i]; return n; })}
-                                className="p-0.5 text-slate-400 hover:text-red-500"
+                                className="p-0.5 text-slate-400 hover:text-orange-600"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -1097,7 +1116,7 @@ function InteractionPreview({
           ) : (
             <button
               onClick={onContinue}
-              className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center gap-1.5"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center gap-1.5"
             >
               <ChevronRight className="w-4 h-4" /> Continue
             </button>
@@ -1260,7 +1279,7 @@ function VideoControls({
                 onClick={(e) => { e.stopPropagation(); onSeek(c.timestamp); onDotClick(c); }}
                 title={`#${i + 1} ${TYPE_LABELS[inferType(c.library || "")]} @ ${formatTime(c.timestamp)}`}
               >
-                <div className="w-5 h-5 rounded-full bg-orange-500 border-2 border-white text-white text-[9px] font-bold flex items-center justify-center shadow-lg hover:scale-125 transition-transform hover:bg-orange-400">
+                <div className="w-5 h-5 rounded-full bg-orange-600 border-2 border-white text-white text-[9px] font-bold flex items-center justify-center shadow-lg hover:scale-125 transition-transform hover:bg-orange-500">
                   {i + 1}
                 </div>
                 <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
@@ -1298,6 +1317,8 @@ export default function Editor() {
   const [isExtractingTranscript, setIsExtractingTranscript] = useState(false);
   const [isImportingH5P, setIsImportingH5P] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const [notification, setNotification] = useState<{ msg: string; type: "success" | "error" | "info" } | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
   const [openForContent, setOpenForContent] = useState<H5PContent | null>(null);
@@ -1308,12 +1329,14 @@ export default function Editor() {
   const [showAIConfirm, setShowAIConfirm] = useState(false);
   const [pendingAIAction, setPendingAIAction] = useState<(() => void) | null>(null);
   const [aiUsage, setAiUsage] = useState<{ usedToday: number; limit: number | null; isAdmin: boolean } | null>(null);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
   const h5pStep1InputRef = useRef<HTMLInputElement>(null);
   const analysisCleanupRef = useRef<(() => void) | null>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
 
   // YouTube IFrame API
   const ytPlayerRef = useRef<YTPlayer | null>(null);
@@ -1333,6 +1356,40 @@ export default function Editor() {
   const videoDurationRef = useRef(0);
 
   useEffect(() => { if (!token) navigate("/"); }, [token, navigate]);
+
+  // Close share menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setShareMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // hasUnsavedChanges is now driven by the interaction form being open (set via onFormDirtyChange)
+  // Warn on browser refresh/close only when form is open
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Intercept browser back button
+  useEffect(() => {
+    const handlePopState = () => {
+      if (hasUnsavedChanges && currentStep === 2) {
+        window.history.pushState(null, "", window.location.href);
+        setShowUnsavedWarning(true);
+      }
+    };
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [hasUnsavedChanges, currentStep]);
 
   useEffect(() => {
     fetchAIUsage().then(setAiUsage).catch(() => {});
@@ -1713,89 +1770,143 @@ export default function Editor() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
-        <div className="flex items-center gap-4">
+        {/* Left — title */}
+        <div>
+          {isTitleEditing ? (
+            <input
+              autoFocus
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={async () => {
+                if (store.video && titleDraft.trim() && titleDraft.trim() !== store.video.title) {
+                  try {
+                    const updated = await updateVideoTitle(store.video.id, titleDraft.trim());
+                    store.setVideo(updated);
+                    notify("Title updated!", "success");
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : "Failed to update title", "error");
+                  }
+                }
+                setIsTitleEditing(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") setIsTitleEditing(false);
+              }}
+              title="Video title"
+              placeholder="Video title"
+              className="text-xl font-bold text-slate-800 border-b-2 border-blue-500 bg-transparent outline-none px-1 w-64"
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-800">{store.video?.title || "New Interactive Video"}</h2>
+              {store.video && (
+                <button
+                  type="button"
+                  onClick={() => { setTitleDraft(store.video!.title || ""); setIsTitleEditing(true); }}
+                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                  title="Rename video"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-slate-500 hidden sm:block">{store.video ? `ID: ${store.video.id}` : "No video loaded"}</p>
+        </div>
+
+        {/* Right — Share dropdown + Home */}
+        <div className="flex items-center gap-2">
+          {store.video && (
+            <div ref={shareMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setShareMenuOpen((v) => !v)}
+                className="flex items-center gap-1.5 h-9 px-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                <Link className="w-4 h-4" />
+                Share
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${shareMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+              {shareMenuOpen && (
+                <div className="absolute right-0 top-11 w-52 bg-white border border-slate-200 rounded-2xl shadow-lg py-1 z-50 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ltiUrl = `${window.location.origin}/api/lti/launch/${store.video!.id}`;
+                      navigator.clipboard.writeText(ltiUrl);
+                      notify("LTI link copied!", "success");
+                      setShareMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <Link className="w-4 h-4 text-slate-400" />
+                    Copy LTI Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleExport(); setShareMenuOpen(false); }}
+                    disabled={isExporting || store.h5pContents.length === 0}
+                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40"
+                  >
+                    {isExporting ? <Loader2 className="w-4 h-4 text-slate-400 animate-spin" /> : <Download className="w-4 h-4 text-slate-400" />}
+                    Download .h5p
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <button
-            onClick={() => navigate("/app/dashboard")}
+            type="button"
+            onClick={() => {
+              if (currentStep === 2 && hasUnsavedChanges) {
+                setShowUnsavedWarning(true);
+              } else {
+                window.dispatchEvent(new CustomEvent('dashboard-refresh'));
+                navigate("/app/dashboard");
+              }
+            }}
             className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors"
           >
             <Home className="w-4 h-4" />
             Home
           </button>
-          <div>
-            {isTitleEditing ? (
-              <input
-                autoFocus
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onBlur={async () => {
-                  if (store.video && titleDraft.trim() && titleDraft.trim() !== store.video.title) {
-                    try {
-                      const updated = await updateVideoTitle(store.video.id, titleDraft.trim());
-                      store.setVideo(updated);
-                      notify("Title updated!", "success");
-                    } catch (err) {
-                      notify(err instanceof Error ? err.message : "Failed to update title", "error");
-                    }
-                  }
-                  setIsTitleEditing(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                  if (e.key === "Escape") setIsTitleEditing(false);
-                }}
-                className="text-xl font-bold text-slate-800 border-b-2 border-blue-500 bg-transparent outline-none px-1 w-64"
-              />
-            ) : (
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-slate-800">{store.video?.title || "New Interactive Video"}</h2>
-                {store.video && (
-                  <button
-                    onClick={() => { setTitleDraft(store.video!.title || ""); setIsTitleEditing(true); }}
-                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                    title="Rename video"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                )}
+        </div>
+      </header>
+
+      {/* ── Save Progress Dialog ───────────────────────────────────────────── */}
+      {showUnsavedWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
               </div>
-            )}
-            <p className="text-xs text-slate-500 hidden sm:block">{store.video ? `ID: ${store.video.id}` : "No video loaded"}</p>
+              <h2 className="text-base font-bold text-slate-800">Save progress?</h2>
+            </div>
+            <p className="text-sm text-slate-600 mb-5">
+              Your interactions will remain saved on the server. Choose <strong>Save</strong> to confirm and go home, or <strong>Cancel</strong> to keep editing.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowUnsavedWarning(false)}
+                className="px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setHasUnsavedChanges(false); setShowUnsavedWarning(false); window.dispatchEvent(new CustomEvent('dashboard-refresh')); navigate("/app/dashboard?saved=1"); }}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                Save
+              </button>
+            </div>
           </div>
         </div>
-
-        {store.video && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const ltiUrl = `${window.location.origin}/api/lti/launch/${store.video!.id}`;
-                navigator.clipboard.writeText(ltiUrl);
-                notify("LTI link copied!", "success");
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-slate-600 text-sm font-semibold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-              title="Copy LTI embed link"
-            >
-              <Link className="w-4 h-4" />
-              Copy LTI Link
-            </button>
-            <button
-              onClick={handleExport}
-              disabled={isExporting || store.h5pContents.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 text-slate-600 text-sm font-semibold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40"
-            >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Export .h5p
-            </button>
-            <button
-              onClick={() => navigate("/app/dashboard?saved=1")}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-blue-600 rounded-xl bg-blue-600 hover:bg-blue-700 hover:border-blue-700 text-white transition-colors"
-              title="Save and go to Dashboard"
-            >
-              <Save className="w-4 h-4" />
-              Save
-            </button>
-          </div>
-        )}
-      </header>
+      )}
 
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {notification && (
@@ -1836,7 +1947,7 @@ export default function Editor() {
               <button
                 type="button"
                 onClick={() => { setShowAIConfirm(false); pendingAIAction?.(); setPendingAIAction(null); }}
-                className="px-4 py-2 rounded-lg text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white transition-colors"
               >
                 Delete & Regenerate
               </button>
@@ -1912,15 +2023,8 @@ export default function Editor() {
                       placeholder="https://www.youtube.com/watch?v=..."
                       className="flex-1 px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-[15px]"
                     />
-                    <button
-                      onClick={handleYoutubeImport}
-                      disabled={isUploading || !youtubeLink.trim()}
-                      className="px-6 py-3.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-[15px] whitespace-nowrap shadow-sm flex items-center gap-2"
-                    >
-                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Youtube className="w-4 h-4" />}
-                      Import
-                    </button>
                   </div>
+                  <p className="text-xs text-slate-400 mt-2">Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-slate-600 font-mono">Enter</kbd> to import</p>
                   {isUploading && <ProgressBar value={60} label="Importing YouTube video..." color="bg-blue-600" />}
                 </div>
               )}
@@ -1939,7 +2043,7 @@ export default function Editor() {
                         </div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">{pendingH5PFile.name}</h3>
                         <p className="text-slate-500 mb-6">H5P package ready to import</p>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); setPendingH5PFile(null); }} className="px-4 py-2 bg-white border border-slate-300 hover:bg-red-50 hover:text-red-700 text-slate-600 font-semibold rounded-lg transition-colors text-sm">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setPendingH5PFile(null); }} className="px-4 py-2 bg-white border border-slate-300 hover:bg-orange-50 hover:text-orange-700 text-slate-600 font-semibold rounded-lg transition-colors text-sm">
                           Remove
                         </button>
                       </>
@@ -1968,7 +2072,7 @@ export default function Editor() {
                   className="px-8 py-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-sm transition-all text-lg flex items-center gap-2"
                 >
                   {isImportingH5P ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                  Continue to Add Interactions
+                  Continue
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
@@ -2181,6 +2285,7 @@ export default function Editor() {
                       videoId={store.video.id}
                       openForContent={openForContent}
                       clearOpen={() => setOpenForContent(null)}
+                      onFormDirtyChange={setHasUnsavedChanges}
                       onSaved={async () => {
                         await store.loadH5PContents(store.video!.id);
                         notify("Interaction saved!", "success");

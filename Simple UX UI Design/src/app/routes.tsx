@@ -5,6 +5,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Editor from "./pages/Editor";
 import Account from "./pages/Account";
+import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import AdminUserSettings from "./pages/AdminUserSettings";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -39,6 +40,10 @@ export const router = createBrowserRouter([
   {
     path: "/app/account",
     Component: Account,
+  },
+  {
+    path: "/app/settings",
+    Component: Settings,
   },
   {
     path: "/app/admin",

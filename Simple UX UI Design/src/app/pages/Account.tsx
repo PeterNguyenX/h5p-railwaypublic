@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { Home, Save } from "lucide-react";
+import { Save, X } from "lucide-react";
 import { useAuthStore } from "../../lib/authStore";
 import { updateMyAccount } from "../../lib/api";
 
@@ -58,22 +58,13 @@ export default function Account() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Back header */}
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-4">
-          <button
-            onClick={() => navigate("/app/dashboard")}
-            className="flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-          >
-            <Home className="w-4 h-4" />
-            Home
-          </button>
-          <span className="text-base font-semibold text-slate-800">Account Settings</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
+          <span className="text-base font-semibold text-slate-800">Profile</span>
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -112,10 +103,18 @@ export default function Account() {
               />
             </div>
 
-            <div className="flex items-center justify-end pt-2">
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => navigate("/app/dashboard")}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Cancel
+              </button>
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl shadow-sm transition-colors"
               >
                 <Save className="w-4 h-4" />
                 Save Profile

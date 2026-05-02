@@ -46,7 +46,7 @@ export default function Register() {
       <div className="w-full max-w-[560px] bg-white shadow-xl rounded-2xl border border-slate-200 p-8 sm:p-10">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="bg-sky-600 p-2.5 rounded-xl flex items-center justify-center">
+            <div className="bg-blue-600 p-2.5 rounded-xl flex items-center justify-center">
               <Video className="w-6 h-6 text-white" />
             </div>
             <span className="text-2xl font-bold text-slate-800 tracking-tight">AI-ActivEdu</span>
@@ -135,7 +135,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-[15px] font-bold text-white bg-orange-500 hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-[15px] font-bold text-white bg-orange-600 hover:bg-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-600 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <UserPlus className="w-5 h-5" />
               {isLoading ? "Creating account..." : "Create Account"}
