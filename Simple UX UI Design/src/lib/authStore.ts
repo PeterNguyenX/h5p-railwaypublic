@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { login as apiLogin, register as apiRegister, getCurrentUser } from './api';
+import { login as apiLogin, register as apiRegister, verifyEmail as apiVerifyEmail, getCurrentUser } from './api';
 
 export type EducationRole = 'Teacher';
 
@@ -14,17 +14,18 @@ const defaultProfile = (username: string): AccountProfile => ({
 
 interface AuthState {
   token: string | null;
-  user: { id: string; username: string; email: string; role: string } | null;
+  user: { id: string; username: string; email: string; role: string; theme?: string } | null;
   profilesByUserId: Record<string, AccountProfile>;
   isLoading: boolean;
   sessionChecked: boolean;
   error: string | null;
-  login: (usernameOrEmail: string, password: string) => Promise<boolean>;
-  register: (username: string, email: string, password: string) => Promise<boolean>;
+  login: (usernameOrEmail: string, password: string, rememberMe?: boolean) => Promise<boolean>;
+  register: (username: string, email: string, password: string) => Promise<{ pending: true; email: string } | false>;
+  verifyEmail: (email: string, code: string) => Promise<boolean>;
   validateSession: () => Promise<void>;
   getCurrentProfile: () => AccountProfile | null;
   updateCurrentProfile: (patch: Partial<AccountProfile>) => void;
-  updateAuthenticatedUser: (patch: Partial<{ username: string; email: string }>) => void;
+  updateAuthenticatedUser: (patch: Partial<{ username: string; email: string; theme: string }>) => void;
   logout: () => void;
   clearError: () => void;
 }
@@ -39,10 +40,10 @@ export const useAuthStore = create<AuthState>()(
       sessionChecked: false,
       error: null,
 
-      login: async (usernameOrEmail, password) => {
+      login: async (usernameOrEmail, password, rememberMe = false) => {
         set({ isLoading: true, error: null });
         try {
-          const data = await apiLogin(usernameOrEmail, password);
+          const data = await apiLogin(usernameOrEmail, password, rememberMe);
           localStorage.setItem('token', data.token);
           set((state) => ({
             token: data.token,
@@ -56,35 +57,32 @@ export const useAuthStore = create<AuthState>()(
           }));
           return true;
         } catch (err: unknown) {
-          set({
-            error: err instanceof Error ? err.message : 'Login failed',
-            isLoading: false,
-          });
+          set({ error: err instanceof Error ? err.message : 'Login failed', isLoading: false });
           return false;
         }
       },
 
+      // Returns { pending, email } on success (user must verify then log in), false on error
       register: async (username, email, password) => {
         set({ isLoading: true, error: null });
         try {
           const data = await apiRegister(username, email, password);
-          localStorage.setItem('token', data.token);
-          set((state) => ({
-            token: data.token,
-            user: data.user,
-            isLoading: false,
-            sessionChecked: true,
-            profilesByUserId: {
-              ...state.profilesByUserId,
-              [data.user.id]: state.profilesByUserId[data.user.id] || defaultProfile(data.user.username),
-            },
-          }));
+          set({ isLoading: false });
+          return { pending: data.pending, email: data.email };
+        } catch (err: unknown) {
+          set({ error: err instanceof Error ? err.message : 'Registration failed', isLoading: false });
+          return false;
+        }
+      },
+
+      verifyEmail: async (email, code) => {
+        set({ isLoading: true, error: null });
+        try {
+          await apiVerifyEmail(email, code);
+          set({ isLoading: false });
           return true;
         } catch (err: unknown) {
-          set({
-            error: err instanceof Error ? err.message : 'Registration failed',
-            isLoading: false,
-          });
+          set({ error: err instanceof Error ? err.message : 'Verification failed', isLoading: false });
           return false;
         }
       },
@@ -113,31 +111,17 @@ export const useAuthStore = create<AuthState>()(
       updateCurrentProfile: (patch) => {
         const state = useAuthStore.getState();
         if (!state.user) return;
-
         const userId = state.user.id;
         const existing = state.profilesByUserId[userId] || defaultProfile(state.user.username);
-        const next = {
-          ...existing,
-          ...patch,
-        };
-
         set((prev) => ({
-          profilesByUserId: {
-            ...prev.profilesByUserId,
-            [userId]: next,
-          },
+          profilesByUserId: { ...prev.profilesByUserId, [userId]: { ...existing, ...patch } },
         }));
       },
 
       updateAuthenticatedUser: (patch) => {
         set((state) => {
           if (!state.user) return state;
-          return {
-            user: {
-              ...state.user,
-              ...patch,
-            },
-          };
+          return { user: { ...state.user, ...patch } };
         });
       },
 

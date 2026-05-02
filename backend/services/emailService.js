@@ -84,4 +84,48 @@ async function sendPasswordResetEmail(email, token) {
   }
 }
 
-module.exports = { sendPasswordResetEmail };
+async function sendVerificationEmail(email, code) {
+  const html = `
+    <div style="font-family: Inter, system-ui, sans-serif; max-width: 560px; margin: 0 auto; color: #1e293b;">
+      <div style="background: #1e3a5f; padding: 32px 40px;">
+        <h1 style="color: #ffffff; font-size: 22px; font-weight: 700; margin: 0;">${APP_NAME}</h1>
+      </div>
+      <div style="padding: 40px; background: #ffffff; border: 1px solid #e2e8f0; border-top: none;">
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">Verify your email</h2>
+        <p style="color: #64748b; margin: 0 0 24px; line-height: 1.6;">
+          Enter the 6-digit code below to complete your ${APP_NAME} account registration.
+          This code expires in <strong>15 minutes</strong>.
+        </p>
+        <div style="background: #f0f5ff; border: 2px solid #1e3a5f; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 40px; font-weight: 800; letter-spacing: 12px; color: #1e3a5f; font-family: monospace;">${code}</span>
+        </div>
+        <p style="color: #94a3b8; font-size: 13px; margin: 0;">
+          If you didn't create an account, you can safely ignore this email.
+        </p>
+      </div>
+    </div>
+  `;
+
+  const client = getResendClient();
+
+  if (!client) {
+    logger.info('DEV MODE — Verification email (not sent)', { to: email, code });
+    return { success: true, devMode: true, code };
+  }
+
+  try {
+    const result = await client.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `[${APP_NAME}] Your verification code: ${code}`,
+      html,
+    });
+    logger.info('Verification email sent', { to: email, emailId: result.data?.id });
+    return { success: true, emailId: result.data?.id };
+  } catch (err) {
+    logger.error('Failed to send verification email', { error: err.message, to: email });
+    throw new Error('Failed to send verification email. Please try again.');
+  }
+}
+
+module.exports = { sendPasswordResetEmail, sendVerificationEmail };

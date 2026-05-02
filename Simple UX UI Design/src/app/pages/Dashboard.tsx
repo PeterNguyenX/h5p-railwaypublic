@@ -515,13 +515,13 @@ export default function Dashboard() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+              className="w-full pl-9 pr-3 py-3 bg-white dark:bg-[#2e2e2e] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] transition-all"
               placeholder="Search videos by name"
             />
           </div>
           <Link
             to="/app/editor"
-            className="inline-flex items-center gap-2.5 px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
+            className="inline-flex items-center gap-2.5 px-6 py-3 bg-[#f5832a] hover:bg-[#e86e15] dark:bg-transparent dark:border dark:border-[#f5832a] dark:hover:border-[#ffa05c] text-white font-bold rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
           >
             <Plus className="w-5 h-5" />
             Create New Video
@@ -532,7 +532,7 @@ export default function Dashboard() {
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setSelectedFolder("all")}
-          className={`px-3 py-2 rounded-lg border text-sm font-medium ${selectedFolder === "all" ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-slate-600"}`}
+          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${selectedFolder === "all" ? "bg-[#1e3a5f] border-[#1e3a5f] text-white dark:bg-transparent dark:border-[#1e3a5f] dark:text-gray-200" : "bg-white dark:bg-transparent border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-white/5"}`}
         >
           All
         </button>
@@ -541,7 +541,7 @@ export default function Dashboard() {
           <div key={folder.id} className="inline-flex items-center">
             <button
               onClick={() => setSelectedFolder(folder.id)}
-              className={`px-3 py-2 rounded-l-lg border-y border-l text-sm font-medium inline-flex items-center gap-1.5 ${selectedFolder === folder.id ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-slate-200 text-slate-600"}`}
+              className={`px-3 py-2 rounded-l-lg border-y border-l text-sm font-medium inline-flex items-center gap-1.5 transition-colors ${selectedFolder === folder.id ? "bg-[#1e3a5f] border-[#1e3a5f] text-white dark:bg-transparent dark:border-[#1e3a5f] dark:text-gray-200" : "bg-white dark:bg-transparent border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-white/5"}`}
             >
               <Folder className="w-4 h-4" />
               {folder.name}
@@ -549,7 +549,7 @@ export default function Dashboard() {
             <button
               onClick={() => moveFolderToTrash(folder.id)}
               title="Move folder to Trash"
-              className="px-2 py-2 rounded-r-lg border text-slate-500 hover:text-orange-600 border-slate-200 bg-white"
+              className="px-2 py-2 rounded-r-lg border text-slate-500 dark:text-gray-400 hover:text-[#f5832a] border-slate-200 dark:border-white/10 bg-white dark:bg-transparent transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -558,7 +558,7 @@ export default function Dashboard() {
 
         <button
           onClick={() => setSelectedFolder("trash")}
-          className={`px-3 py-2 rounded-lg border text-sm font-medium inline-flex items-center gap-1.5 ${selectedFolder === "trash" ? "bg-orange-50 border-orange-200 text-orange-700" : "bg-white border-slate-200 text-slate-600"}`}
+          className={`px-3 py-2 rounded-lg border text-sm font-medium inline-flex items-center gap-1.5 transition-colors ${selectedFolder === "trash" ? "bg-[#f5832a] border-[#f5832a] text-white dark:bg-transparent dark:border-[#f5832a] dark:text-gray-200" : "bg-white dark:bg-transparent border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-white/5"}`}
         >
           <Trash2 className="w-4 h-4" />
           Trash
@@ -567,7 +567,7 @@ export default function Dashboard() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 mb-6">
+        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-300 mb-6">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -579,13 +579,13 @@ export default function Dashboard() {
           <span>Loading your videos...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-cards">
           {visibleVideos.map((video) => {
             const thumb = thumbnailUrl(video);
             return (
               <div
                 key={video.id}
-                className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
+                className="bg-white dark:bg-[#242424] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
                 onClick={() => selectedFolder !== "trash" && openVideo(video.id)}
                 onContextMenu={(event) => {
                   event.preventDefault();
@@ -629,11 +629,11 @@ export default function Dashboard() {
                           if (e.key === "Enter") e.currentTarget.blur();
                           if (e.key === "Escape") setEditingTitleId(null);
                         }}
-                        className="flex-1 font-bold text-[17px] text-slate-900 border-b-2 border-blue-500 bg-transparent outline-none min-w-0"
+                        className="flex-1 font-bold text-[17px] text-slate-900 dark:text-white border-b-2 border-[#f5832a] bg-transparent outline-none min-w-0"
                       />
                     ) : (
                       <>
-                        <h3 className={`font-bold text-slate-900 leading-tight flex-1 ${video.title.length > 60 ? 'text-[11px]' : video.title.length > 40 ? 'text-[13px]' : video.title.length > 25 ? 'text-[15px]' : 'text-[17px]'}`}>{video.title}</h3>
+                        <h3 className={`font-bold text-slate-900 dark:text-white leading-tight flex-1 ${video.title.length > 60 ? 'text-[11px]' : video.title.length > 40 ? 'text-[13px]' : video.title.length > 25 ? 'text-[15px]' : 'text-[17px]'}`}>{video.title}</h3>
                         {selectedFolder !== "trash" && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setTitleDraft(video.title); setEditingTitleId(video.id); }}
@@ -650,7 +650,7 @@ export default function Dashboard() {
                   {selectedFolder !== "trash" && (
                     <p className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400">
                       <Clock className="w-3 h-3 shrink-0" />
-                      {relativeTime(video.updatedAt)}
+                      {relativeTime(visits[video.id] ?? video.updatedAt)}
                     </p>
                   )}
 
@@ -658,13 +658,13 @@ export default function Dashboard() {
                     <div className="mt-3 flex items-center gap-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); restoreVideo(video.id); }}
-                        className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
+                        className="text-xs px-2.5 py-1.5 rounded-md border border-[#1e3a5f]/40 dark:border-[#1e3a5f] text-[#1e3a5f] dark:text-gray-300 hover:bg-[#1e3a5f]/10 dark:hover:bg-transparent dark:hover:border-[#3d6ba6] inline-flex items-center gap-1 transition-colors"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Restore
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteVideoPermanently(video.id); }}
-                        className="text-xs px-2.5 py-1.5 rounded-md border border-orange-200 text-orange-700 hover:bg-orange-50 inline-flex items-center gap-1"
+                        className="text-xs px-2.5 py-1.5 rounded-md border border-[#f5832a]/40 text-[#f5832a] hover:bg-[#f5832a]/10 dark:border-[#f5832a] dark:hover:bg-transparent dark:hover:border-[#ffa05c] inline-flex items-center gap-1 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Delete Permanently
                       </button>
@@ -679,13 +679,13 @@ export default function Dashboard() {
 
       {selectedFolder === "trash" && trashedFolders.length > 0 && (
         <div className="mt-8 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-800">Folders in Trash</h2>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-gray-200">Folders in Trash</h2>
           {trashedFolders.map((folder) => {
             const folderVideos = allVideos.filter(
               (video) => byVideoId[video.id]?.folderId === folder.id && !!byVideoId[video.id]?.trashedAt && !byVideoId[video.id]?.deletedAt,
             );
             return (
-              <div key={folder.id} className="bg-white border border-slate-200 rounded-xl p-4">
+              <div key={folder.id} className="bg-white dark:bg-[#242424] border border-slate-200 dark:border-white/10 rounded-xl p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="inline-flex items-center gap-2 text-slate-800 font-semibold">
                     <Folder className="w-4 h-4" /> {folder.name}
@@ -693,13 +693,13 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => restoreFolder(folder.id)}
-                      className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
+                      className="text-xs px-2.5 py-1.5 rounded-md border border-[#1e3a5f]/40 dark:border-[#1e3a5f] text-[#1e3a5f] dark:text-gray-300 hover:bg-[#1e3a5f]/10 dark:hover:bg-transparent dark:hover:border-[#3d6ba6] transition-colors"
                     >
                       Restore Folder
                     </button>
                     <button
                       onClick={() => deleteFolderPermanently(folder.id)}
-                      className="text-xs px-2.5 py-1.5 rounded-md border border-orange-200 text-orange-700 hover:bg-orange-50"
+                      className="text-xs px-2.5 py-1.5 rounded-md border border-[#f5832a]/40 text-[#f5832a] hover:bg-[#f5832a]/10 dark:border-[#f5832a] dark:hover:bg-transparent dark:hover:border-[#ffa05c] transition-colors"
                     >
                       Delete Permanently
                     </button>
@@ -721,14 +721,14 @@ export default function Dashboard() {
       )}
 
       {detailsVideo && (
-        <aside className="fixed right-0 top-0 h-screen w-full max-w-md bg-white border-l border-slate-200 shadow-xl z-50 overflow-y-auto">
-          <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-slate-900">Details</h3>
+        <aside className="fixed right-0 top-0 h-screen w-full max-w-md bg-white dark:bg-[#242424] border-l border-slate-200 dark:border-white/10 shadow-xl z-50 overflow-y-auto">
+          <div className="p-5 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Details</h3>
             <button
               onClick={() => setDetailsVideoId(null)}
               title="Close details"
               aria-label="Close details"
-              className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+              className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500 dark:text-gray-400 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -773,7 +773,7 @@ export default function Dashboard() {
 
       {contextMenu && (
         <div
-          className="fixed z-[60] w-64 bg-white border border-slate-200 shadow-xl rounded-lg p-1"
+          className="fixed z-[60] w-64 bg-white dark:bg-[#2e2e2e] border border-slate-200 dark:border-white/10 shadow-xl rounded-lg p-1"
           style={{
             top: Math.min(contextMenu.y, window.innerHeight - 380),
             left: Math.min(contextMenu.x, window.innerWidth - 270),
@@ -785,7 +785,7 @@ export default function Dashboard() {
               openVideo(contextMenu.videoId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2 font-medium"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/5 text-sm text-slate-700 dark:text-gray-300 flex items-center gap-2 font-medium transition-colors"
           >
             <Play className="w-4 h-4" /> Open
           </button>
@@ -796,7 +796,7 @@ export default function Dashboard() {
               if (v) { setTitleDraft(v.title); setEditingTitleId(v.id); }
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/5 text-sm text-slate-700 dark:text-gray-300 flex items-center gap-2 transition-colors"
           >
             <Pencil className="w-4 h-4" /> Rename
           </button>
@@ -806,7 +806,7 @@ export default function Dashboard() {
               duplicateVideo(contextMenu.videoId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/5 text-sm text-slate-700 dark:text-gray-300 flex items-center gap-2 transition-colors"
           >
             <Copy className="w-4 h-4" /> Duplicate
           </button>
@@ -817,7 +817,7 @@ export default function Dashboard() {
               downloadH5P(contextMenu.videoId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/5 text-sm text-slate-700 dark:text-gray-300 flex items-center gap-2 transition-colors"
           >
             <Download className="w-4 h-4" /> Download
           </button>
@@ -827,7 +827,7 @@ export default function Dashboard() {
               copyLtiLink(contextMenu.videoId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-sm flex items-center gap-2"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/5 text-sm text-slate-700 dark:text-gray-300 flex items-center gap-2 transition-colors"
           >
             <Link2 className="w-4 h-4" /> LTI link
           </button>
@@ -837,7 +837,7 @@ export default function Dashboard() {
               moveVideoToTrash(contextMenu.videoId);
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 rounded-md hover:bg-orange-50 text-sm text-orange-700 flex items-center gap-2"
+            className="w-full text-left px-3 py-2 rounded-md hover:bg-[#f5832a]/10 dark:hover:bg-[#f5832a]/10 text-sm text-[#f5832a] flex items-center gap-2 transition-colors"
           >
             <Trash2 className="w-4 h-4" /> Move to Trash
           </button>
@@ -845,7 +845,7 @@ export default function Dashboard() {
       )}
 
       {notice && (
-        <div className={`fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg text-white text-sm z-[70] inline-flex items-center gap-2 ${notice === "Profile saved!" || notice === "Video saved!" ? "bg-blue-600" : "bg-slate-900"}`}>
+        <div className={`fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg text-white text-sm z-[70] inline-flex items-center gap-2 ${notice === "Profile saved!" || notice === "Video saved!" ? "bg-[#1e3a5f] dark:border dark:border-[#1e3a5f] dark:bg-transparent" : "bg-[#333333] dark:border dark:border-white/20 dark:bg-transparent"}`}>
           <AlertCircle className="w-4 h-4" />
           {notice}
         </div>

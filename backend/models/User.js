@@ -45,6 +45,24 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: true,
     defaultValue: null
+  },
+  theme: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'light'
+  },
+  emailVerified: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  verificationCode: {
+    type: DataTypes.STRING(6),
+    allowNull: true
+  },
+  verificationCodeExpiry: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   hooks: {

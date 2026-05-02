@@ -76,10 +76,10 @@ const TYPE_LABELS: Record<H5PType, string> = {
 };
 
 const TYPE_COLORS: Record<H5PType, string> = {
-  MultiChoice: "bg-blue-100 text-blue-800 border-blue-200",
-  TrueFalse: "bg-blue-100 text-blue-800 border-blue-200",
-  FillBlanks: "bg-blue-100 text-blue-800 border-blue-200",
-  Matching: "bg-blue-100 text-blue-800 border-blue-200",
+  MultiChoice: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
+  TrueFalse: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
+  FillBlanks: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
+  Matching: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
 };
 
 const TYPE_ICON_NAMES: Record<H5PType, string> = {
@@ -328,7 +328,7 @@ function H5PEditorPanel({
             <button
               type="button"
               onClick={() => setAddMenuOpen((v) => !v)}
-              className="flex items-center gap-1.5 h-8 px-3 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl transition-colors"
+              className="flex items-center gap-1.5 h-8 px-3 bg-[#f5832a] hover:bg-[#e86e15] dark:bg-transparent dark:border dark:border-[#f5832a] dark:hover:border-[#ffa05c] text-white text-xs font-bold rounded-xl transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Interaction
@@ -376,7 +376,7 @@ function H5PEditorPanel({
                       onClick={() => setForm(contentToForm(c))}
                       className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group cursor-pointer"
                     >
-                      <div className="w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-7 h-7 rounded-full bg-[#f5832a] text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
                         {i + 1}
                       </div>
                       <button
@@ -392,7 +392,7 @@ function H5PEditorPanel({
                       <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => { e.stopPropagation(); onDeleted(c.id); }}
-                          className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-[#f5832a] hover:bg-[#f5832a]/10 rounded-lg transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -444,7 +444,7 @@ function H5PEditorPanel({
               value={formatTime(form.timestamp)}
               onChange={(e) => setField("timestamp", parseTimeInput(e.target.value))}
               placeholder="MM:SS"
-              className="w-28 px-3 py-2 font-mono text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-28 px-3 py-2 font-mono text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
             />
             <button
               type="button"
@@ -467,7 +467,7 @@ function H5PEditorPanel({
                 onChange={(e) => setField("question", e.target.value)}
                 rows={3}
                 placeholder="What is the main idea of this segment?"
-                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none"
               />
             </div>
             <div>
@@ -481,7 +481,7 @@ function H5PEditorPanel({
                     id="multi-correct-toggle"
                     checked={form.allowMultipleCorrect}
                     onChange={(e) => setField("allowMultipleCorrect", e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                    className="rounded border-slate-300 text-[#f5832a] focus:ring-[#f5832a]/40 w-3.5 h-3.5"
                   />
                   <label htmlFor="multi-correct-toggle" className="text-xs font-semibold text-slate-600 cursor-pointer">
                     Allow multiple correct answers
@@ -523,7 +523,7 @@ function H5PEditorPanel({
                       value={choice}
                       onChange={(e) => setChoice(i, e.target.value)}
                       placeholder={`Option ${i + 1}`}
-                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
                     />
                   </div>
                 ))}
@@ -542,7 +542,7 @@ function H5PEditorPanel({
                 onChange={(e) => setField("statement", e.target.value)}
                 rows={3}
                 placeholder="Write a statement that is either true or false..."
-                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none"
               />
             </div>
             <div>
@@ -580,7 +580,7 @@ function H5PEditorPanel({
               onChange={(e) => setField("fillText", e.target.value)}
               rows={5}
               placeholder="The mitochondria is the *powerhouse* of the cell, and it produces *ATP*."
-              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none font-mono"
+              className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none font-mono"
             />
             <p className="text-xs text-slate-500 mt-1.5">
               Wrap words that should be blank with <code className="bg-slate-100 px-1 rounded font-mono">*asterisks*</code>
@@ -591,7 +591,7 @@ function H5PEditorPanel({
                 {form.fillText.split(/\*([^*]+)\*/).map((part, i) =>
                   i % 2 === 0
                     ? <span key={i}>{part}</span>
-                    : <span key={i} className="inline-block min-w-16 border-b-2 border-blue-500 text-transparent bg-blue-100 rounded px-1 mx-0.5 text-xs">____</span>
+                    : <span key={i} className="inline-block min-w-16 border-b-2 border-[#f5832a] text-transparent bg-[#fff0e6] rounded px-1 mx-0.5 text-xs">____</span>
                 )}
               </div>
             )}
@@ -607,7 +607,7 @@ function H5PEditorPanel({
                 <button
                   type="button"
                   onClick={() => setField("matchPairs", [...form.matchPairs, { prompt: "", answer: "" }])}
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                  className="text-xs font-semibold text-[#1e3a5f] hover:text-[#2d5286] flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" /> Add pair
                 </button>
@@ -629,7 +629,7 @@ function H5PEditorPanel({
                       setField("matchPairs", updated);
                     }}
                     placeholder={`Prompt ${i + 1}`}
-                    className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
                   />
                   <div className="flex gap-1 items-center">
                     <input
@@ -640,13 +640,13 @@ function H5PEditorPanel({
                         setField("matchPairs", updated);
                       }}
                       placeholder={`Answer ${i + 1}`}
-                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
                     />
                     {form.matchPairs.length > 2 && (
                       <button
                         type="button"
                         onClick={() => setField("matchPairs", form.matchPairs.filter((_, j) => j !== i))}
-                        className="p-1.5 text-slate-400 hover:text-orange-600 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-[#f5832a] transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -672,7 +672,7 @@ function H5PEditorPanel({
           <button
             type="button"
             onClick={handleDelete}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-orange-600 hover:bg-orange-50 border border-orange-300 hover:border-orange-400 font-semibold rounded-xl transition-colors text-sm"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-[#f5832a] hover:bg-[#f5832a]/10 dark:hover:bg-[#f5832a]/10 border border-[#f5832a]/50 hover:border-[#f5832a] font-semibold rounded-xl transition-colors text-sm"
           >
             <Trash2 className="w-3.5 h-3.5" />
             Delete
@@ -690,7 +690,7 @@ function H5PEditorPanel({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {isSaving ? "Saving..." : "Save Interaction"}
@@ -770,7 +770,7 @@ function TopicsPanel({
             {isTopicOpen && (
               <div className="ml-4 border-l border-slate-200 pl-2 space-y-0.5 mb-1">
                 {topic.question && (
-                  <div className="px-2 py-1 mb-1 text-xs text-blue-700 bg-blue-50 rounded italic border-l-2 border-blue-400">
+                  <div className="px-2 py-1 mb-1 text-xs text-[#1e3a5f] bg-[#e8f0fa] rounded italic border-l-2 border-[#1e3a5f]">
                     <span className="font-semibold block mb-0.5 text-[10px] uppercase tracking-wider">Quiz Question</span>
                     {(topic.question as any).question || (topic.question as any).fillText || (topic.question as any).statement}
                   </div>
@@ -793,7 +793,7 @@ function TopicsPanel({
                         {isSubOpen && (
                           <>
                             {sub.question && (
-                              <div className="ml-2 px-2 py-1 mb-1 text-[11px] text-blue-700 bg-blue-50 rounded italic border-l-2 border-blue-400">
+                              <div className="ml-2 px-2 py-1 mb-1 text-[11px] text-[#1e3a5f] bg-[#e8f0fa] rounded italic border-l-2 border-[#1e3a5f]">
                                 <span className="font-semibold block mb-0.5 text-[9px] uppercase tracking-wider">Quiz Question</span>
                                 {(sub.question as any).question || (sub.question as any).fillText || (sub.question as any).statement}
                               </div>
@@ -901,7 +901,7 @@ function InteractionPreview({
             return (
               <>
                 <p className="font-semibold text-slate-800 text-[15px] leading-snug">{(p.question as string) || ""}</p>
-                {isMultiple && <p className="text-xs text-blue-600 font-semibold mb-1">Please select all correct answers.</p>}
+                {isMultiple && <p className="text-xs text-[#1e3a5f] font-semibold mb-1">Please select all correct answers.</p>}
                 <div className="space-y-2">
                   {answers.map((ans, i) => (
                     <button
@@ -916,7 +916,7 @@ function InteractionPreview({
                             ? "border-red-400 bg-red-50 text-red-800"
                             : "border-slate-200 text-slate-500"
                           : selectedAnswers.includes(i)
-                          ? "border-blue-500 bg-blue-50 text-blue-800"
+                          ? "border-[#f5832a] bg-[#fff0e6] text-[#1e3a5f]"
                           : "border-slate-200 hover:border-slate-300 text-slate-700"
                       }`}
                     >
@@ -975,7 +975,7 @@ function InteractionPreview({
                     const userWord = userAnswers[blankIndex++] ?? "";
                     const wordCorrect = userWord.toLowerCase() === correctWord.toLowerCase();
                     if (!submitted) {
-                      return <span key={i} className="inline-block bg-slate-100 border-b-2 border-blue-500 px-2 min-w-16 text-slate-400 text-sm">___</span>;
+                      return <span key={i} className="inline-block bg-slate-100 border-b-2 border-[#f5832a] px-2 min-w-16 text-slate-400 text-sm">___</span>;
                     }
                     return (
                       <span key={i} className="inline-flex flex-col items-center mx-1">
@@ -997,7 +997,7 @@ function InteractionPreview({
                     onKeyDown={(e) => e.key === "Enter" && canSubmit && !submitted && handleSubmit()}
                     disabled={submitted}
                     placeholder="Type your answer..."
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
                   />
                 )}
               </>
@@ -1024,7 +1024,7 @@ function InteractionPreview({
                         if (firstEmpty !== -1) setMatchSelections(prev => ({ ...prev, [firstEmpty]: pair.answer }));
                       }}
                       className={`px-3 py-1.5 rounded-lg text-sm font-semibold border cursor-grab transition-all select-none ${
-                        used ? "opacity-30 cursor-not-allowed" : "bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100"
+                        used ? "opacity-30 cursor-not-allowed" : "bg-[#e8f0fa] border-[#1e3a5f]/20 text-[#1e3a5f] hover:bg-[#1e3a5f]/10"
                       } ${draggingAnswer === pair.answer ? "opacity-50" : ""}`}
                     >
                       {pair.answer}
@@ -1052,20 +1052,20 @@ function InteractionPreview({
                       className={`flex items-center gap-3 p-2.5 rounded-xl border-2 transition-all ${
                         submitted
                           ? isMatch ? "border-green-400 bg-green-50" : "border-red-300 bg-red-50"
-                          : selected ? "border-blue-300 bg-blue-50" : "border-dashed border-slate-300 bg-slate-50"
+                          : selected ? "border-[#f5832a] bg-[#fff0e6]" : "border-dashed border-slate-300 bg-slate-50"
                       }`}
                     >
                       <span className="text-sm font-semibold text-slate-700 flex-1">{pair.prompt}</span>
                       <div className="flex items-center gap-1">
                         {selected ? (
                           <>
-                            <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${submitted ? (isMatch ? "text-green-800" : "text-red-700") : "text-blue-800"}`}>
+                            <span className={`text-sm font-bold px-2.5 py-1 rounded-lg ${submitted ? (isMatch ? "text-green-800" : "text-red-700") : "text-[#1e3a5f]"}`}>
                               {selected}
                             </span>
                             {!submitted && (
                               <button
                                 onClick={() => setMatchSelections(prev => { const n = { ...prev }; delete n[i]; return n; })}
-                                className="p-0.5 text-slate-400 hover:text-orange-600"
+                                className="p-0.5 text-slate-400 hover:text-[#f5832a]"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -1109,14 +1109,14 @@ function InteractionPreview({
             <button
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="px-5 py-2.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-40 text-white font-bold rounded-xl text-sm transition-colors"
+              className="px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] disabled:opacity-40 text-white font-bold rounded-xl text-sm transition-colors"
             >
               Submit
             </button>
           ) : (
             <button
               onClick={onContinue}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-colors flex items-center gap-1.5"
+              className="px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white font-bold rounded-xl text-sm transition-colors flex items-center gap-1.5"
             >
               <ChevronRight className="w-4 h-4" /> Continue
             </button>
@@ -1129,7 +1129,7 @@ function InteractionPreview({
 
 // ─── Progress Bar ──────────────────────────────────────────────────────────────
 
-function ProgressBar({ value, label, color = "bg-blue-600" }: { value: number; label: string; color?: string }) {
+function ProgressBar({ value, label, color = "bg-[#1e3a5f]" }: { value: number; label: string; color?: string }) {
   return (
     <div className="mt-3">
       <div className="flex justify-between text-xs text-slate-500 mb-1.5">
@@ -1279,7 +1279,7 @@ function VideoControls({
                 onClick={(e) => { e.stopPropagation(); onSeek(c.timestamp); onDotClick(c); }}
                 title={`#${i + 1} ${TYPE_LABELS[inferType(c.library || "")]} @ ${formatTime(c.timestamp)}`}
               >
-                <div className="w-5 h-5 rounded-full bg-orange-600 border-2 border-white text-white text-[9px] font-bold flex items-center justify-center shadow-lg hover:scale-125 transition-transform hover:bg-orange-500">
+                <div className="w-5 h-5 rounded-full bg-[#f5832a] border-2 border-white text-white text-[9px] font-bold flex items-center justify-center shadow-lg hover:scale-125 transition-transform hover:bg-[#e86e15]">
                   {i + 1}
                 </div>
                 <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/dot:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
@@ -1547,6 +1547,7 @@ export default function Editor() {
       form.append("title", file.name.replace(/\.[^/.]+$/, ""));
       const video = await uploadVideo(form);
       store.setVideo(video);
+      recordVideoVisit(video.id);
       await store.loadH5PContents(video.id);
       setCurrentStep(2);
       if (video.status === 'processing') startProcessingPoll(video.id);
@@ -1564,6 +1565,7 @@ export default function Editor() {
     try {
       const video = await importYoutube(youtubeLink.trim());
       store.setVideo(video);
+      recordVideoVisit(video.id);
       await store.loadH5PContents(video.id);
       setCurrentStep(2);
       notify("YouTube video imported!", "success");
@@ -1600,6 +1602,7 @@ export default function Editor() {
       try {
         const { video } = await uploadH5PFile(pendingH5PFile, store.video?.id);
         store.setVideo(video);
+        recordVideoVisit(video.id);
         await store.loadH5PContents(video.id);
         setPendingH5PFile(null);
       } catch (err: unknown) {
@@ -1823,7 +1826,7 @@ export default function Editor() {
               }}
               title="Video title"
               placeholder="Video title"
-              className="text-xl font-bold text-slate-800 border-b-2 border-blue-500 bg-transparent outline-none px-1 w-64"
+              className="text-xl font-bold text-slate-800 border-b-2 border-[#f5832a] bg-transparent outline-none px-1 w-64"
             />
           ) : (
             <div className="flex items-center gap-2">
@@ -1894,7 +1897,7 @@ export default function Editor() {
                 navigate("/app/dashboard");
               }
             }}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white transition-colors"
           >
             <Home className="w-4 h-4" />
             Home
@@ -1926,7 +1929,7 @@ export default function Editor() {
               <button
                 type="button"
                 onClick={() => { setHasUnsavedChanges(false); setShowUnsavedWarning(false); window.dispatchEvent(new CustomEvent('dashboard-refresh')); navigate("/app/dashboard?saved=1"); }}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white rounded-xl transition-colors"
               >
                 <Save className="w-4 h-4" />
                 Save
@@ -1975,7 +1978,7 @@ export default function Editor() {
               <button
                 type="button"
                 onClick={() => { setShowAIConfirm(false); pendingAIAction?.(); setPendingAIAction(null); }}
-                className="px-4 py-2 rounded-lg text-sm font-bold bg-orange-600 hover:bg-orange-700 text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-bold bg-[#f5832a] hover:bg-[#e86e15] dark:bg-transparent dark:border dark:border-[#f5832a] dark:hover:border-[#ffa05c] text-white transition-colors"
               >
                 Delete & Regenerate
               </button>
@@ -1990,21 +1993,27 @@ export default function Editor() {
 
           {/* ── STEP 1: Upload ───────────────────────────────────────────── */}
           {currentStep === 1 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 sm:p-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-white dark:bg-[#242424] rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm p-8 sm:p-12 animate-fade-in">
               <div className="text-center max-w-xl mx-auto mb-10">
-                <h1 className="text-3xl font-bold text-slate-900 mb-4">Let's add your video</h1>
-                <p className="text-slate-600 text-lg">Upload a video file, paste a YouTube link, or import an H5P package.</p>
+                <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-white mb-2">Add your video</h1>
+                <p className="text-slate-500 dark:text-gray-400 text-sm">Upload a file, paste a YouTube link, or import an H5P package.</p>
               </div>
 
+              {/* Tab switcher */}
               <div className="flex justify-center mb-8">
-                <div className="inline-flex bg-slate-100 p-1.5 rounded-xl">
+                <div className="inline-flex bg-slate-100 dark:bg-[#1a1a1a] p-1 rounded-xl gap-0.5">
                   {(["file", "youtube", "h5p"] as const).map((tab) => (
                     <button
                       key={tab}
+                      type="button"
                       onClick={() => setActiveUploadTab(tab)}
-                      className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-[15px] transition-all ${activeUploadTab === tab ? "bg-white text-blue-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                        activeUploadTab === tab
+                          ? "bg-white dark:bg-[#2e2e2e] text-[#1e3a5f] dark:text-white shadow-sm"
+                          : "text-slate-500 dark:text-gray-300/50 hover:text-slate-800 dark:hover:text-gray-200"
+                      }`}
                     >
-                      {tab === "file" ? <UploadCloud className="w-5 h-5" /> : tab === "youtube" ? <Youtube className="w-5 h-5" /> : <Package className="w-5 h-5" />}
+                      {tab === "file" ? <UploadCloud className="w-4 h-4" /> : tab === "youtube" ? <Youtube className="w-4 h-4" /> : <Package className="w-4 h-4" />}
                       {tab === "file" ? "Upload File" : tab === "youtube" ? "YouTube Link" : "H5P Package"}
                     </button>
                   ))}
@@ -2012,96 +2021,124 @@ export default function Editor() {
               </div>
 
               {uploadError && (
-                <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm max-w-lg mx-auto">
-                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-sm max-w-lg mx-auto animate-shake">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   {uploadError}
                 </div>
               )}
 
+              {/* File upload dropzone */}
               {activeUploadTab === "file" && (
                 <>
-                  <input ref={fileInputRef} type="file" accept="video/*" onChange={handleVideoFileUpload} className="hidden" />
+                  <input ref={fileInputRef} type="file" accept="video/*" onChange={handleVideoFileUpload} className="hidden" title="Upload video file" aria-label="Upload video file" />
                   <div
                     onClick={() => !isUploading && fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-300 bg-slate-50/50 rounded-2xl p-12 text-center hover:bg-slate-50 hover:border-slate-400 transition-colors cursor-pointer group"
+                    className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-200 group ${
+                      isUploading
+                        ? "border-[#f5832a]/60 bg-[#fff0e6] dark:bg-[#f5832a]/5 cursor-wait"
+                        : "border-slate-300 dark:border-white/10 bg-slate-50/50 dark:bg-[#1a1a1a]/40 hover:border-[#f5832a] hover:bg-[#fff0e6]/40 dark:hover:bg-[#f5832a]/5 cursor-pointer"
+                    }`}
                   >
-                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform border border-slate-200">
-                      {isUploading ? <Loader2 className="w-10 h-10 text-blue-600 animate-spin" /> : <UploadCloud className="w-10 h-10 text-slate-600" />}
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 transition-transform duration-200 ${
+                      isUploading ? "bg-[#fff0e6] dark:bg-[#f5832a]/10" : "bg-slate-100 dark:bg-[#2e2e2e] group-hover:scale-110 group-hover:bg-[#fff0e6] dark:group-hover:bg-[#f5832a]/10"
+                    }`}>
+                      {isUploading
+                        ? <Loader2 className="w-8 h-8 text-[#f5832a] animate-spin" />
+                        : <UploadCloud className="w-8 h-8 text-slate-500 dark:text-gray-400 group-hover:text-[#f5832a]" />
+                      }
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">{isUploading ? "Uploading..." : "Click to upload video"}</h3>
-                    <p className="text-slate-500 mb-6">MP4, WebM, or OGG up to 5GB</p>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-white mb-1">
+                      {isUploading ? "Uploading…" : "Click to upload a video"}
+                    </h3>
+                    <p className="text-sm text-slate-400 dark:text-gray-300/40 mb-5">MP4, WebM, or OGG · up to 5 GB</p>
                     {isUploading && (
-                      <div className="w-full max-w-xs mx-auto bg-slate-200 rounded-full h-2">
-                        <div className="bg-blue-600 h-2 rounded-full animate-pulse w-1/2" />
+                      <div className="w-full max-w-xs mx-auto bg-slate-200 dark:bg-[#2e2e2e] rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-[#f5832a] h-1.5 rounded-full animate-pulse w-1/2" />
                       </div>
                     )}
                   </div>
                 </>
               )}
 
+              {/* YouTube URL */}
               {activeUploadTab === "youtube" && (
                 <div className="max-w-xl mx-auto">
-                  <label className="block text-[15px] font-bold text-slate-700 mb-2">Paste YouTube URL</label>
-                  <div className="flex gap-3">
+                  <label className="block text-sm font-semibold text-[#1e3a5f] dark:text-gray-300 mb-2">YouTube URL</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <Youtube className="w-4 h-4 text-slate-400 group-focus-within:text-[#f5832a] transition-colors" />
+                    </div>
                     <input
                       type="url"
                       value={youtubeLink}
                       onChange={(e) => setYoutubeLink(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleYoutubeImport()}
-                      placeholder="https://www.youtube.com/watch?v=..."
-                      className="flex-1 px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-[15px]"
+                      placeholder="https://www.youtube.com/watch?v=…"
+                      className="w-full pl-10 pr-4 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all text-sm"
                     />
                   </div>
-                  <p className="text-xs text-slate-400 mt-2">Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-slate-600 font-mono">Enter</kbd> to import</p>
-                  {isUploading && <ProgressBar value={60} label="Importing YouTube video..." color="bg-blue-600" />}
+                  <p className="text-xs text-slate-400 dark:text-gray-300/40 mt-2">
+                    Press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-[#2e2e2e] border border-slate-200 dark:border-white/10 rounded text-slate-600 dark:text-gray-300 font-mono text-[11px]">Enter</kbd> to import
+                  </p>
+                  {isUploading && <ProgressBar value={60} label="Importing YouTube video…" color="bg-[#f5832a]" />}
                 </div>
               )}
 
+              {/* H5P package */}
               {activeUploadTab === "h5p" && (
                 <>
-                  <input ref={h5pStep1InputRef} type="file" accept=".h5p" onChange={handleH5PFileSelect} className="hidden" />
+                  <input ref={h5pStep1InputRef} type="file" accept=".h5p" onChange={handleH5PFileSelect} className="hidden" title="Upload H5P package" aria-label="Upload H5P package" />
                   <div
                     onClick={() => h5pStep1InputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-300 bg-slate-50/50 rounded-2xl p-12 text-center hover:bg-slate-50 hover:border-slate-400 transition-colors cursor-pointer group"
+                    className={`border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-200 group cursor-pointer ${
+                      pendingH5PFile
+                        ? "border-green-400/60 dark:border-green-500/40 bg-green-50/50 dark:bg-green-900/10"
+                        : "border-slate-300 dark:border-white/10 bg-slate-50/50 dark:bg-[#1a1a1a]/40 hover:border-[#f5832a] hover:bg-[#fff0e6]/40 dark:hover:bg-[#f5832a]/5"
+                    }`}
                   >
                     {pendingH5PFile ? (
                       <>
-                        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-200">
-                          <CheckCircle2 className="w-10 h-10 text-green-600" />
+                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                          <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">{pendingH5PFile.name}</h3>
-                        <p className="text-slate-500 mb-6">H5P package ready to import</p>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); setPendingH5PFile(null); }} className="px-4 py-2 bg-white border border-slate-300 hover:bg-orange-50 hover:text-orange-700 text-slate-600 font-semibold rounded-lg transition-colors text-sm">
+                        <h3 className="text-base font-bold text-slate-800 dark:text-white mb-1 truncate max-w-xs mx-auto">{pendingH5PFile.name}</h3>
+                        <p className="text-sm text-slate-400 dark:text-gray-300/40 mb-5">H5P package ready to import</p>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setPendingH5PFile(null); }}
+                          className="px-4 py-1.5 bg-white dark:bg-[#2e2e2e] border border-slate-300 dark:border-white/10 hover:border-red-300 hover:text-red-600 dark:hover:border-red-700 dark:hover:text-red-400 text-slate-600 dark:text-gray-300 font-semibold rounded-lg transition-all text-sm"
+                        >
                           Remove
                         </button>
                       </>
                     ) : (
                       <>
-                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:scale-110 transition-transform border border-slate-200">
-                          <Package className="w-10 h-10 text-slate-600" />
+                        <div className="w-16 h-16 bg-slate-100 dark:bg-[#2e2e2e] rounded-2xl flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:bg-[#fff0e6] dark:group-hover:bg-[#f5832a]/10 transition-all duration-200">
+                          <Package className="w-8 h-8 text-slate-500 dark:text-gray-400 group-hover:text-[#f5832a]" />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-2">Click to upload H5P package</h3>
-                        <p className="text-slate-500">.h5p files only</p>
+                        <h3 className="text-base font-bold text-slate-800 dark:text-white mb-1">Click to upload H5P package</h3>
+                        <p className="text-sm text-slate-400 dark:text-gray-300/40">.h5p files only</p>
                       </>
                     )}
                   </div>
                   {pendingH5PFile && (
-                    <p className="text-center text-sm text-slate-500 mt-4">
-                      The H5P package will be imported when you continue. You still need to add a video first.
+                    <p className="text-center text-xs text-slate-400 dark:text-gray-300/40 mt-3">
+                      The H5P package will be imported when you continue. You still need to select a video source.
                     </p>
                   )}
                 </>
               )}
 
-              <div className="mt-12 flex justify-end">
+              <div className="mt-10 flex justify-end">
                 <button
+                  type="button"
                   onClick={handleContinueToStep2}
                   disabled={(!store.video && !(activeUploadTab === "h5p" && pendingH5PFile)) || isImportingH5P}
-                  className="px-8 py-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-sm transition-all text-lg flex items-center gap-2"
+                  className="flex items-center gap-2 px-7 py-3 bg-[#f5832a] hover:bg-[#e86e15] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-[#f5832a]/20 transition-all duration-200 active:scale-[0.98]"
                 >
-                  {isImportingH5P ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                  {isImportingH5P ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Continue
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -2193,7 +2230,7 @@ export default function Editor() {
                     {/* Panel header */}
                     <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <Sparkles className="w-4 h-4 text-blue-600" />
+                        <Sparkles className="w-4 h-4 text-[#f5832a]" />
                         <h3 className="font-bold text-slate-800 text-base">AI Transcribing &amp; Applying H5P</h3>
                         {aiUsage && (
                           aiUsage.isAdmin
@@ -2230,7 +2267,7 @@ export default function Editor() {
                                 <button
                                   type="button"
                                   onClick={handleTranscribeAndGenerate}
-                                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
                                 >
                                   <Sparkles className="w-4 h-4" />
                                   Transcribe &amp; Generate H5P with AI
@@ -2240,13 +2277,13 @@ export default function Editor() {
                             {isRunning && (
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
-                                  <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
-                                  <span className="text-sm text-blue-800 font-semibold truncate flex-1">{unifiedMessage}</span>
+                                  <Loader2 className="w-4 h-4 animate-spin text-[#f5832a] shrink-0" />
+                                  <span className="text-sm text-[#1e3a5f] dark:text-gray-200 font-semibold truncate flex-1">{unifiedMessage}</span>
                                   <span className="font-mono text-xs text-slate-500 shrink-0">{unifiedProgress}%</span>
                                 </div>
                                 <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                                   <div
-                                    className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out"
+                                    className="bg-[#1e3a5f] h-full rounded-full transition-all duration-500 ease-out"
                                     style={{ width: `${unifiedProgress}%` }}
                                   />
                                 </div>
@@ -2269,10 +2306,11 @@ export default function Editor() {
 
                       {/* Manual transcript upload — small secondary option */}
                       <div className="flex items-center gap-2 pt-1">
-                        <input ref={transcriptInputRef} type="file" accept=".vtt,.srt" onChange={handleTranscriptUpload} className="hidden" />
+                        <input ref={transcriptInputRef} type="file" accept=".vtt,.srt" onChange={handleTranscriptUpload} className="hidden" title="Upload transcript file" aria-label="Upload transcript file" />
                         <button
+                          type="button"
                           onClick={() => transcriptInputRef.current?.click()}
-                          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-700 font-medium transition-colors"
+                          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-[#1e3a5f] font-medium transition-colors"
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
                           {store.transcriptFilename ? `Using: ${store.transcriptFilename}` : "Or upload transcript (.vtt/.srt)"}

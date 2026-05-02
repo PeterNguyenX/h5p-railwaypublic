@@ -348,10 +348,14 @@ router.post("/upload", auth, h5pUpload.single('h5pFile'), async (req, res) => {
           } catch (_) {}
         }
 
+        const youtubeThumbnail = youtubeId
+          ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`
+          : '/default-thumbnail.svg';
+
         targetVideo = await Video.create({
           title: finalTitle,
           status: extractedFilePath ? 'processing' : 'ready',
-          thumbnailPath: '/default-thumbnail.svg',
+          thumbnailPath: youtubeThumbnail,
           youtubeId: youtubeId || null,
           youtubeUrl: youtubeUrl || null,
           filePath: extractedFilePath || null,

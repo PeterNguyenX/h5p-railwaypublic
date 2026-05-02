@@ -57,47 +57,47 @@ export default function Account() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#1a1a1a] flex flex-col transition-colors duration-200">
+      <header className="bg-white dark:bg-[#242424] border-b border-slate-200 dark:border-white/10 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-          <span className="text-base font-semibold text-slate-800">Profile</span>
+          <span className="text-base font-semibold text-slate-800 dark:text-gray-200">Profile</span>
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div className="bg-white dark:bg-[#242424] rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-[14px] font-semibold text-slate-700 mb-1.5">Display Name</label>
+              <label className="block text-[14px] font-semibold text-slate-700 dark:text-gray-300 mb-1.5">Display Name</label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(isAdmin ? e.target.value.toUpperCase() : e.target.value)}
-                className="w-full px-4 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                className="w-full px-4 py-3.5 bg-slate-50 dark:bg-[#2e2e2e] text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] transition-all"
                 placeholder="Your full name"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-700 mb-1.5">Username</label>
+              <label className="block text-[14px] font-semibold text-slate-700 dark:text-gray-300 mb-1.5">Username</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(isAdmin ? e.target.value.toUpperCase() : e.target.value)}
-                className="w-full px-4 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                className="w-full px-4 py-3.5 bg-slate-50 dark:bg-[#2e2e2e] text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] transition-all"
                 placeholder="Username"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[14px] font-semibold text-slate-700 mb-1.5">Email</label>
+              <label className="block text-[14px] font-semibold text-slate-700 dark:text-gray-300 mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                className="w-full px-4 py-3.5 bg-slate-50 dark:bg-[#2e2e2e] text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] transition-all"
                 placeholder="email@example.com"
                 required
               />
@@ -107,21 +107,21 @@ export default function Account() {
               <button
                 type="button"
                 onClick={() => navigate("/app/dashboard")}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-transparent dark:border dark:border-white/20 dark:hover:border-white/40 text-slate-700 dark:text-gray-300 font-semibold rounded-xl transition-colors"
               >
                 <X className="w-4 h-4" />
                 Cancel
               </button>
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl shadow-sm transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white font-bold rounded-xl shadow-sm transition-colors"
               >
                 <Save className="w-4 h-4" />
                 Save Profile
               </button>
             </div>
 
-            {saveError && <p className="text-sm text-red-700 font-semibold">{saveError}</p>}
+            {saveError && <p className="text-sm text-red-600 dark:text-red-400 font-semibold">{saveError}</p>}
           </form>
         </div>
       </div>

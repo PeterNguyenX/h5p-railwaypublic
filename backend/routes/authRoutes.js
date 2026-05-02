@@ -13,107 +13,129 @@ const {
   forgotPasswordSchema,
   resetPasswordSchema,
 } = require('../validation/schemas');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendVerificationEmail } = require('../services/emailService');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
-// Register
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+
+function generateToken(userId, rememberMe = false) {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: rememberMe ? '30d' : '24h' });
+}
+
+function generateVerificationCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+// Register — sends verification email, does NOT return a login token
 router.post('/register', validate(registerSchema), async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Validate input
     if (!username || !email || !password) {
-      return res.status(400).json({
-        message: "All fields are required",
-        missingFields: {
-          username: !username,
-          email: !email,
-          password: !password,
-        },
-      });
+      return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        message: "Invalid email format",
-      });
+      return res.status(400).json({ message: "Invalid email format" });
     }
 
-    // Validate password strength
     if (password.length < 6) {
-      return res.status(400).json({
-        message: "Password must be at least 6 characters long",
-      });
+      return res.status(400).json({ message: "Password must be at least 6 characters long" });
     }
 
-    // Check if user already exists
+    // Check for existing verified account
     const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({
-        message: "Email is already registered",
+    if (existingUser && existingUser.emailVerified) {
+      return res.status(400).json({ message: "Email is already registered" });
+    }
+
+    const code = generateVerificationCode();
+    const codeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    if (existingUser && !existingUser.emailVerified) {
+      // Resend code for unverified account
+      await existingUser.update({
+        password,
+        verificationCode: code,
+        verificationCodeExpiry: codeExpiry,
+      });
+    } else {
+      await User.create({
+        username,
+        email,
+        password,
+        emailVerified: false,
+        isActive: false,
+        verificationCode: code,
+        verificationCodeExpiry: codeExpiry,
       });
     }
 
-    // Create user (password will be hashed by the model's beforeCreate hook)
-    const user = await User.create({
-      username,
+    await sendVerificationEmail(email, code);
+
+    return res.status(201).json({
+      message: "Verification code sent to your email.",
+      pending: true,
       email,
-      password,
-    });
-
-    // Generate token
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "24h" }
-    );
-
-    // Return user data without password
-    const userResponse = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
-
-    res.status(201).json({
-      message: "User registered successfully",
-      token,
-      user: userResponse,
     });
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).json({
-      message: "An error occurred during registration",
-      error: error.message,
-    });
+    return res.status(500).json({ message: "An error occurred during registration", error: error.message });
   }
 });
 
-// Login
-router.post('/login', validate(loginSchema), async (req, res) => {
+// Verify email with 6-digit code — activates account, user must then log in
+router.post('/verify-email', async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const usernameOrEmail = typeof username === 'string' ? username.trim() : '';
-
-    // Validate input
-    if (!usernameOrEmail || !password) {
-      return res.status(400).json({
-        message: "Username/email and password are required",
-        missingFields: {
-          username: !usernameOrEmail,
-          password: !password,
-        },
-      });
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ message: "Email and code are required." });
     }
 
-    // Find by either username or email for better UX.
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid code." });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ message: "Account already verified. Please log in." });
+    }
+
+    if (!user.verificationCode || user.verificationCode !== String(code).trim()) {
+      return res.status(400).json({ message: "Invalid verification code." });
+    }
+
+    if (!user.verificationCodeExpiry || new Date() > user.verificationCodeExpiry) {
+      return res.status(400).json({ message: "Verification code has expired. Please register again." });
+    }
+
+    await user.update({
+      emailVerified: true,
+      isActive: true,
+      verificationCode: null,
+      verificationCodeExpiry: null,
+    });
+
+    return res.json({ message: "Email verified successfully. You can now log in." });
+  } catch (error) {
+    logger.error('Email verification failed', { error: error.message });
+    return res.status(500).json({ message: "Verification failed. Please try again." });
+  }
+});
+
+// Login — supports rememberMe (30-day token) and email-verified check
+router.post('/login', validate(loginSchema), async (req, res) => {
+  try {
+    const { username, password, rememberMe } = req.body;
+    const usernameOrEmail = typeof username === 'string' ? username.trim() : '';
+
+    if (!usernameOrEmail || !password) {
+      return res.status(400).json({ message: "Username/email and password are required" });
+    }
+
     const user = await User.findOne({
       where: {
         [Op.or]: [
@@ -122,69 +144,73 @@ router.post('/login', validate(loginSchema), async (req, res) => {
         ],
       },
     });
+
     if (!user) {
       LoginAttempt.create({ email: usernameOrEmail, ipAddress: req.ip || req.headers['x-forwarded-for'], success: false, failureReason: 'INVALID_CREDENTIALS' }).catch(() => {});
-      return res.status(401).json({
-        message: "Invalid username/email or password",
+      return res.status(401).json({ message: "Invalid username/email or password" });
+    }
+
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        message: "Please verify your email before logging in.",
+        needsVerification: true,
+        email: user.email,
       });
     }
 
     if (user.isActive === false) {
-      return res.status(403).json({
-        message: "Account deactivated",
-        error: "Account deactivated",
-      });
+      return res.status(403).json({ message: "Account deactivated" });
     }
 
-    // Check password
     let isMatch;
     try {
       isMatch = await user.validatePassword(password);
     } catch (err) {
-      console.error("Password validation error:", err);
-      return res.status(500).json({
-        message: "Password validation failed",
-        error: err.message,
-      });
+      return res.status(500).json({ message: "Password validation failed", error: err.message });
     }
+
     if (!isMatch) {
       LoginAttempt.create({ email: user.email, username: user.username, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: false, failureReason: 'INVALID_CREDENTIALS' }).catch(() => {});
-      return res.status(401).json({
-        message: "Invalid username/email or password",
-      });
+      return res.status(401).json({ message: "Invalid username/email or password" });
     }
 
     LoginAttempt.create({ email: user.email, username: user.username, userId: user.id, ipAddress: req.ip || req.headers['x-forwarded-for'], success: true }).catch(() => {});
     await user.update({ lastLoginAt: new Date() });
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "24h" }
-    );
+    const token = generateToken(user.id, !!rememberMe);
 
-    // Return user data without password
-    const userResponse = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
-
-    res.json({
+    return res.json({
       message: "Login successful",
       token,
-      user: userResponse,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        theme: user.theme || 'light',
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
     });
   } catch (error) {
-    console.error("Login error (full):", error);
-    res.status(500).json({
-      message: "An error occurred during login",
-      error: error.message,
-    });
+    console.error("Login error:", error);
+    return res.status(500).json({ message: "An error occurred during login", error: error.message });
+  }
+});
+
+// Save user theme preference
+router.put('/preferences', auth, async (req, res) => {
+  try {
+    const { theme } = req.body;
+    if (!theme || !['light', 'dark'].includes(theme)) {
+      return res.status(400).json({ message: "theme must be 'light' or 'dark'" });
+    }
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    await user.update({ theme });
+    return res.json({ message: "Preferences saved.", theme });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to save preferences" });
   }
 });
 
@@ -210,45 +236,19 @@ router.put('/account', auth, async (req, res) => {
     }
 
     const user = await User.findByPk(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found.' });
 
-    const usernameTaken = await User.findOne({
-      where: {
-        username: normalizedUsername,
-        id: { [Op.ne]: user.id },
-      },
-    });
+    const usernameTaken = await User.findOne({ where: { username: normalizedUsername, id: { [Op.ne]: user.id } } });
+    if (usernameTaken) return res.status(400).json({ message: 'Username is already taken.' });
 
-    if (usernameTaken) {
-      return res.status(400).json({ message: 'Username is already taken.' });
-    }
+    const emailTaken = await User.findOne({ where: { email: normalizedEmail, id: { [Op.ne]: user.id } } });
+    if (emailTaken) return res.status(400).json({ message: 'Email is already in use.' });
 
-    const emailTaken = await User.findOne({
-      where: {
-        email: normalizedEmail,
-        id: { [Op.ne]: user.id },
-      },
-    });
-
-    if (emailTaken) {
-      return res.status(400).json({ message: 'Email is already in use.' });
-    }
-
-    await user.update({
-      username: normalizedUsername,
-      email: normalizedEmail,
-    });
+    await user.update({ username: normalizedUsername, email: normalizedEmail });
 
     return res.json({
       message: 'Account details updated successfully.',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user.id, username: user.username, email: user.email, role: user.role },
     });
   } catch (error) {
     logger.error('Update account failed', { error: error.message });
@@ -270,14 +270,10 @@ router.put('/account/password', auth, async (req, res) => {
     }
 
     const user = await User.findByPk(req.user.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found.' });
 
     const oldPasswordMatches = await user.validatePassword(String(oldPassword));
-    if (!oldPasswordMatches) {
-      return res.status(400).json({ message: 'Old password is incorrect.' });
-    }
+    if (!oldPasswordMatches) return res.status(400).json({ message: 'Old password is incorrect.' });
 
     user.password = String(newPassword);
     await user.save();
@@ -289,31 +285,22 @@ router.put('/account/password', auth, async (req, res) => {
   }
 });
 
-// REQ-5: Request password reset (30-minute, single-use token)
+// Request password reset
 router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res) => {
   try {
     const { email } = req.body;
-
-    // Always return a generic response to prevent account enumeration
-    const genericResponse = {
-      message: 'If the account exists, a password reset email has been sent.',
-    };
+    const genericResponse = { message: 'If the account exists, a password reset email has been sent.' };
 
     const user = await User.findOne({ where: { email } });
-    if (!user) {
-      return res.json(genericResponse);
-    }
+    if (!user) return res.json(genericResponse);
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
     const resetTokenExpiry = new Date(Date.now() + 30 * 60 * 1000);
 
-    await user.update({
-      resetToken: hashedToken,
-      resetTokenExpiry,
-    });
-
+    await user.update({ resetToken: hashedToken, resetTokenExpiry });
     await sendPasswordResetEmail(user.email, rawToken);
+
     return res.json(genericResponse);
   } catch (error) {
     logger.error('Forgot password failed', { error: error.message });
@@ -321,24 +308,17 @@ router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res)
   }
 });
 
-// REQ-5: Apply new password if token is valid and not expired
+// Apply new password
 router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
   try {
     const { token, password } = req.body;
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await User.findOne({
-      where: {
-        resetToken: hashedToken,
-        resetTokenExpiry: {
-          [Op.gt]: new Date(),
-        },
-      },
+      where: { resetToken: hashedToken, resetTokenExpiry: { [Op.gt]: new Date() } },
     });
 
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid or expired reset token.' });
-    }
+    if (!user) return res.status(400).json({ message: 'Invalid or expired reset token.' });
 
     user.password = password;
     user.resetToken = null;
@@ -352,34 +332,14 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res) =
   }
 });
 
-// Get current user
+// Get current user (includes theme)
 router.get("/me", auth, async (req, res) => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
-    
-    // req.user is already the user object from auth middleware, 
-    // but let's fetch fresh data to be safe
-    const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password'] }
-    });
-    
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
-    
+    const user = await User.findByPk(req.user.id, { attributes: { exclude: ['password', 'verificationCode'] } });
+    if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
   } catch (error) {
-    console.error("Get user error:", error);
-    res.status(500).json({
-      message: "An error occurred while fetching user data",
-      error: error.message,
-    });
+    res.status(500).json({ message: "An error occurred while fetching user data", error: error.message });
   }
 });
 
@@ -388,33 +348,16 @@ const enableDebugAuthEndpoint =
   process.env.NODE_ENV !== 'production';
 
 if (enableDebugAuthEndpoint) {
-  // Debug auth endpoint
   router.get("/debug", async (req, res) => {
     try {
       const token = req.header('Authorization')?.replace('Bearer ', '');
-      if (!token) {
-        return res.json({ error: "No token provided" });
-      }
-
-      const jwt = require('jsonwebtoken');
+      if (!token) return res.json({ error: "No token provided" });
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
-        const User = require('../models/User');
+        const decoded = jwt.verify(token, JWT_SECRET);
         const user = await User.findOne({ where: { id: decoded.userId || decoded.id } });
-        
-        res.json({
-          token: "provided",
-          decoded: decoded,
-          userFound: !!user,
-          user: user ? { id: user.id, username: user.username, role: user.role } : null,
-          jwtSecret: process.env.JWT_SECRET ? "set" : "not set"
-        });
+        res.json({ decoded, userFound: !!user, user: user ? { id: user.id, username: user.username, role: user.role } : null });
       } catch (jwtError) {
-        res.json({
-          error: "JWT verification failed",
-          message: jwtError.message,
-          jwtSecret: process.env.JWT_SECRET ? "set" : "not set"
-        });
+        res.json({ error: "JWT verification failed", message: jwtError.message });
       }
     } catch (error) {
       res.status(500).json({ error: error.message });

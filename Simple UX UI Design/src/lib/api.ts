@@ -20,13 +20,13 @@ function authHeaders(): HeadersInit {
 
 export interface LoginResponse {
   token: string;
-  user: { id: string; username: string; email: string; role: string };
+  user: { id: string; username: string; email: string; role: string; theme?: string };
 }
 
 export interface RegisterResponse {
   message: string;
-  token: string;
-  user: { id: string; username: string; email: string; role: string };
+  pending: true;
+  email: string;
 }
 
 export async function register(username: string, email: string, password: string): Promise<RegisterResponse> {
@@ -42,17 +42,39 @@ export async function register(username: string, email: string, password: string
   return res.json();
 }
 
-export async function login(username: string, password: string): Promise<LoginResponse> {
+export async function verifyEmail(email: string, code: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/auth/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Verification failed');
+  }
+  return res.json();
+}
+
+export async function login(username: string, password: string, rememberMe = false): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, rememberMe }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || err.message || 'Login failed');
   }
   return res.json();
+}
+
+export async function saveUserPreferences(theme: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/preferences`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ theme }),
+  });
+  if (!res.ok) throw new Error('Failed to save preferences');
 }
 
 export async function updateMyAccount(username: string, email: string): Promise<LoginResponse['user']> {
