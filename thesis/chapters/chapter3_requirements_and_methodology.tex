@@ -75,6 +75,18 @@ to and from the question editor, requiring them to re-seek the correct
 timestamp; and (b)~instructors with lower technical proficiency abandoned
 the task entirely after encountering two consecutive error screens.
 
+Figure~\ref{fig:usecase} presents the complete set of system use cases for
+both the Instructor and Admin actors, derived from the user research and
+project objectives.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/fig_usecase}}
+  \caption{Use case diagram showing Instructor and Admin actors and their
+           interactions with the AI-ActivEdu platform}
+  \label{fig:usecase}
+\end{figure}
+
 \subsection{Functional Requirements}
 
 The functional requirements derived from the user research and the project
@@ -159,11 +171,28 @@ Nielsen's usability heuristics~\cite{nielsen1994} to identify potential
 sources of extraneous cognitive load before any interface sketches were
 produced.
 
+Figure~\ref{fig:workflow} presents a side-by-side comparison of the
+WordPress-based baseline workflow (ten steps, 47 interface interactions) and
+the redesigned platform workflow (seven steps, approximately eight interactions).
+The reduction in interaction count is the primary mechanism through which
+extraneous cognitive load is reduced, consistent with Chandler and Sweller's
+integrated-format principle~\cite{chandler1991}.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/fig_workflow_comparison}}
+  \caption{Authoring workflow comparison: WordPress H5P plugin (left,
+           baseline) versus the redesigned AI-ActivEdu platform (right).
+           Red annotations indicate identified pain points; green annotations
+           indicate design improvements.}
+  \label{fig:workflow}
+\end{figure}
+
 The most significant design decision at this stage was to co-locate the video
-player, the timestamp display, and the question editor on a single screen.
-This directly addresses the split-attention effect identified in the
-literature (Section~2.5) and eliminates the requirement to navigate between
-screens during authoring.
+player, the timestamp capture button, and the question editor on a single
+screen. This directly addresses the split-attention effect identified in the
+literature (Section~2.5) and eliminates the requirement to hold timestamp
+information in working memory while navigating between screens.
 
 \subsection{Stage 2: Wireframing and Heuristic Evaluation}
 

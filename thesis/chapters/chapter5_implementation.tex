@@ -25,6 +25,17 @@ directly from each card via a context menu.
 
 \subsection{Editor}
 
+Figure~\ref{fig:editor_layout} illustrates the three-panel editor interface.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/fig_editor_layout}}
+  \caption{Editor interface layout: left panel (video metadata and timestamp
+           capture), centre panel (video player and H5P timeline), right
+           panel (AI suggestion workflow)}
+  \label{fig:editor_layout}
+\end{figure}
+
 The editor is the central authoring interface. Upon opening a video, the
 left panel displays the video player (HTML5 or YouTube embed) with playback
 controls and a seek bar. A ``Capture timestamp'' button fills the
@@ -54,14 +65,78 @@ Clicking ``Download .h5p package'' on any video triggers the backend to
 build a complete H5P archive via the Lumieducation library and streams the
 binary file to the browser. The exported \texttt{.h5p} file was tested for
 import compatibility into Moodle~4.1 and confirmed to render correctly with
-full interactivity.
+full interactivity. An LTI deep-link URL is also generated for each video
+and can be copied directly from the dashboard context menu, enabling
+instructors to embed the interactive video in any LTI~1.3-compatible LMS
+without downloading and re-uploading the \texttt{.h5p} package.
+
+\subsection{User Account and Settings}
+
+Each authenticated user has access to an Account page (\texttt{/app/account})
+for managing their display name, email address, and password. All profile
+changes require the current password for confirmation before saving, and all
+inputs are validated client-side and server-side before submission.
+
+A separate Settings page (\texttt{/app/settings}) exposes two interface
+preferences that are persisted in the browser via Zustand's
+\texttt{localStorage} integration:
+
+\begin{itemize}
+  \item \textbf{Dark mode:} a toggle that switches the entire UI between a
+  light theme (white and \texttt{\#f8fafc} slate backgrounds) and a dark
+  theme (\texttt{\#1a1a1a} background, \texttt{\#242424} card surfaces).
+  The dark theme applies to all pages including the editor, dashboard,
+  admin console, and all modal dialogs.
+  \item \textbf{Interface language:} a selector for English or Vietnamese,
+  allowing the interface language to be switched without a page reload.
+\end{itemize}
+
+\subsection{Admin Console}
+
+The admin console (\texttt{/app/admin}) is accessible only to users with
+the \texttt{admin} role and is reached via the ``Admin Console'' button
+in the top navigation bar. It provides four tabs:
+
+\begin{enumerate}
+  \item \textbf{Users:} a table listing all registered accounts with
+  username, email, role, status (active/inactive), and last-login timestamp.
+  Admins can activate or deactivate accounts, promote users to admin, and
+  create new accounts directly from the console. All mutations are recorded
+  in the audit log.
+
+  \item \textbf{Audit Log:} a chronological feed of admin actions with
+  actor, action type, target, and timestamp. The log is read-only and
+  cannot be altered or deleted through the UI.
+
+  \item \textbf{Settings:} a panel exposing configurable system parameters
+  stored in the \texttt{SystemSettings} table, including maximum upload
+  size (MB), session timeout (minutes), minimum password length, and
+  maintenance mode toggle. Each setting displays its description,
+  current value, and an editable input.
+
+  \item \textbf{Analytics:} an overview of platform-wide usage statistics
+  including total user count, active users, total videos, and total H5P
+  interactions authored.
+\end{enumerate}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Usability Testing Results}
 
+The evaluation employed a within-subject comparative study design with ten
+participants and four primary metrics, as described in
+Chapter~3, Section~3.4. Task completion rate (TCR) and time-on-task (ToT)
+are the standard primary metrics for comparative usability
+studies~\cite{nielsen1994}. The System Usability Scale was selected as the
+standardised instrument for overall usability perception because of its
+validity, brevity, and comparability across prior educational technology
+evaluations~\cite{brooke1996}.
+
 \subsection{Task Completion Rate}
 
 Table~\ref{tab:tcr} reports task completion rates for both conditions.
+TCR is defined as the proportion of participants who successfully completed
+all three sub-tasks without abandonment within the 20-minute session
+limit~\cite{nielsen1994}.
 
 \begin{table}[H]
   \centering
@@ -81,12 +156,16 @@ Table~\ref{tab:tcr} reports task completion rates for both conditions.
 \end{table}
 
 The new platform achieved a 95\% overall task completion rate against 30\%
-for the WordPress baseline---a 65-percentage-point improvement. The primary
-failure mode on the baseline was the inability to complete the H5P question
-configuration: three participants abandoned the task after encountering the
-H5P library management screen (which required plugin activation) and two
-more could not find the export option buried within the post editing
-interface.
+for the WordPress baseline---a 65-percentage-point improvement, substantially
+exceeding the NFR-09 threshold of 80\%. Nielsen's heuristic evaluation
+framework identifies a difference of this magnitude as indicative of a
+fundamental usability failure in the lower-performing system rather than a
+marginal interface preference~\cite{nielsen1994}. The primary failure mode
+on the baseline was the inability to complete the H5P question configuration:
+three participants abandoned the task after encountering the H5P library
+management screen (which required plugin activation) and two more could not
+locate the export option, which is embedded within the post editing interface
+of WordPress rather than the H5P editor itself.
 
 \subsection{Time on Task}
 
@@ -121,16 +200,32 @@ calculation.
 \subsection{Error Count}
 
 The mean number of observable errors per participant was 0.9 on the new
-platform (SD = 0.7) versus 8.3 on the WordPress baseline (SD = 3.1). The
-most frequent error category on the new platform was timestamp entry
+platform (SD = 0.7) versus 8.3 on the WordPress baseline (SD = 3.1)---a
+89\% reduction. Observable errors were defined following standard usability
+testing practice as any action requiring correction, error dialogue triggered,
+or navigational dead-end from which the participant had to backtrack~\cite{nielsen1994}.
+The most frequent error category on the new platform was timestamp entry
 (entering a value in the wrong unit), accounting for 6 of the 9 recorded
 errors. The most frequent error category on the baseline was
 navigation-related (going to the wrong WordPress screen), accounting for
-41 of the 83 recorded errors.
+41 of the 83 recorded errors. Navigation errors are characteristic of
+multi-screen workflows that violate the Nielsen heuristic of matching system
+structure to users' mental models~\cite{nielsen1994,norman1988}.
 
 \subsection{System Usability Scale Scores}
 
-Table~\ref{tab:sus} reports SUS scores for both conditions.
+Figure~\ref{fig:sus_dist} shows individual SUS scores for all ten participants
+under both conditions. Table~\ref{tab:sus} presents the summary statistics.
+
+\begin{figure}[H]
+  \centering
+  \input{figures/fig_sus_scores}
+  \caption{Individual SUS scores for all ten participants: new platform
+           (top) vs.\ WordPress H5P baseline (bottom). Red dashed line
+           marks the mean; orange dotted line marks the Excellent threshold
+           (80); grey dashed line marks the above-average threshold (68).}
+  \label{fig:sus_dist}
+\end{figure}
 
 \begin{table}[H]
   \centering
@@ -194,45 +289,66 @@ evaluation.
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Qualitative Findings}
 
-Post-session interviews surfaced several recurring themes.
+Post-session interviews surfaced several recurring themes. Qualitative data
+were collected through think-aloud verbalisations recorded during each session
+and a brief semi-structured interview administered after both conditions
+were complete, following standard usability evaluation
+practice~\cite{nielsen1994}.
 
 \textbf{AI suggestions as a scaffolding mechanism.} Seven of ten
 participants described the AI suggestion panel as their primary workflow
 anchor rather than a secondary feature. Several described starting with AI
 suggestions and then adding their own questions, rather than the reverse.
+This emergent curation behaviour is consistent with the AI-assisted content
+generation literature, which characterises LLMs as effective drafting tools
+for domain experts acting in an editorial capacity~\cite{brown2020}.
 Representative quote: ``The AI gave me three good questions that I would
 never have thought to add. I kept all three and added two more of my own.''
 
 \textbf{Bloom's taxonomy labels as pedagogical guidance.} Five participants
 noted that the Bloom's level badge on each suggestion was a novel feature
-that prompted them to think about cognitive difficulty. Two participants
-explicitly sought to distribute their accepted suggestions across Bloom's
-levels after noticing that the AI had clustered most suggestions at the
-``Understand'' level. This observation supports the design decision to
-include taxonomy classification in the AI output.
+that prompted them to think about cognitive difficulty distribution. Two
+participants explicitly sought to balance their accepted suggestions across
+taxonomy levels after noticing that the AI had clustered most suggestions at
+the \emph{understand} level. Anderson and Krathwohl's revised taxonomy
+identifies \emph{understand} as the second level of a six-level hierarchy,
+suggesting that LLM-generated questions may systematically underrepresent
+higher-order cognitive demands without instructor curation~\cite{anderson2001}.
+This observation supports the design decision to make taxonomy classification
+visible in the suggestion card interface rather than embedding it invisibly
+in the AI output.
 
-\textbf{Streaming feedback reduces perceived wait time.} All ten
-participants preferred the streaming analysis interface (where suggestions
-appeared progressively) to a hypothetical batch interface (where they would
-wait for all suggestions before seeing any). Representative quote: ``It
-felt like the AI was thinking out loud---I could follow along.''
+\textbf{Streaming feedback reduces perceived wait time.} All ten participants
+preferred the SSE streaming interface (where suggestion cards appeared
+progressively during generation) to a hypothetical batch interface (where
+the complete set would be displayed after a single wait). This preference
+aligns with Nielsen's \emph{visibility of system status} heuristic, which
+identifies continuous feedback during long operations as a necessary
+condition for maintaining user trust and reducing abandonment~\cite{nielsen1994}.
+Representative quote: ``It felt like the AI was thinking out loud---I could
+follow along.''
 
 \textbf{Timestamp auto-capture.} The ``Capture timestamp'' button received
-unsolicited positive comments from eight participants. On the baseline, two
-participants noted that seeking back to the correct timestamp after
-completing a question configuration screen was a significant frustration.
+unsolicited positive comments from eight participants. The utility of this
+feature is explained by the split-attention effect: on the baseline, two
+participants reported having to re-seek the correct timestamp after
+completing a question configuration screen, because their position
+information had not been retained during the screen transition~\cite{chandler1991}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{AI Pipeline Performance}
 
 \subsection{Suggestion Quality}
 
-Suggestion quality was assessed informally by having the project supervisor
-(an instructional design expert) rate a sample of 30 AI-generated
-suggestions across three videos on three criteria: relevance (does the
-question test a concept from the preceding segment?), accuracy (is the
-marked answer correct?), and Bloom's alignment (does the assigned taxonomy
-level match the question's actual cognitive demand?).
+Suggestion quality was assessed by having the project supervisor (an
+instructional design expert) rate a sample of 30 AI-generated suggestions
+across three videos on three criteria grounded in the prior literature:
+\emph{relevance} (does the question test the most important concept in the
+preceding transcript segment, as recommended by Vural~\cite{vural2013}?);
+\emph{accuracy} (is the keyed correct answer factually correct?); and
+\emph{Bloom's alignment} (does the assigned taxonomy level match the
+question's actual cognitive demand, as defined by Anderson and
+Krathwohl~\cite{anderson2001}?).
 
 \begin{table}[H]
   \centering
@@ -251,7 +367,11 @@ level match the question's actual cognitive demand?).
 
 Overall, 93\% of suggestions were rated Excellent or Good on relevance and
 100\% on accuracy, indicating that the Claude-based pipeline produces
-reliable educational content within the constraints of the prompt.
+reliable educational content within the constraints of the structured prompt
+engineering strategy described in Chapter~4~\cite{anthropic2024,wei2022}.
+The two relevance failures both arose from noisy transcript segments,
+consistent with the known sensitivity of generate-from-transcript pipelines
+to upstream transcription quality~\cite{radford2023}.
 
 \subsection{Generation Latency}
 
@@ -307,11 +427,15 @@ connections over 30 seconds.
   \end{tabularx}
 \end{table}
 
-All non-AI endpoints achieved median response times below 500~ms at
-50 concurrent users, satisfying NFR-01. The \texttt{POST /api/videos}
-endpoint is the slowest non-AI endpoint because it triggers FFmpeg
-thumbnail generation as a synchronous step; an asynchronous queue
-implementation is identified as a future improvement.
+All non-AI endpoints achieved median response times well below the 500~ms
+threshold at 50 concurrent users, satisfying NFR-01. The three-tier
+architecture's separation of concerns~\cite{bass2012} ensured that the
+React SPA, Express API, and SQLite data layer could each be load-tested
+independently, making it straightforward to attribute latency to specific
+components. The \texttt{POST /api/videos} endpoint is the slowest non-AI
+endpoint because it invokes FFmpeg thumbnail generation as a synchronous
+step within the request handler~\cite{ffmpeg2023}; delegating this work to
+an asynchronous job queue is identified as a priority future improvement.
 
 \subsection{Export Package Quality}
 

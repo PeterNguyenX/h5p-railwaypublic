@@ -122,10 +122,13 @@ const initializeDefaults = async () => {
 
   for (const defaultSetting of defaults) {
     try {
-      await SystemSettings.findOrCreate({
+      const [setting, created] = await SystemSettings.findOrCreate({
         where: { key: defaultSetting.key },
         defaults: defaultSetting
       });
+      if (!created && !setting.description) {
+        await setting.update({ description: defaultSetting.description });
+      }
     } catch (error) {
       logger.error('Failed to create default setting', { error: error.message, key: defaultSetting.key });
     }

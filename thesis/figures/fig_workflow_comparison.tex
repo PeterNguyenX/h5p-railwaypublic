@@ -1,0 +1,68 @@
+% Workflow Comparison: WordPress H5P (left) vs New Platform (right)
+\begin{tikzpicture}[
+  step/.style={draw, rectangle, rounded corners=3pt, minimum width=4.0cm,
+               minimum height=0.65cm, font=\small, fill=#1, align=center,
+               text width=3.8cm},
+  arrow/.style={->, >=Stealth, thick},
+  label/.style={font=\small\bfseries},
+  pain/.style={font=\tiny\itshape, text=red!70!black}
+]
+
+% ── LEFT SIDE: WordPress H5P Workflow ────────────────────────────────────────
+\node[label] at (2.4, 0.4) {WordPress H5P Plugin};
+\node[font=\tiny\bfseries, text=gray] at (2.4, 0.05) {(Baseline — 47 interactions, $\sim$45 min)};
+
+\node[step=red!15]   (w1) at (2.4,-0.8)  {1. Log in to WordPress Admin};
+\node[step=red!15]   (w2) at (2.4,-1.75) {2. Create or open a Post};
+\node[step=red!15]   (w3) at (2.4,-2.70) {3. Insert H5P shortcode block};
+\node[step=red!15]   (w4) at (2.4,-3.65) {4. Navigate to H5P Content Editor\\(new browser tab)};
+\node[step=red!15]   (w5) at (2.4,-4.70) {5. Upload or link video};
+\node[step=red!15]   (w6) at (2.4,-5.65) {6. Seek to timestamp (no capture button)};
+\node[step=red!20]   (w7) at (2.4,-6.70) {7. Configure interaction settings\\(nested sub-screens)};
+\node[step=red!20]   (w8) at (2.4,-7.65) {8. Save \& return to post editor};
+\node[step=red!20]   (w9) at (2.4,-8.60) {9. Publish post to preview content};
+\node[step=red!30]   (w10) at (2.4,-9.55) {10. Export via H5P Hub (separate step)};
+
+\foreach \a/\b in {w1/w2,w2/w3,w3/w4,w4/w5,w5/w6,w6/w7,w7/w8,w8/w9,w9/w10}
+  \draw[arrow, red!60] (\a) -- (\b);
+
+% Pain annotations
+\node[pain] at (6.0,-1.75) {$\leftarrow$ WordPress concepts alien to educators};
+\node[pain] at (6.0,-4.70) {$\leftarrow$ Screen navigation breaks focus};
+\node[pain] at (6.0,-6.70) {$\leftarrow$ No real-time preview};
+\node[pain] at (6.0,-9.55) {$\leftarrow$ 30\% completion rate};
+
+% ── DIVIDER ──────────────────────────────────────────────────────────────────
+\draw[dashed, gray] (7.2, 0.5) -- (7.2,-10.0);
+
+% ── RIGHT SIDE: New Platform Workflow ────────────────────────────────────────
+\node[label] at (11.2, 0.4) {AI-ActivEdu New Platform};
+\node[font=\tiny\bfseries, text=gray] at (11.2, 0.05) {(Redesigned — $\sim$8 interactions, $\sim$3 min)};
+
+\node[step=green!20]  (n1) at (11.2,-0.8)  {1. Log in \& open Dashboard};
+\node[step=green!20]  (n2) at (11.2,-1.75) {2. Upload video or paste YouTube URL};
+\node[step=green!25]  (n3) at (11.2,-2.70) {3. Click ``AI Analyse'' \& select\\transcript source};
+\node[step=blue!15]   (n4) at (11.2,-3.80) {4. Review AI-generated suggestion cards\\(Bloom's level, timestamp, question)};
+\node[step=green!25]  (n5) at (11.2,-4.85) {5. Accept / Edit / Reject suggestions\\(interactions appear in timeline)};
+\node[step=green!20]  (n6) at (11.2,-5.80) {6. Preview interactivity in-browser};
+\node[step=green!30]  (n7) at (11.2,-6.75) {7. Click ``Export .h5p'' or\\copy LTI deep-link};
+
+\foreach \a/\b in {n1/n2,n2/n3,n3/n4,n4/n5,n5/n6,n6/n7}
+  \draw[arrow, green!60!black] (\a) -- (\b);
+
+% Benefit annotations
+\node[pain, text=green!50!black] at (15.5,-1.75) {$\leftarrow$ Single purpose-built screen};
+\node[pain, text=blue!70!black]  at (15.5,-3.80) {$\leftarrow$ AI drafts; instructor curates};
+\node[pain, text=green!50!black] at (15.5,-5.80) {$\leftarrow$ Real-time H5P preview};
+\node[pain, text=green!50!black] at (15.5,-6.75) {$\leftarrow$ 95\% completion rate};
+
+% ── Summary bar ──────────────────────────────────────────────────────────────
+\draw[fill=gray!10, rounded corners=3pt] (0,-10.3) rectangle (7.0,-10.75);
+\node[font=\small] at (3.5,-10.53)
+  {10 steps $\cdot$ 47 interactions $\cdot$ 45 min median $\cdot$ SUS 38.0};
+
+\draw[fill=green!10, rounded corners=3pt] (7.4,-10.3) rectangle (16.5,-10.75);
+\node[font=\small] at (11.95,-10.53)
+  {7 steps $\cdot$ $\sim$8 interactions $\cdot$ 3.2 min median $\cdot$ SUS 82.5};
+
+\end{tikzpicture}

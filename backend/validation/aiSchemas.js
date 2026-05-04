@@ -16,7 +16,7 @@ const analyzeRequestSchema = z.object({
 const h5pSuggestionSchema = z.object({
   id: z.string().min(1).optional(),
   timestamp: z.number().nonnegative(),
-  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks', 'Hotspot', 'DragDrop']),
+  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks', 'DragText', 'MarkWords', 'Matching']),
   h5pLibrary: z.string().min(1).optional(),
   config: z.record(z.unknown()),
   reason: z.string().optional(),

@@ -286,7 +286,7 @@ export async function whisperTranscribeVideo(videoId: string, model = 'base'): P
 
 // ─── AI Analysis ──────────────────────────────────────────────────────────────
 
-export type H5PInteractionType = 'MultiChoice' | 'TrueFalse' | 'FillBlanks' | 'Hotspot' | 'DragDrop';
+export type H5PInteractionType = 'MultiChoice' | 'TrueFalse' | 'FillBlanks' | 'DragText' | 'MarkWords';
 
 export interface AISuggestion {
   id: string;
@@ -299,11 +299,14 @@ export interface AISuggestion {
 }
 
 export interface TopicQuestion {
-  type: 'MultiChoice' | 'TrueFalse' | 'FillBlanks';
+  type: 'MultiChoice' | 'TrueFalse' | 'FillBlanks' | 'DragText' | 'MarkWords' | 'Matching';
   question?: string;
   answers?: Array<{ text: string; correct: boolean }>;
   correct?: boolean;
   fillText?: string;
+  taskDescription?: string;
+  textField?: string;
+  pairs?: Array<{ prompt: string; answer: string }>;
   feedback: { correct: string; incorrect: string };
 }
 

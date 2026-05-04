@@ -1,0 +1,47 @@
+% Use Case Diagram — AI-ActivEdu Platform
+% Two actors: Instructor and Admin (Admin extends Instructor)
+\begin{tikzpicture}[
+  actor/.style={draw, rectangle, rounded corners=4pt, minimum width=2cm,
+                minimum height=0.7cm, font=\small\bfseries, fill=white},
+  uc/.style={draw, ellipse, minimum width=3.2cm, minimum height=0.7cm,
+             font=\small, fill=white, align=center},
+  boundary/.style={draw, dashed, rounded corners=6pt, fill=gray!5},
+  >=Stealth
+]
+
+% System boundary
+\draw[boundary] (1.2,-7.8) rectangle (10.6,0.6);
+\node[font=\small\bfseries] at (5.9,0.25) {AI-ActivEdu Platform};
+
+% ── Instructor actor (left) ──────────────────────────────────────────────────
+\node[actor] (inst) at (-1.8,-3.5) {Instructor};
+
+% ── Admin actor (right) ─────────────────────────────────────────────────────
+\node[actor] (admin) at (13.2,-3.5) {Admin};
+\draw[->, dashed] (admin) -- node[above, font=\tiny] {$\langle\langle$extends$\rangle\rangle$} (inst);
+
+% ── Use cases — Instructor ───────────────────────────────────────────────────
+\node[uc] (reg)    at (4.0, 0.0)  {Register \& Login};
+\node[uc] (upload) at (4.0,-1.3)  {Upload Video};
+\node[uc] (youtube)at (4.0,-2.55) {Import YouTube URL};
+\node[uc] (editor) at (4.0,-3.8)  {Author H5P Interactions\\(Manual)};
+\node[uc] (ai)     at (4.0,-5.2)  {AI-Assisted Question\\Generation};
+\node[uc] (export) at (4.0,-6.55) {Export H5P Package};
+
+% ── Use cases — Both / Platform management ───────────────────────────────────
+\node[uc] (dash)   at (7.9, 0.0)  {Manage Dashboard\\(Folders / Trash)};
+\node[uc] (account)at (7.9,-1.3)  {Manage Account\\Settings};
+\node[uc] (lti)    at (7.9,-2.55) {Copy LTI Deep-Link};
+\node[uc] (users)  at (7.9,-3.8)  {Manage Users};
+\node[uc] (audit)  at (7.9,-5.2)  {View Audit Log};
+\node[uc] (sysset) at (7.9,-6.55) {Configure System\\Settings};
+
+% ── Association lines — Instructor ──────────────────────────────────────────
+\foreach \uc in {reg,upload,youtube,editor,ai,export,dash,account,lti}
+  \draw (inst) -- (\uc);
+
+% ── Association lines — Admin ────────────────────────────────────────────────
+\foreach \uc in {reg,users,audit,sysset,dash,account}
+  \draw (admin) -- (\uc);
+
+\end{tikzpicture}

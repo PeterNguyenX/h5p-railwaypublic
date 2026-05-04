@@ -9,13 +9,15 @@ the security model.
 \section{Overall System Architecture}
 
 \subsection{Architectural Overview}
+\label{sec:architecture}
 
 The platform follows a three-tier architecture consisting of a
 \emph{presentation tier} (React SPA), an \emph{application tier}
 (Express.js REST API), and a \emph{data tier} (SQLite database managed via
 Sequelize ORM)~\cite{bass2012}. External service dependencies are limited to
-the Anthropic Claude API (cloud AI) and Ollama (local AI); all other
-components run within the local server process.
+Groq (primary cloud AI), the Anthropic Claude API (cloud fallback AI),
+and Ollama (local AI fallback); all other components run within the
+local server process.
 
 Figure~\ref{fig:architecture} shows the complete system architecture.
 
@@ -33,10 +35,10 @@ The architectural goals that drove the design are:
   backend exclusively through a versioned REST API. No server-side rendering
   is used, ensuring that the UI can be developed and tested independently.
 
-  \item \textbf{AI provider independence.} The AI pipeline checks for Ollama
-  availability at request time and falls back to Claude transparently. The
-  frontend receives identical suggestion structures regardless of which
-  provider was used.
+  \item \textbf{AI provider independence.} The AI pipeline routes requests
+  through a three-provider priority chain: Groq (primary) $\to$ Ollama
+  (local fallback) $\to$ Claude (cloud fallback). The frontend receives
+  identical suggestion structures regardless of which provider was used.
 
   \item \textbf{H5P library isolation.} All H5P operations are delegated to
   the \texttt{@lumieducation/h5p-server} library, ensuring compliance with
@@ -289,7 +291,10 @@ H5P elements, AI suggestions, upload progress, and streaming status).
 
 \subsection{The Editor Interface}
 
-The editor is a single-screen interface with three vertical panels:
+The editor is a single-screen interface with three vertical panels,
+implementing the co-location design principle derived from Chandler and
+Sweller's split-attention effect research~\cite{chandler1991} and Garrett's
+skeleton-plane interface organisation~\cite{garrett2010}:
 
 \begin{enumerate}
   \item \textbf{Left panel: Video source and upload.} Provides drag-and-drop
@@ -319,19 +324,26 @@ panel as the LLM generates them.
 
 The frontend communicates with the backend through a typed API client
 (\texttt{src/lib/api.ts}) that declares TypeScript interfaces for every
-request and response object. This prevents type mismatches between the
-frontend expectations and the backend JSON schemas, catching integration
-errors at compile time rather than at runtime.
+request and response object~\cite{typescript2023}. TypeScript's static type
+system catches type mismatches between the frontend's expectations and the
+backend's JSON schemas at compile time rather than at runtime, which is
+particularly valuable in this project because the AI pipeline involves
+several distinct JSON schemas (transcript segments, AI suggestions, and H5P
+content parameters) that must remain consistent across the service
+boundary~\cite{typescript2023}.
 
 The \texttt{AISuggestion} type, for example, mirrors the Zod schema used
 by the AI service on the backend:
 
-\begin{lstlisting}[language=TypeScript,caption={AISuggestion TypeScript interface}]
+\begin{lstlisting}[language=TypeScript,caption={AISuggestion TypeScript interface (6 supported types)}]
+type H5PInteractionType =
+  'MultiChoice' | 'TrueFalse' | 'FillBlanks'
+  | 'Matching' | 'DragText' | 'MarkWords';
+
 interface AISuggestion {
   id: string;
   timestamp: number;
-  type: 'MultiChoice' | 'TrueFalse' | 'FillBlanks'
-      | 'Hotspot' | 'DragDrop' | 'MarkWords';
+  type: H5PInteractionType;
   h5pLibrary: string;
   config: Record<string, unknown>;
   reason: string;
@@ -339,19 +351,174 @@ interface AISuggestion {
 }
 \end{lstlisting}
 
+The platform supports six H5P interaction types in total, all of which
+are available for both AI-assisted generation and manual authoring.
+Five types (\texttt{MultiChoice}, \texttt{TrueFalse}, \texttt{FillBlanks},
+\texttt{DragText}, \texttt{MarkWords}) are generated throughout the video
+based on the content pattern matrix. The sixth type, \texttt{Matching},
+is reserved by the AI for a dedicated \emph{Video Recap} topic that is
+appended \emph{after} all content topics have ended. The system prompt
+instructs the model to set this topic's \texttt{start} equal to the end
+time of the final content topic and its \texttt{end} equal to the last
+transcript timestamp. Its question covers 4--5 key concept--definition
+pairs drawn from across the entire lecture, serving as a
+whole-video knowledge-consolidation exercise~\cite{anderson2001}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Inclusive Design for Non-Technical Educators}
+\label{sec:inclusive_design}
+
+A central design requirement established during the requirements analysis
+(Section~\ref{sec:requirements}) was that the platform must be operable by
+instructors with limited technical experience, including older faculty members
+who are accustomed to conventional slide-based or face-to-face teaching.
+The WordPress H5P baseline workflow required users to navigate two separate
+browser tabs, understand WordPress post concepts, and manually configure nested
+sub-screens for each interaction---a sequence that produced a 30\% completion
+rate among the pilot group and a mean SUS score of 38.0~\cite{brooke1996},
+well below the ``poor usability'' threshold of 51. This section documents the
+specific design and engineering decisions made to lower that barrier.
+
+\subsection{Cognitive Load Reduction Through Interface Simplification}
+
+Sweller's cognitive load theory distinguishes between \emph{intrinsic} load
+(inherent to the subject matter) and \emph{extraneous} load (imposed by a
+poorly designed interface)~\cite{sweller1988}. The platform's interface was
+designed to minimise extraneous load through four strategies:
+
+\begin{enumerate}
+  \item \textbf{Single-screen authoring.} All authoring activities---video
+  upload, transcript review, AI analysis, interaction creation, and H5P
+  export---occur on a single three-panel screen. Instructors never navigate
+  away from the editor, eliminating the context-switching that was identified
+  as the primary pain point in the WordPress baseline~\cite{chandler1991}.
+
+  \item \textbf{Guided type selection.} The interaction-type picker presents
+  each of the six question types with a colour-coded icon and a plain-English
+  description of \emph{when to use it} (e.g.\ ``Absolute facts or rules
+  students confirm as true or false''). Instructors do not need to understand
+  H5P library names or technical taxonomy; the design language of the picker
+  maps pedagogical intent to a concrete choice~\cite{norman1988}.
+
+  \item \textbf{Progressive disclosure.} The editor form shows only the fields
+  relevant to the selected question type. A \texttt{MultiChoice} form shows a
+  question field and four option inputs; a \texttt{TrueFalse} form shows a
+  statement and a True/False toggle. Unrelated fields are never visible,
+  reducing the number of decisions an instructor must make per
+  interaction~\cite{nielsen1994}.
+
+  \item \textbf{Inline preview.} \texttt{FillBlanks}, \texttt{DragText}, and
+  \texttt{MarkWords} fields render a live preview of how the asterisk-marked
+  text will appear to students, so instructors can verify their intent without
+  publishing or previewing in a separate window.
+\end{enumerate}
+
+\subsection{Interaction List Transparency}
+
+The H5P interactions panel displays each existing interaction with its type
+badge, timestamp, and a preview of the question text (truncated to one line).
+This allows instructors to review the full set of interactions at a glance
+without opening each one individually. The numbered position indicators use
+orange dots with white ring borders, deliberately echoing the seek-bar markers
+on the video timeline so that instructors perceive the interaction list and the
+video player as spatially related representations of the same
+content~\cite{chandler1991}.
+
+\subsection{Safe Navigation with Discard Warnings}
+
+When an instructor begins filling in a new interaction form and then clicks the
+back button, the platform checks whether any field has been modified. If the
+form is dirty, an amber warning banner appears inline (rather than as a modal
+dialog or browser alert) with two clearly labelled options: ``Keep editing''
+and ``Discard''. This pattern follows Nielsen's error-prevention
+heuristic~\cite{nielsen1994}: the system does not silently discard work, nor
+does it block navigation with a system dialog that breaks focus.
+
+\subsection{Backend Performance for Responsive Feedback}
+
+Older instructors are more likely to abandon a workflow when response times are
+perceptible~\cite{nielsen1994}. Three backend decisions directly address this:
+
+\begin{enumerate}
+  \item \textbf{SQLite with in-process access.} Because SQLite runs in the same
+  process as the Express server, read queries have sub-millisecond latency with
+  no network round-trip to a database server~\cite{sqlite2023}. Dashboard page
+  loads and video metadata fetches are typically below 30~ms.
+
+  \item \textbf{Groq primary provider.} Groq's LPU inference hardware delivers
+  AI analysis results in 3--8~seconds for a 20-minute lecture transcript,
+  compared with 15--30~seconds for an equivalent Claude request. The
+  platform's provider priority chain (Groq $\to$ Ollama $\to$ Claude) ensures
+  the fastest available provider is always used first.
+
+  \item \textbf{Server-Sent Events streaming.} Rather than requiring the
+  instructor to wait silently for the full AI response, the SSE streaming
+  endpoint emits progress messages (``Identifying topics\ldots'',
+  ``Generating questions\ldots'') and partial results as they arrive. This
+  continuous feedback prevents the blank-screen waiting period that is a common
+  cause of instructor abandonment in web-based authoring tools~\cite{davis1989}.
+\end{enumerate}
+
+\subsection{Accessibility and Visual Design}
+
+The platform follows a \emph{purposeful restraint} visual language: a white
+background with a single accent colour (\texttt{\#f5832a} orange), generous
+padding, and 14--16~px body text. Each of the six question types is assigned a
+distinct pastel colour token (blue, green, purple, teal, amber, indigo) so
+that instructors can recognise interaction types at a glance without reading
+the label. Dark mode is supported via Tailwind CSS's \texttt{dark:} variant
+and a user-level preference persisted in \texttt{localStorage} via the Zustand
+settings store, accommodating instructors who work in low-light environments or
+who have photosensitivity.
+
+Table~\ref{tab:ux_comparison} summarises the measurable differences between
+the WordPress H5P baseline and the new platform on the dimensions most
+relevant to non-technical educators.
+
+\begin{table}[H]
+  \centering
+  \caption{Usability comparison: WordPress H5P baseline vs.\ new platform}
+  \label{tab:ux_comparison}
+  \begin{tabularx}{\linewidth}{lXX}
+    \toprule
+    \textbf{Dimension} & \textbf{WordPress H5P} & \textbf{New Platform} \\
+    \midrule
+    Steps to create one interaction & 10 & 4 \\
+    Browser tabs required & 2 & 1 \\
+    Median task time & 45~min & 3.2~min \\
+    Completion rate & 30\% & 95\% \\
+    SUS score (mean) & 38.0 (poor) & 82.5 (excellent) \\
+    Real-time preview & None & Inline (asterisk fields) \\
+    AI assistance & None & Full (6 question types) \\
+    Interaction type guidance & None & Description per type \\
+    Discard warning & None (silent loss) & Inline amber banner \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{AI Pipeline Architecture}
 
 The AI pipeline is the defining technical contribution of this platform.
 It converts a raw video transcript into a validated, Bloom's-labelled list
-of H5P interaction suggestions through a four-stage process. Figure~\ref{fig:ai_pipeline}
-illustrates this flow.
+of H5P interaction suggestions through five stages. Figure~\ref{fig:ai_pipeline}
+illustrates the high-level data flow, and Figure~\ref{fig:seq_ai} presents
+the detailed actor-level interaction sequence including the SSE streaming
+path and the inject-on-accept workflow.
 
 \begin{figure}[H]
   \centering
   \input{figures/fig_ai_pipeline}
   \caption{AI pipeline: from video transcript to injected H5P interactions}
   \label{fig:ai_pipeline}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/fig_sequence_ai}}
+  \caption{Sequence diagram: AI-assisted question generation, validation,
+           review, and injection workflow}
+  \label{fig:seq_ai}
 \end{figure}
 
 \subsection{Stage 1: Transcript Acquisition}
@@ -387,77 +554,222 @@ The \texttt{formatSegmentsForPrompt()} function in \texttt{aiService.js}
 converts the normalised segment array into a human-readable transcript
 string with timestamp labels. Each line takes the format:
 
-\begin{lstlisting}[language=JavaScript,caption={Transcript segment formatting}]
-// Input segment: { start: 65, end: 73, text: "Photosynthesis converts..." }
+\begin{lstlisting}[language=JavaScript,caption={Transcript segment formatting with raw-second timestamps}]
+// Input segment: { start: 330, end: 345, text: "Photosynthesis converts..." }
 // Output line:
-"[01:05 -> 01:13] Photosynthesis converts..."
+"[05:30 (330s) -> 05:45 (345s)] Photosynthesis converts..."
 \end{lstlisting}
 
-This format makes the temporal structure of the transcript legible to
-the LLM and enables the model to place suggestions at accurate timestamp
-values.
+Each segment line embeds \emph{both} the human-readable \texttt{MM:SS}
+form \emph{and} the raw integer seconds in parentheses. The system prompt
+explicitly instructs the model to use the raw seconds integer as the
+\texttt{startTime} field in its JSON output, eliminating the rounding
+errors that arise when models reparse ``MM:SS'' strings~\cite{white2023}.
 
-\subsection{Stage 3: AI Prompt and Generation}
+\subsection{Stage 3: Two-Step AI Prompt and Question-Type Assignment}
+\label{sec:stage3}
 
-The core AI system prompt is defined as a constant in \texttt{aiService.js}.
-It instructs the model to:
+The AI system prompt in \texttt{aiService.js} adopts a two-step
+\emph{output automater} pattern~\cite{white2023} that separates topic
+discovery from question generation, constraining the model's degrees of
+freedom at each step and thereby improving output consistency.
 
-\begin{itemize}
-  \item Identify 4--8 moments where an H5P interaction would reinforce
-  learning.
-  \item Space suggestions at least 30~seconds apart.
-  \item Prefer positions after a concept is fully explained, not
-  mid-sentence.
-  \item Return \emph{only} a valid JSON array with no markdown formatting,
-  no preamble, and no explanation.
-  \item Conform each suggestion to a precisely specified schema (timestamp,
-  type, config, reason).
-  \item For MultiChoice, include exactly four options with exactly one
-  marked \texttt{"correct": true}.
-\end{itemize}
+\subsubsection{Step 1 --- Topic Segmentation}
 
-The system prompt embeds the complete H5P content parameter schemas for
-all six supported types, ensuring that the model can produce valid
-\texttt{config} objects without hallucinating field names.
+In the first step the model receives the formatted transcript and is
+instructed to produce a hierarchical topic outline rather than a flat
+list of suggestions. The required output structure is a JSON array of
+2--5 top-level topics, each carrying its timestamp span, a Bloom's
+taxonomy level~\cite{anderson2001}, a difficulty rating (1--3), and
+1--3 subtopics. Every topic node and every subtopic node is associated
+with \emph{exactly one} question:
 
-The generation is dispatched to two providers in priority order:
+\begin{lstlisting}[language=JSON,caption={Required JSON output structure for Step 1 (topic segmentation)}]
+[
+  {
+    "topic": "Photosynthesis Overview",
+    "startTime": 330,
+    "endTime": 345,
+    "bloomsLevel": "Remember",
+    "difficulty": 1,
+    "subtopics": [
+      {
+        "subtopic": "Light-dependent reactions",
+        "startTime": 360,
+        "endTime": 380,
+        "bloomsLevel": "Understand",
+        "difficulty": 2,
+        "question": { ... }
+      }
+    ],
+    "question": { ... }
+  }
+]
+\end{lstlisting}
+
+This hierarchical structure mirrors the cognitive organisation of the
+lecture rather than imposing an arbitrary spacing constraint, and has
+been shown to align more closely with Bloom's taxonomy as a framework for
+formative assessment design~\cite{anderson2001}.
+
+\subsubsection{Step 2 --- Question Generation via Pattern Matrix}
+
+In the second step the system prompt provides the model with a
+\emph{pattern matrix} that deterministically maps observable
+characteristics of each topic's content to one of three H5P question
+types. The pattern matrix is reproduced verbatim from the
+\texttt{AI\_SYSTEM\_PROMPT} constant:
+
+\begin{lstlisting}[language={},caption={Pattern matrix from the AI system prompt (Step 2)}]
+Generate EXACTLY ONE question per topic/subtopic using this pattern matrix:
+
+  Content characteristic                     Question type
+  -----------------------------------------------  ----------
+  Definition / technical term                      FillBlanks
+    ("X is defined as...", "Y stands for...")
+  Binary fact / absolute rule                      TrueFalse
+    ("always", "never", a true/false claim)
+  List / comparison / process / category           MultiChoice
+    (multiple items, relationships, steps)
+  Sequence / ordered steps / procedure             DragText
+    (steps that must go in a specific order)
+  Vocabulary / key term identification             MarkWords
+    (important terms embedded in a passage)
+  Standalone ``Video Recap'' appended after all topics  Matching
+    (4-5 concept-definition pairs drawn from the full video)
+
+For FillBlanks: wrap the key term with asterisks (*term*)
+  so it becomes a fill-in-the-blank blank.
+For TrueFalse: set the "correct" field to the boolean
+  truth value of the statement.
+For MultiChoice: provide exactly four options,
+  mark exactly one "correct": true; source the three
+  distractors from nearby content in the transcript.
+For DragText: wrap each draggable word/phrase in *asterisks*;
+  taskDescription must describe the ordering task.
+For MarkWords: wrap each key term in *asterisks*;
+  include 2-5 marked terms; taskDescription tells students
+  what category of term to look for.
+For Matching: ONLY the last top-level topic uses this type;
+  provide 4-5 pairs covering key concepts from the whole video;
+  taskDescription must frame this as an end-of-video review.
+\end{lstlisting}
+
+Table~\ref{tab:pattern_matrix} summarises the mapping between content
+type, question type, H5P library, and the key JSON fields required by
+each schema.
+
+\begin{table}[H]
+  \centering
+  \caption{All six supported H5P interaction types and their AI generation rules}
+  \label{tab:pattern_matrix}
+  \begin{tabularx}{\linewidth}{llllX}
+    \toprule
+    \textbf{Content characteristic} & \textbf{Type} & \textbf{H5P library} & \textbf{AI?} & \textbf{Key schema fields} \\
+    \midrule
+    Definition / technical term  & \texttt{FillBlanks}  & H5P.Blanks 1.14      & \checkmark &
+      \texttt{text} (key term in \texttt{*asterisks*}) \\
+    Binary fact / absolute rule  & \texttt{TrueFalse}   & H5P.TrueFalse 1.6    & \checkmark &
+      \texttt{question}, \texttt{correct} (boolean) \\
+    List / comparison / process  & \texttt{MultiChoice} & H5P.MultiChoice 1.16 & \checkmark &
+      \texttt{question}, \texttt{answers[4]} (one \texttt{correct:true}) \\
+    Sequence / ordered procedure & \texttt{DragText}    & H5P.DragText 1.10    & \checkmark &
+      \texttt{taskDescription}, \texttt{textField} (draggable words in \texttt{*asterisks*}) \\
+    Vocabulary / key terms       & \texttt{MarkWords}   & H5P.MarkWords 1.9    & \checkmark &
+      \texttt{taskDescription}, \texttt{textField} (key terms in \texttt{*asterisks*}) \\
+    Standalone recap after video  & \texttt{Matching}    & H5P.DragText 1.10    & \checkmark* &
+      \texttt{taskDescription}, \texttt{pairs[\,]} (\texttt{prompt}/\texttt{answer}) \\
+    \bottomrule
+    \multicolumn{5}{l}{\footnotesize * Generated once only as a standalone ``Video Recap'' topic appended after all content topics, covering key concept--definition pairs from the full video.}
+  \end{tabularx}
+\end{table}
+
+The pattern matrix reduces the model's output to a choice among three
+structured templates, each with a precisely defined JSON schema. This
+constrained generation strategy is consistent with the
+\emph{output automater} prompt-engineering pattern described by
+White et al.~\cite{white2023}, in which the LLM is asked to fill in a
+template rather than compose freeform text, significantly reducing
+hallucination of unknown field names.
+
+\subsubsection{Provider Selection and Prompt Adaptation}
+
+The AI generation is dispatched to three providers in priority order:
 
 \begin{enumerate}
-  \item \textbf{Ollama} (if running locally). The \texttt{aiServiceOllama.js}
-  service calls the Ollama REST API at \texttt{http://localhost:11434}. The
-  default model is configurable via the \texttt{OLLAMA\_MODEL} environment
-  variable. Ollama provides free, privacy-preserving inference with no API
-  costs.
+  \item \textbf{Groq} (primary). The Groq cloud API is contacted first
+  using the \texttt{llama-3.3-70b-versatile} model via the
+  \texttt{groq-sdk} client. Groq provides free-tier inference with
+  sub-second token generation, making it the default provider for
+  production use. The two-step system prompt is used directly.
 
-  \item \textbf{Anthropic Claude} (cloud fallback). The
-  \texttt{@anthropic-ai/sdk} client calls
-  \texttt{claude-sonnet-4-20250514}~\cite{anthropic2024} for the streaming
-  endpoint and \texttt{claude-3-5-sonnet-20241022} for the non-streaming
-  endpoint. Both models offer strong instruction-following and reliable
-  structured JSON output.
+  \item \textbf{Ollama} (local fallback). If the Groq request fails or
+  the \texttt{GROQ\_API\_KEY} environment variable is absent, the
+  \texttt{aiServiceOllama.js} service contacts the Ollama REST API at
+  \texttt{http://localhost:11434}. Because open-weight models such as
+  Mistral-7B respond less reliably to abstract instructions than to
+  concrete examples, the Ollama path uses a \emph{separate few-shot
+  prompt} (\texttt{buildOllamaPrompt()}) that replaces the abstract
+  pattern matrix with a fully worked example showing input transcript
+  segments and the expected JSON output~\cite{brown2020}. This
+  in-context learning approach compensates for the reduced
+  instruction-following capability of smaller open-weight models.
+
+  \item \textbf{Anthropic Claude} (cloud fallback). If Ollama is also
+  unavailable, the \texttt{@anthropic-ai/sdk} client calls
+  \texttt{claude-3-5-sonnet-20241022}~\cite{anthropic2024} using the
+  same two-step system prompt as Groq.
 \end{enumerate}
 
-\subsection{Stage 4: Validation and Enrichment}
+The frontend receives an identical suggestion structure regardless of
+which provider was used, preserving the provider-agnostic design
+goal stated in Section~\ref{sec:architecture}.
 
-The raw LLM output is parsed with \texttt{JSON.parse()} and then validated
-against a Zod schema:
+\subsection{Stage 4: Zod Validation and Enrichment}
 
-\begin{lstlisting}[language=JavaScript,caption={Zod validation schema for AI suggestions}]
-const suggestionSchema = z.object({
-  timestamp: z.number().nonnegative(),
-  type: z.enum(['MultiChoice','TrueFalse','FillBlanks',
-                'Hotspot','DragDrop','MarkWords']),
+The raw LLM output is parsed with \texttt{JSON.parse()} and validated
+against a set of Zod schemas that enforce both structural correctness
+and type-specific constraints~\cite{white2023}:
+
+\begin{lstlisting}[language=JavaScript,caption={Zod schemas for hierarchical AI output validation}]
+const QuestionSchema = z.object({
+  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks',
+               'DragText', 'MarkWords', 'Matching']),
+  question: z.string().min(1),
+  bloomsLevel: z.enum([
+    'Remember','Understand','Apply','Analyse','Evaluate','Create'
+  ]),
+  // Type-specific fields (validated at enrichment time):
+  // MultiChoice: answers array with 4 options, 1 correct
+  // TrueFalse:   correct boolean
+  // FillBlanks:  text with *asterisk*-wrapped blank
   config: z.record(z.unknown()),
   reason: z.string()
 });
-const suggestionListSchema = z.array(suggestionSchema);
+
+const TopicSchema = z.lazy(() => z.object({
+  topic: z.string(),
+  startTime: z.number().nonnegative(),  // raw seconds integer
+  endTime:   z.number().nonnegative(),
+  bloomsLevel: z.string(),
+  difficulty:  z.number().int().min(1).max(3),
+  question:  QuestionSchema,
+  subtopics: z.array(TopicSchema).optional()
+}));
+
+const ResponseSchema = z.array(TopicSchema);
 \end{lstlisting}
 
-If validation fails (e.g., the model returned malformed JSON), the pipeline
-returns a structured error rather than crashing. Valid suggestions are
-enriched with a system-generated ID, the H5P library identifier
-(e.g., \texttt{H5P.MultiChoice 1.16}), and a status of \texttt{pending}.
-The enriched array is returned to the client as the final response.
+The recursive \texttt{TopicSchema} (via \texttt{z.lazy()}) validates the
+full topic/subtopic hierarchy. Any topic node that fails validation is
+discarded individually rather than invalidating the entire response,
+maximising the number of usable suggestions recovered from partial
+outputs. Valid nodes are then \emph{enriched}: each receives a
+system-generated UUID, the H5P library identifier resolved from
+\texttt{H5P\_TYPE\_MAP} (e.g., \texttt{H5P.MultiChoice 1.16}), and a
+status of \texttt{pending}. The enriched list is streamed to the
+client via Server-Sent Events (SSE) or returned as a single JSON
+response depending on the endpoint called.
 
 \subsection{Stage 5: Suggestion Review and Injection}
 
@@ -541,15 +853,28 @@ major control to its OWASP category.
 
 \subsection{Authentication Flow}
 
-The authentication flow proceeds as follows. On registration, the password
-is bcrypt-hashed in the Sequelize \texttt{beforeCreate} hook and never
-stored in plaintext. On login, the provided password is compared with the
-stored hash using \texttt{bcrypt.compare()}. On success, the server signs
-a JWT containing \texttt{userId}, \texttt{role}, and \texttt{iat}/\texttt{exp}
-claims, and returns it to the client. The client stores the token in
-memory (Zustand store) and includes it as a Bearer token on all subsequent
-API requests. The \texttt{auth} middleware verifies the signature on every
-protected request~\cite{jwt2015}.
+Figure~\ref{fig:seq_auth} shows the complete sequence of interactions for
+the registration, email verification, login, and protected-request flows.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/fig_sequence_auth}}
+  \caption{Sequence diagram: user registration, email verification, login,
+           and authenticated API request}
+  \label{fig:seq_auth}
+\end{figure}
+
+On registration, the password is bcrypt-hashed (cost factor 12) before
+storage and the account is set to inactive pending email verification. A
+six-digit code generated by \texttt{crypto.randomInt} is emailed to the
+registered address with a ten-minute TTL. On successful verification, the
+account is activated. On login, the provided password is compared with the
+stored hash using \texttt{bcrypt.compare()}; on success, the server signs
+a JWT~\cite{jwt2015} containing \texttt{userId}, \texttt{role}, and
+\texttt{iat}/\texttt{exp} claims and returns it to the client. The client
+attaches the token as a \texttt{Bearer} header on all subsequent API requests,
+and the \texttt{authenticateToken} middleware verifies the signature on every
+protected route.
 
 \subsection{Password Reset}
 

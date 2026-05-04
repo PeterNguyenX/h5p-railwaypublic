@@ -9,16 +9,20 @@ instructors, with a dual focus on user-centred workflow design and
 AI-assisted question generation.
 
 The core technical contribution is a full-stack web application comprising
-a React~18 + TypeScript single-page application, an Express.js REST API,
-a SQLite database managed via Sequelize ORM, and the Lumieducation H5P
-server library. Layered on top of this foundation is an AI pipeline that
-extracts timestamped transcripts from videos (via YouTube captions, WebVTT
-uploads, or Whisper audio transcription), submits them to a large language
-model (Anthropic Claude or a locally hosted Ollama instance), and returns
-a Zod-validated list of H5P interaction suggestions classified by Bloom's
-revised taxonomy. A Server-Sent Events streaming interface delivers token-level
-AI progress updates to the browser, providing immediate feedback during the
-8--12 second generation latency.
+a React~18 + TypeScript single-page application~\cite{react2023,typescript2023},
+an Express.js REST API~\cite{expressjs2023}, a SQLite database managed via the
+Sequelize ORM~\cite{sqlite2023,sequelize2023}, and the Lumieducation H5P
+server library~\cite{lumieducation2023}. Layered on top of this foundation
+is an AI pipeline that extracts timestamped transcripts from videos (via
+YouTube captions, uploaded WebVTT files, or Whisper audio
+transcription~\cite{radford2023}), submits them to a large language model
+(Anthropic Claude~\cite{anthropic2024} or a locally hosted Ollama instance),
+and returns a Zod-validated list of H5P interaction suggestions classified
+by Bloom's revised taxonomy~\cite{anderson2001}. A Server-Sent Events
+streaming interface delivers token-level AI progress updates to the browser,
+providing immediate feedback during the 8--12 second generation
+latency---consistent with Nielsen's requirement for system status
+visibility~\cite{nielsen1994}.
 
 The platform was evaluated against the dominant WordPress-based H5P workflow
 in a comparative usability study with ten participants. The new platform
@@ -44,26 +48,36 @@ question suggestions. All four were directly addressed in the new platform.
 
 Co-locating the video player, timestamp capture, question editor, and AI
 suggestion panel on a single screen eliminated the split-attention effect
-identified in the cognitive load literature. The integrated format reduced
-the number of required interface interactions from 47 (WordPress) to
-approximately 8 for a three-question interactive video.
+identified by Chandler and Sweller~\cite{chandler1991}: the extraneous load
+imposed by navigating between screens is removed when all task-relevant
+information is co-present. The integrated format reduced the number of
+required interface interactions from 47 (WordPress) to approximately 8 for
+a three-question interactive video---a reduction consistent with the 30--50\%
+task-time gains predicted by Paas, Renkl, and Sweller for integrated-format
+instructional designs~\cite{paas2003}.
 
 \textbf{RQ3: What architecture best supports AI-assisted H5P authoring?}
 
 The dual-provider AI architecture (Ollama as first choice, Claude as
-fallback) combined with Zod-based structured output validation provides a
-reliable, cost-flexible pipeline. SSE streaming is essential for managing
-perceived latency during the 8--12 second generation time. The Lumieducation
-H5P server library provides a robust, specification-compliant H5P layer
-without CMS dependency.
+fallback) combined with Zod-based structured output validation---following
+the output automater pattern described by White et al.~\cite{white2023}---
+provides a reliable, cost-flexible pipeline. SSE streaming is essential for
+managing perceived latency during the 8--12 second generation time. The
+Lumieducation H5P server library~\cite{lumieducation2023} provides a robust,
+specification-compliant H5P layer without CMS dependency, built on the
+three-tier architecture recommended for institutional web
+applications~\cite{bass2012}.
 
 \textbf{RQ4: To what extent does the platform outperform the baseline?}
 
 The platform outperforms the WordPress baseline on every measured dimension:
 task completion rate by 65 percentage points, time-on-task by 93\%, error
-rate by 89\%, SUS score by 44.5 points, and satisfaction by 2.7 points on
-a five-point scale. These improvements are practically significant and
-suggest that the platform is ready for pilot deployment at VNU-HCM.
+rate by 89\%, SUS score by 44.5 points (from ``Poor'' to ``Excellent'' on
+Brooke's scale~\cite{brooke1996}), and satisfaction by 2.7 points on a
+five-point scale. Given that the Technology Acceptance Model identifies
+perceived ease of use as a necessary condition for adoption~\cite{davis1989},
+improvements of this magnitude are of direct practical significance for
+expanding faculty engagement with interactive video pedagogy at VNU-HCM.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Contributions}
@@ -109,11 +123,14 @@ This thesis makes the following contributions:
 
 Several limitations constrain the interpretation of the findings.
 
-\textbf{Evaluation sample size.} Ten participants is sufficient for a
-heuristic usability study but insufficient for statistical hypothesis
-testing~\cite{nielsen1994}. The reported effect sizes are large enough to
-be practically interpretable, but formal significance testing would require
-a larger and more representative sample including actual university faculty.
+\textbf{Evaluation sample size.} Ten participants satisfies Nielsen's
+recommendation for detecting the majority of usability
+problems~\cite{nielsen1994} but is insufficient for parametric hypothesis
+testing with adequate statistical power. The reported effect sizes are large
+enough to be practically interpretable in isolation, but confidence intervals
+and non-parametric significance tests (e.g., Mann--Whitney U) would require
+a minimum of approximately 30 participants per condition to achieve power
+$\geq 0.80$.
 
 \textbf{Proxy participants.} IT students were used as educator proxies.
 While standard practice for early-stage evaluation, this introduces a gap
@@ -132,9 +149,12 @@ validation.
 
 \textbf{AI suggestion quality variance.} Suggestion quality depends on
 transcript quality, which degrades with noisy audio or heavy technical
-vocabulary. The current prompt strategy has not been optimised for
-non-English videos; Vietnamese-language lecture transcription and question
-generation are important future directions.
+vocabulary. While Whisper achieves competitive word-error rates on clean
+English audio~\cite{radford2023}, its performance on Vietnamese academic
+speech---particularly domain-specific technical terminology---has not been
+evaluated in this project. Vietnamese-language transcription and question
+generation are therefore important future directions requiring dedicated
+evaluation.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Future Work}
@@ -153,12 +173,15 @@ This requires both Whisper fine-tuning on Vietnamese academic audio and
 prompt adaptation for Vietnamese H5P content generation.
 
 \textbf{Learning analytics integration.} Connecting the platform's export
-events with the VNU-HCM MOOC LRS (Learning Record Store) would enable
-instructors to see how students interact with their interactive videos---
-which questions cause the most replays, which timestamps trigger the most
-errors, and how interaction patterns correlate with assessment outcomes.
-This integration would directly address the learning analytics gap
-identified by Siemens and Long~\cite{siemens2011}.
+and interaction events with the VNU-HCM MOOC Learning Record Store would
+enable instructors to observe how students engage with their interactive
+videos---which questions cause the most replays, which timestamps trigger
+the most errors, and how interaction patterns correlate with downstream
+assessment performance. This integration would directly address the
+learning analytics opportunity identified by Siemens and
+Long~\cite{siemens2011}, who argue that the data exhaust of interactive
+learning systems constitutes an underutilised resource for instructional
+improvement.
 
 \textbf{Collaborative authoring.} Adding real-time collaborative editing
 (multiple instructors working on the same video simultaneously) via

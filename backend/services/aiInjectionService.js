@@ -38,8 +38,8 @@ function buildTitle(suggestion) {
     MultiChoice: 'Multiple Choice',
     TrueFalse: 'True/False',
     FillBlanks: 'Fill in the Blanks',
-    Hotspot: 'Hotspot',
-    DragDrop: 'Drag and Drop'
+    DragText: 'Drag Text',
+    MarkWords: 'Mark Words',
   };
 
   const minutes = Math.floor(suggestion.timestamp / 60);

@@ -5,7 +5,7 @@ import {
   Sparkles, Plus, Save, X, Loader2, AlertCircle,
   Download, Clock, Package, Trash2,
   ChevronLeft, FileText, Play, Pause, Pencil, Link,
-  ListChecks, ToggleLeft, PenLine, Shuffle
+  ListChecks, ToggleLeft, PenLine, Shuffle, MoveHorizontal, Highlighter
 } from "lucide-react";
 import { useEditorStore } from "../../lib/editorStore";
 import { useAuthStore } from "../../lib/authStore";
@@ -66,6 +66,8 @@ const H5P_LIBRARIES: Record<H5PType, string> = {
   TrueFalse: "H5P.TrueFalse 1.6",
   FillBlanks: "H5P.Blanks 1.14",
   Matching: "H5P.DragText 1.10",
+  DragText: "H5P.DragText 1.10",
+  MarkWords: "H5P.MarkWords 1.9",
 };
 
 const TYPE_LABELS: Record<H5PType, string> = {
@@ -73,13 +75,17 @@ const TYPE_LABELS: Record<H5PType, string> = {
   TrueFalse: "True / False",
   FillBlanks: "Fill in Blanks",
   Matching: "Matching",
+  DragText: "Drag Text",
+  MarkWords: "Mark Words",
 };
 
 const TYPE_COLORS: Record<H5PType, string> = {
-  MultiChoice: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
-  TrueFalse: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
-  FillBlanks: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
-  Matching: "bg-[#e8f0fa] text-[#1e3a5f] border-[#1e3a5f]/20",
+  MultiChoice: "bg-blue-50   text-blue-700   border-blue-200   dark:bg-blue-900/40   dark:text-blue-300   dark:border-blue-700",
+  TrueFalse:   "bg-green-50  text-green-700  border-green-200  dark:bg-green-900/40  dark:text-green-300  dark:border-green-700",
+  FillBlanks:  "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700",
+  Matching:    "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700",
+  DragText:    "bg-teal-50   text-teal-700   border-teal-200   dark:bg-teal-900/40   dark:text-teal-300   dark:border-teal-700",
+  MarkWords:   "bg-amber-50  text-amber-700  border-amber-200  dark:bg-amber-900/40  dark:text-amber-300  dark:border-amber-700",
 };
 
 const TYPE_ICON_NAMES: Record<H5PType, string> = {
@@ -87,11 +93,22 @@ const TYPE_ICON_NAMES: Record<H5PType, string> = {
   TrueFalse:   "ToggleLeft",
   FillBlanks:  "PenLine",
   Matching:    "Shuffle",
+  DragText:    "MoveHorizontal",
+  MarkWords:   "Highlighter",
+};
+
+const TYPE_DESCRIPTIONS: Record<H5PType, string> = {
+  MultiChoice: "Lists, comparisons, or processes with one or more correct answers",
+  TrueFalse:   "Absolute facts or rules students confirm as true or false",
+  FillBlanks:  "Key terms or definitions — students complete the blank",
+  Matching:    "Recap pairs linking concepts to definitions (best at end)",
+  DragText:    "Ordered steps or sequences — students drag words into place",
+  MarkWords:   "Passages with key vocabulary — students click to highlight",
 };
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type H5PType = "MultiChoice" | "TrueFalse" | "FillBlanks" | "Matching";
+type H5PType = "MultiChoice" | "TrueFalse" | "FillBlanks" | "Matching" | "DragText" | "MarkWords";
 
 interface H5PForm {
   editingId: string | null;      // null = new, string = editing existing
@@ -109,6 +126,9 @@ interface H5PForm {
   fillText: string;
   // Matching
   matchPairs: { prompt: string; answer: string }[];
+  // DragText / MarkWords (shared structure)
+  taskDescription: string;
+  textField: string;
 }
 
 function blankForm(type: H5PType, timestamp: number): H5PForm {
@@ -117,7 +137,19 @@ function blankForm(type: H5PType, timestamp: number): H5PForm {
     question: "", choices: ["", "", "", ""], correctIndices: [0], allowMultipleCorrect: false,
     statement: "", tfCorrect: true, fillText: "",
     matchPairs: [{ prompt: "", answer: "" }, { prompt: "", answer: "" }, { prompt: "", answer: "" }],
+    taskDescription: "", textField: "",
   };
+}
+
+function extractQuestionPreview(c: H5PContent): string {
+  const p = (c.params || {}) as Record<string, unknown>;
+  const q = (p.question || p.taskDescription || p.text || p.fillText || "") as string;
+  if (q) return q.replace(/\*([^*]+)\*/g, "$1");
+  if (Array.isArray(p.pairs) && p.pairs.length > 0) {
+    const first = p.pairs[0] as { prompt?: string };
+    return first.prompt ? `Match: ${first.prompt}…` : "";
+  }
+  return "";
 }
 
 function inferType(libraryOrType: string): H5PType {
@@ -125,6 +157,7 @@ function inferType(libraryOrType: string): H5PType {
   if (s.includes("multichoice") || s.includes("multiple")) return "MultiChoice";
   if (s.includes("truefalse") || s.includes("true")) return "TrueFalse";
   if (s.includes("blank") || s.includes("fill")) return "FillBlanks";
+  if (s.includes("markwords") || s.includes("mark")) return "MarkWords";
   if (s.includes("dragtext") || s.includes("matching") || s.includes("drag")) return "Matching";
   return "MultiChoice";
 }
@@ -160,6 +193,13 @@ function contentToForm(c: H5PContent): H5PForm {
     const pairs = (p.pairs as Array<{ prompt: string; answer: string }>) || [];
     return { ...base, matchPairs: pairs.length > 0 ? pairs : base.matchPairs };
   }
+  if (type === "DragText" || type === "MarkWords") {
+    return {
+      ...base,
+      taskDescription: (p.taskDescription as string) || "",
+      textField: (p.textField as string) || "",
+    };
+  }
   // FillBlanks
   return { ...base, fillText: (p.text as string) || "" };
 }
@@ -178,6 +218,8 @@ function formToContentData(f: H5PForm) {
     params = { question: f.statement, correct: f.tfCorrect ? "true" : "false" };
   } else if (f.type === "Matching") {
     params = { pairs: f.matchPairs.filter(p => p.prompt.trim() && p.answer.trim()) };
+  } else if (f.type === "DragText" || f.type === "MarkWords") {
+    params = { taskDescription: f.taskDescription, textField: f.textField };
   } else {
     params = { text: f.fillText, showSolutions: "end", autoCheck: false };
   }
@@ -213,18 +255,11 @@ function H5PEditorPanel({
   clearOpen: () => void;
 }) {
   const [form, setForm] = useState<H5PForm | null>(null);
+  const [formDirty, setFormDirty] = useState(false);
+  const [showDiscardWarning, setShowDiscardWarning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const addMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setAddMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const [showTypePicker, setShowTypePicker] = useState(false);
 
   // Notify parent when form open/close state changes
   useEffect(() => {
@@ -241,13 +276,37 @@ function H5PEditorPanel({
 
   const startNew = (type: H5PType) => {
     setForm(blankForm(type, Math.floor(currentTime)));
+    setFormDirty(false);
     setSaveError(null);
+    setShowTypePicker(false);
     clearOpen();
+  };
+
+  const handleBack = () => {
+    if (!form) { setShowTypePicker(false); return; }
+    if (!form.editingId && formDirty) {
+      setShowDiscardWarning(true);
+    } else if (!form.editingId) {
+      setForm(null);
+      setFormDirty(false);
+      setShowTypePicker(true);
+    } else {
+      cancel();
+    }
+  };
+
+  const confirmDiscard = () => {
+    setShowDiscardWarning(false);
+    setForm(null);
+    setFormDirty(false);
+    setShowTypePicker(true);
   };
 
   const cancel = () => {
     setForm(null);
-    setSaveError(null);
+    setFormDirty(false);
+    setShowDiscardWarning(false);
+    setShowTypePicker(false);
     clearOpen();
   };
 
@@ -304,8 +363,10 @@ function H5PEditorPanel({
     clearOpen();
   };
 
-  const setField = <K extends keyof H5PForm>(key: K, val: H5PForm[K]) =>
+  const setField = <K extends keyof H5PForm>(key: K, val: H5PForm[K]) => {
+    setFormDirty(true);
     setForm((f) => f ? { ...f, [key]: val } : f);
+  };
 
   const setChoice = (i: number, val: string) =>
     setForm((f) => {
@@ -317,46 +378,68 @@ function H5PEditorPanel({
 
   // ── Idle state ────────────────────────────────────────────────────────────
   if (!form) {
+    // ── Type picker (full-panel) ───────────────────────────────────────────
+    if (showTypePicker) {
+      const iconMap = { ListChecks, ToggleLeft, PenLine, Shuffle, MoveHorizontal, Highlighter } as Record<string, React.ElementType>;
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowTypePicker(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              title="Back"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div>
+              <p className="text-sm font-bold text-slate-700">Choose question type</p>
+              <p className="text-xs text-slate-400">Select the format that best fits your content</p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+            {(["MultiChoice", "TrueFalse", "FillBlanks", "DragText", "MarkWords", "Matching"] as H5PType[]).map((type) => {
+              const Icon = iconMap[TYPE_ICON_NAMES[type]];
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => startNew(type)}
+                  className="flex items-center gap-4 w-full p-4 rounded-xl border border-slate-200 hover:border-[#f5832a]/40 hover:bg-[#fff8f4] transition-all text-left group"
+                >
+                  <div className={`p-2.5 rounded-xl shrink-0 ${TYPE_COLORS[type]} group-hover:scale-105 transition-transform`}>
+                    {Icon && <Icon className="w-5 h-5" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-slate-700 group-hover:text-[#f5832a] transition-colors">{TYPE_LABELS[type]}</div>
+                    <div className="text-xs text-slate-400 mt-0.5 leading-snug">{TYPE_DESCRIPTIONS[type]}</div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#f5832a] shrink-0 transition-colors" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Interactions list ──────────────────────────────────────────────────
     return (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
-        {/* Add Interaction dropdown button */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
             {h5pContents.length > 0 ? `Interactions (${h5pContents.length})` : "Interactions"}
           </p>
-          <div ref={addMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setAddMenuOpen((v) => !v)}
-              className="flex items-center gap-1.5 h-8 px-3 bg-[#f5832a] hover:bg-[#e86e15] dark:bg-transparent dark:border dark:border-[#f5832a] dark:hover:border-[#ffa05c] text-white text-xs font-bold rounded-xl transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Interaction
-              <ChevronDown className={`w-3 h-3 transition-transform ${addMenuOpen ? "rotate-180" : ""}`} />
-            </button>
-            {addMenuOpen && (
-              <div className="absolute right-0 top-9 w-48 bg-white border border-slate-200 rounded-2xl shadow-lg py-1 z-50 overflow-hidden">
-                {(["MultiChoice", "TrueFalse", "FillBlanks", "Matching"] as H5PType[]).map((type) => {
-                  const iconMap = { ListChecks, ToggleLeft, PenLine, Shuffle } as Record<string, React.ElementType>;
-                  const Icon = iconMap[TYPE_ICON_NAMES[type]];
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => { startNew(type); setAddMenuOpen(false); }}
-                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      {Icon && <Icon className="w-4 h-4 text-slate-400" />}
-                      {TYPE_LABELS[type]}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowTypePicker(true)}
+            className="flex items-center gap-1.5 h-8 px-3 bg-[#f5832a] hover:bg-[#e86e15] dark:bg-transparent dark:border dark:border-[#f5832a] dark:hover:border-[#ffa05c] text-white text-xs font-bold rounded-xl transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Interaction
+          </button>
         </div>
 
-        {/* Existing interactions list */}
         <div className="flex-1 overflow-y-auto p-5">
           {h5pContents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
@@ -370,33 +453,41 @@ function H5PEditorPanel({
                 .sort((a, b) => a.timestamp - b.timestamp)
                 .map((c, i) => {
                   const type = inferType(c.library || "");
+                  const preview = extractQuestionPreview(c);
                   return (
                     <div
                       key={c.id}
                       onClick={() => setForm(contentToForm(c))}
-                      className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-all group cursor-pointer"
+                      className="flex items-start gap-3 p-3 border border-slate-200 dark:border-white/10 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-all group cursor-pointer"
                     >
-                      <div className="w-7 h-7 rounded-full bg-[#f5832a] text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="w-7 h-7 rounded-full bg-[#f5832a] text-white text-xs font-bold flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm mt-0.5">
                         {i + 1}
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onSeek(c.timestamp); }}
-                        className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-mono text-xs font-bold text-slate-700 transition-colors shrink-0"
-                      >
-                        <Clock className="w-3 h-3" />
-                        {formatTime(c.timestamp)}
-                      </button>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${TYPE_COLORS[type]}`}>
-                        {TYPE_LABELS[type]}
-                      </span>
-                      <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onDeleted(c.id); }}
-                          className="p-1.5 text-slate-400 hover:text-[#f5832a] hover:bg-[#f5832a]/10 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${TYPE_COLORS[type]}`}>
+                            {TYPE_LABELS[type]}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onSeek(c.timestamp); }}
+                            className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded font-mono text-xs font-bold text-slate-600 transition-colors"
+                          >
+                            <Clock className="w-3 h-3" />
+                            {formatTime(c.timestamp)}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onDeleted(c.id); }}
+                            className="ml-auto p-1 text-slate-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {preview && (
+                          <p className="text-xs text-slate-500 mt-1 truncate">{preview}</p>
+                        )}
                       </div>
                     </div>
                   );
@@ -413,9 +504,24 @@ function H5PEditorPanel({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+      {/* Discard warning banner */}
+      {showDiscardWarning && (
+        <div className="mx-4 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-800">Discard changes?</p>
+            <p className="text-xs text-amber-600 mt-0.5">What you've typed will not be saved.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setShowDiscardWarning(false)} className="text-xs font-semibold text-amber-700 hover:text-amber-900 px-2 py-1 rounded-lg hover:bg-amber-100 transition-colors">Keep editing</button>
+            <button type="button" onClick={confirmDiscard} className="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 px-2 py-1 rounded-lg transition-colors">Discard</button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-5 border-b border-slate-100 flex items-center gap-3">
-        <button onClick={cancel} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+        <button onClick={handleBack} title="Back" className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div>
@@ -654,6 +760,88 @@ function H5PEditorPanel({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Drag Text */}
+        {form.type === "DragText" && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Task Description</label>
+              <input
+                type="text"
+                value={form.taskDescription}
+                onChange={(e) => setField("taskDescription", e.target.value)}
+                placeholder="Drag the words to complete the sequence..."
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
+                Text with Draggable Words
+              </label>
+              <textarea
+                value={form.textField}
+                onChange={(e) => setField("textField", e.target.value)}
+                rows={5}
+                placeholder="First *initialize* the connection, then *authenticate* the user, finally *authorize* access."
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none font-mono"
+              />
+              <p className="text-xs text-slate-500 mt-1.5">
+                Wrap each draggable word in <code className="bg-slate-100 px-1 rounded font-mono">*asterisks*</code> — students drag them into the blanks
+              </p>
+              {form.textField && (
+                <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700">
+                  <span className="text-xs font-semibold text-slate-500 block mb-1">Preview:</span>
+                  {form.textField.split(/\*([^*]+)\*/).map((part, i) =>
+                    i % 2 === 0
+                      ? <span key={i}>{part}</span>
+                      : <span key={i} className="inline-block border border-[#1a4a3a] bg-[#e8f5f0] text-[#1a4a3a] rounded px-2 py-0.5 mx-0.5 text-xs font-semibold">{part}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Mark Words */}
+        {form.type === "MarkWords" && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">Task Description</label>
+              <input
+                type="text"
+                value={form.taskDescription}
+                onChange={(e) => setField("taskDescription", e.target.value)}
+                placeholder="Click on all the key terms in this passage..."
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
+                Text with Key Terms
+              </label>
+              <textarea
+                value={form.textField}
+                onChange={(e) => setField("textField", e.target.value)}
+                rows={5}
+                placeholder="In *photosynthesis*, plants use *chlorophyll* to convert sunlight into *glucose* and oxygen."
+                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none font-mono"
+              />
+              <p className="text-xs text-slate-500 mt-1.5">
+                Wrap each key term in <code className="bg-slate-100 px-1 rounded font-mono">*asterisks*</code> — students click to highlight them
+              </p>
+              {form.textField && (
+                <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 leading-relaxed">
+                  <span className="text-xs font-semibold text-slate-500 block mb-1">Preview:</span>
+                  {form.textField.split(/\*([^*]+)\*/).map((part, i) =>
+                    i % 2 === 0
+                      ? <span key={i}>{part}</span>
+                      : <span key={i} className="inline-block bg-yellow-100 border border-yellow-400 text-yellow-900 rounded px-1.5 py-0.5 mx-0.5 text-xs font-semibold cursor-pointer hover:bg-yellow-200 transition-colors">{part}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

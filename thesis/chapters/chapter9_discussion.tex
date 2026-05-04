@@ -1,22 +1,264 @@
 \chapter{Discussion}
 
+This chapter synthesises the findings from the evaluation, considers their
+implications for educational technology practice and research, and reflects
+critically on the limitations and generalisability of the work.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Interpretation of Findings}
-The results support the thesis claim that educator-centered workflow design can deliver major usability gains without giving up standards-compatible output. Improvements are consistent with cognitive-load reduction principles and usability heuristics from prior work \citep{sweller1988,nielsen1994,clarkmayer2016}.
 
+\subsection{Usability Gains and Cognitive Load Reduction}
+
+The primary finding of the evaluation is unambiguous: the purpose-built
+platform reduced the cognitive burden of H5P interactive video authoring
+dramatically compared to the WordPress-based baseline. A 65-percentage-point
+improvement in task completion rate and a 93\% reduction in median task time
+are effect sizes that exceed the improvement thresholds proposed by
+Nielsen~\cite{nielsen1994} as indicative of a ``dramatic'' usability
+difference. These improvements are consistent with the predictions of
+cognitive load theory~\cite{sweller1988,chandler1991}: co-locating the
+video player, timestamp capture button, question editor, and AI suggestion
+panel on a single screen eliminated the split-attention effect that
+characterised the WordPress workflow, in which instructors were required to
+hold video timestamps and partially-composed questions in working memory
+while navigating between screens.
+
+The reduction in mean error count from 8.3 (WordPress) to 0.9 (new
+platform) per participant further supports the cognitive load interpretation.
+The most frequent error category on the new platform---timestamp entry in
+the wrong unit---reflects a residual interface ambiguity rather than a
+systemic workflow problem, and it accounts for only 6 of 9 total errors
+across all 10 participants. The most frequent error on the baseline, by
+contrast, was navigation-related (going to the wrong WordPress screen),
+indicating that the fundamental task structure, not just individual field
+interactions, was the source of difficulty.
+
+The SUS score of 82.5 positions the platform firmly in the ``Excellent''
+grade range~\cite{brooke1996}, above both the acceptable threshold of 68
+and the ``good'' threshold of 80. This result, combined with the 4.8/5.0
+satisfaction rating, indicates that usability improvements were perceived
+subjectively as well as demonstrated objectively in task performance.
+
+\subsection{AI-Assisted Authoring as a Pedagogical Tool}
+
+The qualitative findings reveal an emergent behaviour that was not
+anticipated in the initial design: several participants used the AI
+suggestion panel not merely as a productivity accelerator but as a
+pedagogical scaffold. The Bloom's taxonomy labels on suggestion cards
+prompted five participants to reflect on the cognitive difficulty
+distribution of their question sets, with two explicitly rearranging their
+selections to achieve a more balanced spread across taxonomy levels. This
+suggests that the AI pipeline's classification of suggestions by cognitive
+level has value beyond accuracy filtering---it introduces educators without
+formal instructional design training to a framework for deliberate cognitive
+targeting.
+
+This finding aligns with the vision articulated by Beetham and
+Sharpe~\cite{beetham2019}: the most effective educational technology tools
+do not merely automate existing practice but provide scaffolding that helps
+educators develop their own pedagogical reasoning. An AI suggestion panel
+that labels suggestions by Bloom's level acts as a lightweight instructional
+design tutor alongside its role as a content generator.
+
+The observation that 7 of 10 participants treated the AI suggestion panel
+as their primary workflow anchor---starting with AI suggestions and
+supplementing them with manually authored questions, rather than the
+reverse---suggests a shift in mental model from ``I author questions and
+the AI helps'' to ``the AI drafts questions and I curate them.'' This curation
+posture places the instructor in a reviewing and judging role rather than a
+generating role, which is consistent with Bloom's taxonomy's observation
+that evaluation (\emph{evaluate}) is a higher-order cognitive activity than
+recall (\emph{remember}) or reproduction~\cite{anderson2001}. Curation may
+therefore be a more appropriate role for domain-expert educators than
+question generation from scratch.
+
+\subsection{Architectural Suitability}
+
+The dual-provider AI architecture (Ollama first, Claude fallback) proved
+pragmatically effective. Claude produced zero schema validation failures
+across 20 test runs, while Ollama produced two failures that were caught by
+the Zod validator and returned as structured errors. The prompt revision
+that resolved the Ollama failures (adding the instruction to omit markdown
+code fences) illustrates the iterative nature of prompt engineering:
+structured output reliability requires prompt constraints that are specific
+to each model's output tendencies. The modular AI service design, which
+routes to either provider behind a common interface, allowed this fix to be
+applied once without changes to the frontend or H5P integration layer.
+
+The choice of SQLite as the database---often dismissed as unsuitable for
+multi-user applications---proved well-matched to the deployment constraints.
+At 50 concurrent connections, all non-AI API endpoints responded within
+500~ms, satisfying NFR-01. SQLite's file-based architecture~\cite{sqlite2023}
+simplifies backup (a single file copy), migration (a standard Sequelize
+migration script), and local development (no database server installation
+required). The schema is designed for forward-compatibility through the
+Sequelize ORM~\cite{sequelize2023}: migrating to PostgreSQL would require
+only a dialect change and connection string update, with no application
+code modification, reflecting the database-independence architectural goal
+stated in Section~4.1.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Pedagogical Implications}
-Interactive video authoring becomes feasible for instructors who are not CMS specialists. This rebalances effort from technical setup toward instructional design quality, improving the likelihood of sustained adoption.
 
-\section{Architectural Implications}
-A service-oriented backend with explicit validation boundaries proved effective for combining traditional CRUD operations with probabilistic AI outputs. The architecture remains extensible for advanced analytics, rubric alignment, and multilingual support.
+The results carry three practical implications for educational technology
+deployment in Vietnamese universities.
 
-\section{Limitations}
-The current version has the following limitations:
-\begin{itemize}[leftmargin=2em]
-\item Evaluation scale is limited and may not represent all teaching contexts.
-\item Mobile-first authoring remains partial.
-\item Full coverage of all H5P content types is not yet implemented.
-\item Long-running AI tasks require more robust queueing for very large deployments.
+\textbf{Lowering the authoring barrier expands who can create interactive
+content.} The Technology Acceptance Model posits that perceived ease of use
+is a necessary condition for tool adoption, particularly in contexts where
+perceived usefulness is already high~\cite{davis1989}. The WordPress-based
+workflow effectively excluded non-technical instructors by collapsing
+perceived ease of use through its multi-screen complexity, regardless of
+their instructional motivation. The new platform's 95\% task completion rate
+and 3.2-minute median task time suggest that interactive video authoring can
+be made accessible to the full faculty population, not just the technically
+proficient minority. The multiplicative implication is significant: an
+instructor who previously could not justify 45~minutes to embed a single
+question can now embed three or four interactive moments within a comparable
+time investment.
+
+\textbf{AI assistance shifts effort from generation to curation.} As noted
+above, the AI pipeline effectively transfers the question-generation effort
+from the instructor to the model, and transfers the instructional design
+effort from the model back to the instructor. Instructors spend their time
+judging whether a suggested question is appropriate, accurate, and
+pedagogically well-placed---tasks for which their domain expertise is
+essential. This division of labour is arguably better aligned with
+instructor expertise than requiring them to compose each question from
+scratch.
+
+\textbf{Bloom's taxonomy classification raises metacognitive awareness.}
+Anderson and Krathwohl's revised taxonomy provides a principled hierarchy
+of cognitive objectives that instructors can use to ensure their question
+sets span a range of cognitive difficulty~\cite{anderson2001}. The inclusion
+of taxonomy labels on AI-generated suggestion cards introduced a
+metacognitive dimension to the authoring workflow that was absent in both
+the baseline and the prior design. Even participants who were unfamiliar
+with Bloom's revised taxonomy prior to the study were observed using the
+labels to diversify their question distributions, suggesting that interface-
+level exposure to a pedagogical framework can influence authoring behaviour
+without requiring prior formal training in instructional design.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Architectural and Engineering Implications}
+
+The project offers several engineering lessons applicable to the broader
+class of AI-augmented educational technology systems.
+
+\textbf{Structured output validation bridges the probabilistic--deterministic
+boundary.} Treating AI output as untrusted input and validating every
+suggestion against a Zod schema---following the output automater pattern
+described by White et al.~\cite{white2023}---prevented schema violations
+from reaching the H5P content store. In an educational deployment context,
+a corrupt H5P package could silently produce unrenderable or pedagogically
+incorrect content in students' learning environments without triggering an
+obvious system error. The validation layer absorbs the reliability gap
+between probabilistic model output and the deterministic software contracts
+that downstream systems depend on.
+
+\textbf{Streaming is essential for AI-interactive UIs.} All 10 evaluation
+participants preferred the SSE streaming interface over a hypothetical batch
+interface. The 8--12 second generation latency for a 5-minute video is
+perceptible but not disruptive when the interface provides token-level
+progress feedback. Without streaming, the same latency would constitute a
+blocking wait with no system status visibility, violating Nielsen's
+heuristic of visibility of system status~\cite{nielsen1994}.
+
+\textbf{Provider abstraction enables cost and privacy flexibility.}
+Offering Ollama (free, locally hosted, privacy-preserving) as a first
+choice with Claude as a fallback means that institutions with data
+sovereignty concerns can operate the AI pipeline entirely within their
+network, while still benefiting from cloud AI when the local inference
+server is unavailable. This design pattern is broadly applicable to
+EdTech systems in contexts where regulatory or institutional constraints
+limit data transmission to external AI providers.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Limitations and Boundary Conditions}
+
+\subsection{Sample Size and Participant Pool}
+
+The evaluation used ten participants, the minimum recommended by Nielsen
+for a usability study aimed at identifying the majority of usability
+problems~\cite{nielsen1994}. This sample size is adequate for qualitative
+problem identification but insufficient for parametric statistical testing.
+The reported means and effect sizes should be interpreted as evidence of
+practically significant differences rather than as statistically controlled
+point estimates. A larger study with n $\geq 30$ would be required to
+compute confidence intervals and perform Mann--Whitney U tests with
+adequate power.
+
+Furthermore, the participants were IT students acting as instructor proxies.
+While this is standard practice for early-stage usability evaluation, there
+is a plausible ecological validity gap: actual university instructors may
+exhibit different mental models, different domain expertise in their subject
+matter (which affects how they evaluate AI-generated questions), and
+different attitudes toward AI assistance. In particular, instructors in
+non-technical disciplines may engage differently with the Bloom's taxonomy
+labels than IT students who have encountered the taxonomy in their academic
+training.
+
+\subsection{Single-Session Measurement}
+
+The evaluation measured performance in a single 30-minute session per
+condition. This design captures first-use performance but does not measure
+learning curves, habituation effects, or long-term adoption. A longitudinal
+study tracking instructor usage over a full semester would provide evidence
+on whether the initial performance advantages are maintained, whether new
+usage patterns emerge (e.g., instructors developing personal AI prompt
+customisations), and whether instructors recommend the platform to peers---
+a strong indicator of real-world adoption potential.
+
+\subsection{H5P Content Type Coverage}
+
+The platform supports six of the 50+ H5P content types. While these six
+types cover the most common interactive video use cases, instructors with
+specific pedagogical needs (branching scenarios, drag-the-words, essay
+questions) would find the platform insufficient as a sole authoring tool.
+Extending the type coverage while maintaining the Zod-validated AI
+generation pipeline for each new type requires both schema definition work
+and prompt engineering effort proportional to the complexity of the new
+type's content parameters.
+
+\subsection{Transcript-Dependent AI Quality}
+
+The AI suggestion quality observed in the evaluation was based on videos
+with clear, English-language audio and high-quality YouTube automatic
+captions. Degraded transcript quality---from noisy audio, heavy accents,
+domain-specific technical vocabulary, or non-English language---would
+reduce suggestion relevance. The two off-topic suggestions in the expert
+quality assessment (Section~5.4) both arose from noisy transcript segments.
+This transcript dependency is an inherent property of the generate-from-transcript
+paradigm and cannot be fully addressed through prompt engineering alone;
+it requires upstream improvements in transcription quality.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Generalisability}
+
+The design principles and architectural patterns developed in this project
+are broadly generalisable beyond the HCMIU context:
+
+\begin{itemize}
+  \item The co-location design principle (reducing split-attention by
+  placing all authoring tools on a single screen) applies to any
+  timestamp-based content authoring tool, not only H5P.
+
+  \item The dual-provider AI architecture (local-first, cloud-fallback)
+  is applicable to any educational technology system that must balance
+  AI capability with data privacy constraints.
+
+  \item The structured output validation pattern (treating AI responses
+  as untrusted input, validating against a schema, discarding non-conforming
+  outputs) is applicable wherever LLMs are used to generate structured data
+  for consumption by downstream systems.
+
+  \item The SSE streaming pattern for AI progress reporting is applicable
+  to any web interface where AI generation latency exceeds approximately
+  3~seconds and user abandonment is a concern.
 \end{itemize}
 
-\section{Generalizability}
-While rooted in the VNU-HCM context, the design principles and architecture patterns are broadly transferable to higher-education institutions with similar LMS and cloud constraints.
+Institutions in comparable contexts---Southeast Asian universities with
+similar LMS infrastructure (Moodle, Canvas), similar faculty technical
+literacy profiles, and similar national digital education policy
+imperatives---would likely find the platform directly deployable and the
+evaluation results directionally applicable.

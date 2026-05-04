@@ -50,9 +50,17 @@ Generate EXACTLY ONE question per topic/subtopic (no skips!) using this pattern 
 • Definition / technical term ("X is...", "Y stands for..."): → "FillBlanks"
 • Binary fact / absolute rule ("always", "never", true/false claim): → "TrueFalse"
 • List / comparison / process / category: → "MultiChoice"
+• Sequence / ordered steps / procedure (steps that must go in order): → "DragText"
+• Vocabulary / key terms in a passage (identify important words): → "MarkWords"
 
-ONLY these 3 types: "MultiChoice", "TrueFalse", "FillBlanks"
+ONLY these 6 types: "MultiChoice", "TrueFalse", "FillBlanks", "DragText", "MarkWords", "Matching"
 CRITICAL: Every topic and subtopic MUST have a question field. Do not omit any.
+
+SPECIAL RULE — MATCHING RECAP AFTER ALL TOPICS:
+After all topics are listed, add ONE extra topic at the very end titled "Video Recap".
+Set its start = end time of the last topic, end = last transcript timestamp.
+Its question MUST be type "Matching" covering 4–5 key concept pairs drawn from the ENTIRE video.
+Use "Matching" ONLY for this final recap topic — never inside other topics or subtopics.
 
 ══════════════════════════
 OUTPUT SCHEMA (follow exactly)
@@ -128,6 +136,44 @@ EXAMPLE: FillBlanks question
   }
 }
 
+EXAMPLE: Matching question (ONLY for the final topic — end-of-video recap)
+{
+  "type": "Matching",
+  "taskDescription": "Match each networking concept to its correct description:",
+  "pairs": [
+    {"prompt": "DHCP", "answer": "Automatically assigns IP addresses to devices"},
+    {"prompt": "DNS", "answer": "Translates domain names to IP addresses"},
+    {"prompt": "Router", "answer": "Forwards packets between different networks"},
+    {"prompt": "Switch", "answer": "Connects devices within a local area network"}
+  ],
+  "feedback": {
+    "correct": "Excellent! You have matched all concepts correctly.",
+    "incorrect": "Not quite. Review the definitions from the lecture and try again."
+  }
+}
+
+EXAMPLE: DragText question (for sequences / ordered steps)
+{
+  "type": "DragText",
+  "taskDescription": "Drag the words into the correct order to complete the TCP handshake steps:",
+  "textField": "The client sends a *SYN* packet, the server replies with *SYN-ACK*, and the client completes with *ACK*.",
+  "feedback": {
+    "correct": "Correct! That is the correct order of the TCP three-way handshake.",
+    "incorrect": "Incorrect. The three-way handshake goes SYN → SYN-ACK → ACK."
+  }
+}
+
+EXAMPLE: MarkWords question (for key term identification)
+{
+  "type": "MarkWords",
+  "taskDescription": "Click on all the key networking terms mentioned in this section:",
+  "textField": "In computer networks, *routers* forward packets between networks, while *switches* connect devices within a LAN. The *IP address* uniquely identifies each device.",
+  "feedback": {
+    "correct": "Correct! You identified all the key networking terms.",
+    "incorrect": "Incorrect. Look for the technical terms that were defined in this section."
+  }
+}
+
 ══════════════════════════
 RULES
 ══════════════════════════
@@ -137,12 +183,15 @@ RULES
 - MultiChoice: exactly 4 answers, 1 or more correct. You may also occasionally generate a comprehensive summary question where one option is "All of the above" (and it is the correct answer).
 - TrueFalse: "correct" must be a boolean (true or false), not a string
 - FillBlanks: wrap only the key term in *single asterisks*
+- DragText: wrap each draggable word/phrase in *single asterisks*; the surrounding text provides context clues; taskDescription must describe the ordering task
+- MarkWords: wrap each key term in *single asterisks*; include 2–5 marked terms; taskDescription must tell students what to look for
+- Matching: ONLY for the standalone "Video Recap" topic appended after all content topics; provide 4–5 pairs; prompts are key terms from across the full video, answers are their definitions
 - Distractors must come from elsewhere in the transcript (plausible but wrong)`;
 
 // ─── Zod schemas ───────────────────────────────────────────────────────────────
 
 const QuestionSchema = z.object({
-  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks']),
+  type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks', 'DragText', 'MarkWords', 'Matching']),
   question: z.string().optional(),
   answers: z.array(z.object({ text: z.string(), correct: z.boolean() })).optional(),
   correct: z.boolean().optional(),
@@ -172,6 +221,9 @@ const H5P_TYPE_MAP = {
   MultiChoice: 'H5P.MultiChoice 1.16',
   TrueFalse: 'H5P.TrueFalse 1.6',
   FillBlanks: 'H5P.Blanks 1.14',
+  DragText: 'H5P.DragText 1.10',
+  MarkWords: 'H5P.MarkWords 1.9',
+  Matching: 'H5P.DragText 1.10',
 };
 
 function formatSegmentsForPrompt(segments) {
@@ -358,15 +410,26 @@ function buildOllamaPrompt(segments) {
   const midPoint = Math.round(duration / 2);
 
   // Few-shot: provide a complete worked example so mistral mirrors the structure exactly
+  // Includes all 5 question types so the model knows their schemas
   return `You are a JSON API. Output ONLY a valid JSON object.
+
+AVAILABLE QUESTION TYPES AND WHEN TO USE THEM:
+- "TrueFalse": binary fact or absolute rule (correct must be boolean)
+- "MultiChoice": list, comparison, process, or category (4 answers, 1+ correct)
+- "FillBlanks": definition or technical term (wrap key term in *asterisks*, use fillText field)
+- "DragText": sequence or ordered steps (wrap draggable words in *asterisks*, use taskDescription + textField fields)
+- "MarkWords": key term identification (wrap key terms in *asterisks*, use taskDescription + textField fields)
+- "Matching": ONLY for a final "Video Recap" topic appended after all content topics (4–5 pairs, use taskDescription + pairs fields)
 
 EXAMPLE INPUT:
 [00:00 (0s) -> 00:45 (45s)] Caching stores copies of data so future requests are faster.
 [00:45 (45s) -> 01:30 (90s)] A cache hit occurs when the requested data is found in cache.
-[01:30 (90s) -> 02:15 (135s)] Cache eviction removes old entries using policies like LRU.
+[01:30 (90s) -> 02:15 (135s)] Cache eviction removes old entries using policies like LRU or FIFO.
+[02:15 (135s) -> 03:00 (180s)] To set up caching: first configure the cache size, then define the eviction policy, finally enable cache warming.
+[03:00 (180s) -> 03:45 (225s)] Key terms in this section: throughput, latency, and cache coherence.
 
 EXAMPLE OUTPUT:
-{"topics":[{"title":"What is Caching","start":0,"end":45,"question":{"type":"TrueFalse","question":"Caching stores copies of data to speed up future requests.","correct":true,"feedback":{"correct":"Correct! That is exactly what caching does.","incorrect":"Incorrect. Caching does store copies of data to speed access."}},"subtopics":[]},{"title":"Cache Hits and Misses","start":45,"end":90,"question":{"type":"MultiChoice","question":"What is a cache hit?","answers":[{"text":"The requested data is found in cache","correct":true},{"text":"The cache is full","correct":false},{"text":"Data is deleted from cache","correct":false},{"text":"The cache fails to load","correct":false}],"feedback":{"correct":"Correct! A cache hit means the data was found.","incorrect":"Incorrect. A cache hit means the data was already stored in cache."}},"subtopics":[]},{"title":"Cache Eviction","start":90,"end":135,"question":{"type":"MultiChoice","question":"Which eviction policy removes the least recently used entry?","answers":[{"text":"LRU (Least Recently Used)","correct":true},{"text":"FIFO (First In First Out)","correct":false},{"text":"Random Replacement","correct":false},{"text":"MRU (Most Recently Used)","correct":false}],"feedback":{"correct":"Correct! LRU evicts the entry that was used least recently.","incorrect":"Incorrect. LRU stands for Least Recently Used."}},"subtopics":[]}]}
+{"topics":[{"title":"What is Caching","start":0,"end":45,"question":{"type":"TrueFalse","question":"Caching stores copies of data to speed up future requests.","correct":true,"feedback":{"correct":"Correct! That is exactly what caching does.","incorrect":"Incorrect. Caching does store copies of data to speed access."}},"subtopics":[]},{"title":"Cache Hits and Misses","start":45,"end":90,"question":{"type":"MultiChoice","question":"What is a cache hit?","answers":[{"text":"The requested data is found in cache","correct":true},{"text":"The cache is full","correct":false},{"text":"Data is deleted from cache","correct":false},{"text":"The cache fails to load","correct":false}],"feedback":{"correct":"Correct! A cache hit means the data was found.","incorrect":"Incorrect. A cache hit means the data was already stored in cache."}},"subtopics":[]},{"title":"Cache Eviction Policies","start":90,"end":135,"question":{"type":"FillBlanks","fillText":"The *LRU* eviction policy removes the least recently used cache entry.","feedback":{"correct":"Correct! LRU stands for Least Recently Used.","incorrect":"Incorrect. LRU (Least Recently Used) removes entries that have not been accessed recently."}},"subtopics":[]},{"title":"Setting Up Caching","start":135,"end":180,"question":{"type":"DragText","taskDescription":"Drag the words to complete the correct setup sequence:","textField":"First *configure* the cache size, then define the *eviction policy*, finally enable cache *warming*.","feedback":{"correct":"Correct! That is the right order for setting up caching.","incorrect":"Incorrect. Follow the order: configure size, define eviction policy, enable warming."}},"subtopics":[]},{"title":"Key Performance Terms","start":180,"end":210,"question":{"type":"MarkWords","taskDescription":"Click on all the key performance terms mentioned in this section:","textField":"Caching improves *throughput* and reduces *latency*. Applications with shared data must also consider *cache coherence*.","feedback":{"correct":"Correct! You identified all the key terms.","incorrect":"Incorrect. The key terms are throughput, latency, and cache coherence."}},"subtopics":[]},{"title":"Video Recap","start":210,"end":225,"question":{"type":"Matching","taskDescription":"Match each caching concept to its correct description:","pairs":[{"prompt":"LRU","answer":"Eviction policy that removes least recently used entries"},{"prompt":"Cache hit","answer":"Requested data is found in the cache"},{"prompt":"Cache warming","answer":"Pre-loading data into cache before it is needed"},{"prompt":"Throughput","answer":"Amount of data processed per unit of time"}],"feedback":{"correct":"Excellent! You matched all concepts correctly.","incorrect":"Not quite. Review the definitions from the lecture and try again."}},"subtopics":[]}]}
 
 Now generate a similar JSON object for the lecture transcript below. Identify 3-5 topics spanning the FULL video (0 to ${duration}s). Use the RAW SECONDS shown as (Xs) for start/end values.
 

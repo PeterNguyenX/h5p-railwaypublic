@@ -428,8 +428,8 @@ export default function Admin() {
                             </select>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${u.isActive ? "bg-green-600 text-white dark:bg-green-500" : "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-300 border border-red-200 dark:border-red-700"}`}>
-                              {u.isActive ? "Active" : "Deactivated"}
+                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold border ${u.isActive ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700" : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700"}`}>
+                              {u.isActive ? "Active" : "Inactive"}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-slate-700 font-medium">{shortLastLoginAge(u, nowTs)}</td>
@@ -527,7 +527,7 @@ export default function Admin() {
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-gray-400 font-mono text-xs">{attempt.ipAddress}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${attempt.success ? "bg-green-600 text-white dark:bg-green-500" : "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-300 border border-red-200 dark:border-red-700"}`}>
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold border ${attempt.success ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-700" : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700"}`}>
                             {attempt.success ? "Success" : "Failed"}
                           </span>
                         </td>

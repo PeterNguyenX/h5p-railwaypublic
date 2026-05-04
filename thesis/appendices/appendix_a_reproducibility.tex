@@ -15,12 +15,15 @@ and testing.
     \midrule
     Node.js      & 18.x LTS        & Required by \texttt{@lumieducation/h5p-server}. \\
     npm          & 9.x              & Package manager. \\
-    React        & 18.2.0           & Frontend framework. \\
+    React        & 18.2.0           & Frontend framework (port 3002 with strictPort). \\
     TypeScript   & 4.9.5            & Frontend and shared types. \\
-    Vite         & 4.x              & Frontend build tool. \\
-    Express.js   & 4.21.2           & Backend HTTP framework. \\
+    Vite         & 4.x              & Frontend build tool; \texttt{strictPort: true} prevents silent port remapping. \\
+    Tailwind CSS & 3.x              & Utility-first CSS framework; dark mode via \texttt{class} strategy. \\
+    Zustand      & 4.x              & Lightweight frontend state management (auth, settings, editor). \\
+    Express.js   & 4.21.2           & Backend HTTP framework (port 5001). \\
     Sequelize    & 6.37.7           & ORM for SQLite. \\
     sqlite3      & 5.1.7            & SQLite native bindings. \\
+    Nodemailer   & 6.x              & Email delivery for verification codes and password reset. \\
     Python       & 3.10+            & Required for \texttt{faster-whisper} (optional). \\
     faster-whisper & 0.10+          & Optional: audio transcription. \\
     Ollama       & 0.1.x+           & Optional: local LLM inference. \\
@@ -40,7 +43,7 @@ cd backend && npm install
   to \texttt{backend/.env} and set \texttt{JWT\_SECRET} and optionally
   \texttt{ANTHROPIC\_API\_KEY}.
 
-  \item \textbf{Start the backend} (runs on port~3001 by default):
+  \item \textbf{Start the backend} (runs on port~5001 by default):
 \begin{lstlisting}[language=bash]
 cd backend && npm run dev
 \end{lstlisting}
@@ -50,13 +53,13 @@ cd backend && npm run dev
 cd "Simple UX UI Design" && npm install
 \end{lstlisting}
 
-  \item \textbf{Start the frontend} (runs on port~3000 by default):
+  \item \textbf{Start the frontend} (runs on port~3002 by default):
 \begin{lstlisting}[language=bash]
 cd "Simple UX UI Design" && npm run dev
 \end{lstlisting}
 
   \item \textbf{Open the application} at
-  \texttt{http://localhost:3000} in a modern web browser.
+  \texttt{http://localhost:3002} in a modern web browser.
 \end{enumerate}
 
 \section{Key API Endpoints Reference}
@@ -90,4 +93,14 @@ cd "Simple UX UI Design" && npm run dev
   POST & /api/ai/inject             & Inject accepted suggestions into H5P. \\
   POST & /api/transcript/youtube    & Extract captions from YouTube video. \\
   GET  & /api/admin/users           & List all users (admin only). \\
+  PATCH & /api/admin/users/:id      & Update user role or active status (admin only). \\
+  POST & /api/admin/users           & Create a new account (admin only). \\
+  GET  & /api/admin/audit-log       & Retrieve admin audit log (admin only). \\
+  GET  & /api/admin/settings        & Get all system settings (admin only). \\
+  PUT  & /api/admin/settings/:key   & Update a system setting (admin only). \\
+  PUT  & /api/users/profile         & Update authenticated user's profile. \\
+  POST & /api/auth/verify-email     & Submit 6-digit email verification code. \\
+  POST & /api/auth/forgot-password  & Request password reset email. \\
+  POST & /api/auth/reset-password   & Submit new password with reset token. \\
+  GET  & /api/lti/launch            & LTI~1.3 launch endpoint for LMS integration. \\
 \end{longtable}

@@ -24,10 +24,14 @@ A comparative usability evaluation conducted with ten Information Technology stu
 acting as instructor proxies demonstrated substantial improvements over the
 WordPress-based baseline: task completion rate increased from 30\% to 95\%, median
 content creation time fell from 45~minutes to 3.2~minutes, and user satisfaction
-scores rose from 2.1 to 4.8 on a five-point scale. Security controls were aligned to
-the OWASP Top Ten through JWT-based authentication, bcrypt password hashing
-(cost factor~12), HTTP security headers via Helmet, strict CORS allowlisting, and
-input validation at every API boundary.
+scores rose from 2.1 to 4.8 on a five-point scale. Platform features include a multi-panel video editor, folder-based content
+management with 30-day soft-delete trash, an administration console with
+audit logging and system settings, email verification for new accounts, and
+a dark mode interface preference. Security controls were aligned to the OWASP
+Top Ten through JWT-based authentication, bcrypt password hashing
+(cost factor~12), email verification with time-limited codes, HTTP security
+headers via Helmet, strict CORS allowlisting, rate limiting, and input
+validation at every API boundary.
 
 The thesis contributes a reproducible architecture for AI-assisted interactive
 content authoring, an empirically validated workflow that reduces cognitive overhead

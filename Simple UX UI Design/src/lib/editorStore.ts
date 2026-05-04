@@ -9,6 +9,8 @@ const H5P_TYPE_MAP: Record<string, string> = {
   MultiChoice: 'H5P.MultiChoice 1.16',
   TrueFalse: 'H5P.TrueFalse 1.6',
   FillBlanks: 'H5P.Blanks 1.14',
+  DragText: 'H5P.DragText 1.10',
+  MarkWords: 'H5P.MarkWords 1.9',
 };
 
 function buildSuggestion(question: TopicQuestion, timestamp: number, nodeTitle: string): AISuggestion {
@@ -19,7 +21,14 @@ function buildSuggestion(question: TopicQuestion, timestamp: number, nodeTitle: 
     config = { question: question.question, answers: question.answers };
   } else if (question.type === 'TrueFalse') {
     config = { question: question.question, correct: question.correct ? 'true' : 'false' };
+  } else if (question.type === 'DragText') {
+    config = { taskDescription: question.taskDescription, textField: question.textField };
+  } else if (question.type === 'MarkWords') {
+    config = { taskDescription: question.taskDescription, textField: question.textField };
+  } else if (question.type === 'Matching') {
+    config = { taskDescription: question.taskDescription, pairs: question.pairs };
   } else {
+    // FillBlanks
     config = { text: question.fillText, showSolutions: 'end', autoCheck: false };
   }
 
