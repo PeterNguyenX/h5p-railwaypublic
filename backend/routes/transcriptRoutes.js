@@ -226,19 +226,49 @@ router.post('/whisper/:videoId', auth, async (req, res) => {
       const tmpDir = path.join(__dirname, '..', 'uploads', 'tmp');
       fs.mkdirSync(tmpDir, { recursive: true });
       tempAudioPath = path.join(tmpDir, `yt_${video.id}.mp3`);
-      const ffmpegBin = 'C:\\Users\\ASUS\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin';
+      // Resolve ffmpeg location cross-platform: prefer env var, then PATH
+      const ffmpegBinFromEnv = process.env.FFMPEG_BIN_DIR || '';
+      let ffmpegArgs = [];
+      if (ffmpegBinFromEnv && fs.existsSync(ffmpegBinFromEnv)) {
+        ffmpegArgs = ['--ffmpeg-location', ffmpegBinFromEnv];
+      }
+
+      // Resolve yt-dlp binary cross-platform
+      const os = require('os');
+      const ytDlpCandidates = process.platform === 'win32'
+        ? [
+            process.env.YTDLP_BIN || '',
+            'C:\\Users\\ASUS\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\yt-dlp.exe',
+            'yt-dlp.exe',
+          ]
+        : [
+            process.env.YTDLP_BIN || '',
+            '/usr/local/bin/yt-dlp',
+            '/opt/homebrew/bin/yt-dlp',
+            'yt-dlp',
+          ];
+      const ytDlpBin = ytDlpCandidates.find(p => p && (fs.existsSync(p) || !path.isAbsolute(p))) || 'yt-dlp';
+
       try {
-        const systemYtDlp = 'C:\\Users\\ASUS\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\yt-dlp.exe';
-        const ytDlpBin = fs.existsSync(systemYtDlp) ? systemYtDlp : 'yt-dlp';
         await execFileAsync(ytDlpBin, [
           '-x', '--audio-format', 'mp3',
-          '--ffmpeg-location', ffmpegBin,
+          ...ffmpegArgs,
           '-o', tempAudioPath,
           '--no-playlist',
           ytUrl
         ], { timeout: 5 * 60 * 1000 });
       } catch (dlErr) {
-        return res.status(500).json({ error: 'Failed to download YouTube audio: ' + dlErr.message });
+        const msg = dlErr.message || '';
+        let hint = '';
+        if (msg.includes('ffprobe and ffmpeg not found') || msg.includes('ffmpeg-location') || msg.includes('ffmpeg not found')) {
+          hint = ' — ffmpeg is not installed or not on PATH. Install it (Mac: brew install ffmpeg, Windows: winget install Gyan.FFmpeg) then restart the server. Or set FFMPEG_BIN_DIR in backend/.env to the folder containing ffmpeg.';
+        } else if (msg.includes('yt-dlp') || msg.includes('not found') || msg.includes('No such file')) {
+          hint = ' — yt-dlp is not installed or not on PATH. Install it (Mac: brew install yt-dlp, Windows: winget install yt-dlp) then restart the server.';
+        } else if (msg.includes('JavaScript runtime')) {
+          hint = ' — yt-dlp needs a JavaScript runtime (Node.js or Deno). Make sure Node.js is on PATH and restart the server.';
+        }
+        console.error('yt-dlp download failed:', msg);
+        return res.status(500).json({ error: 'Failed to download YouTube audio' + hint });
       }
       videoFilePath = tempAudioPath;
     } else {

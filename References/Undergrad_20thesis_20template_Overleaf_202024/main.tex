@@ -1,0 +1,76 @@
+\documentclass[a4paper,hidelinks,12pt]{report}
+\usepackage{geometry}
+\geometry{
+ a4paper,
+ left=30mm,
+ top=25mm,
+ bottom=20mm,
+ right=20mm
+}
+\usepackage{authblk}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{mathabx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage[toc,page]{appendix}
+\usepackage{graphicx}
+\usepackage{mathtools}
+\usepackage[labelfont=bf]{caption}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{csquotes}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{blindtext}
+\usepackage{csquotes}
+\usepackage{makecell}
+\usepackage{multicol}
+\usepackage{ragged2e}
+\usepackage{adjustbox}
+\usepackage[smartEllipses, pipeTables]{markdown}
+\usepackage{geometry}
+\usepackage[normalem]{ulem}
+\useunder{\uline}{\ul}{}
+\usepackage{lscape}
+\usepackage{longtable}
+\usepackage[utf8]{inputenc}
+\usepackage{listings}
+
+\setcounter{secnumdepth}{5}
+
+\begin{document}
+\nocite{*}
+\input{before_main/title}
+\input{before_main/approval}
+\input{before_main/acknowledge}
+
+
+\tableofcontents{}
+% Change to separate figures and tables (17/12)
+
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+\pagebreak
+
+% MAIN TEX HERE
+\input{before_main/abstract}
+\input{tex/intro}
+\input{tex/literature}
+\input{tex/method}
+\input{tex/result}
+\input{tex/discussion}
+\input{tex/conclusion}
+% END MAIN TEX HERE
+
+% \printbibliography
+
+
+\bibliographystyle{ieeetr}
+\bibliography{reference}
+
+\end{document}

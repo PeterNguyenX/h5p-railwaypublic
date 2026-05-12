@@ -6,10 +6,10 @@
   "scripts": {
     "start": "cd backend && node server.js",
     "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "npm --prefix \"Simple UX UI Design\" run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build": "npm --prefix \"Simple UX UI Design\" run build",
-    "install-all": "npm install && cd backend && npm install && npm --prefix \"Simple UX UI Design\" install",
+    "build": "npm --prefix frontend run build",
+    "install-all": "npm install && cd backend && npm install && npm --prefix frontend install",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
@@ -25,5 +25,9 @@
   "license": "ISC",
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "i18next": "^26.0.9",
+    "react-i18next": "^17.0.6"
   }
 }

@@ -1,3 +1,36 @@
 {
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/main.aux": true,
+        "**/main.log": true,
+        "**/main.gz": true,
+        "**/main.out": true
+    },
+    "latex-workshop.latex.rootFile": "thesis 3/main.tex",
+    "latex-workshop.latex.autoBuild.enable": true,
+    "latex-workshop.latex.autoBuild.run": "onSave",
+    "latex-workshop.latex.tools": [
+        {
+            "name": "tectonic",
+            "command": "tectonic",
+            "args": [
+                "--keep-intermediates",
+                "--keep-logs",
+                "%DOC%"
+            ]
+        }
+    ],
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "tectonic",
+            "tools": ["tectonic"]
+        }
+    ],
+    "latex-workshop.view.pdf.viewer": "tab",
+    "latex-workshop.chktex.enabled": false
 }

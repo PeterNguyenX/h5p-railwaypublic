@@ -85,7 +85,7 @@ router.post('/analyze', auth, async (req, res) => {
       return res.status(400).json(formatValidationError(parsed.error));
     }
 
-    const { segments, videoId } = parsed.data;
+    const { segments, videoId, language = 'en' } = parsed.data;
     const { Video } = require('../models');
 
     const video = await Video.findByPk(videoId);
@@ -100,7 +100,7 @@ router.post('/analyze', auth, async (req, res) => {
     const ollamaOk = await isOllamaAvailable();
     if (ollamaOk) {
       try {
-        const result = await analyzeTranscriptOllama(segments);
+        const result = await analyzeTranscriptOllama(segments, language);
         // Ollama may return old suggestions format — wrap as topics if needed
         topics = result.topics || result.suggestions || [];
         model = result.model;
@@ -109,7 +109,7 @@ router.post('/analyze', auth, async (req, res) => {
         if (!ANTHROPIC_API_KEY) {
           return res.status(500).json({ error: 'No AI backend available.' });
         }
-        const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY);
+        const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY, language);
         topics = result.topics;
         model = 'claude';
       }
@@ -117,7 +117,7 @@ router.post('/analyze', auth, async (req, res) => {
       if (!ANTHROPIC_API_KEY) {
         return res.status(500).json({ error: 'No AI backend available.' });
       }
-      const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY);
+      const result = await analyzeTranscript(segments, ANTHROPIC_API_KEY, language);
       topics = result.topics;
       model = 'claude';
     }
@@ -142,7 +142,7 @@ router.post('/analyze-stream', auth, async (req, res) => {
       return res.status(400).json(formatValidationError(parsed.error));
     }
 
-    const { segments, videoId } = parsed.data;
+    const { segments, videoId, language = 'en' } = parsed.data;
     const { Video } = require('../models');
 
     // Verify video exists and user has access
@@ -175,7 +175,7 @@ router.post('/analyze-stream', auth, async (req, res) => {
     await video.update({ aiProcessedAt: new Date() });
 
     // Use the unified provider router: Groq → Ollama → Claude
-    await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res, videoId, video);
+    await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res, videoId, video, language);
   } catch (error) {
     console.error('Error in AI streaming analysis:', error.message);
     if (!res.headersSent) {
@@ -295,7 +295,7 @@ router.post('/transcribe-and-generate', auth, async (req, res) => {
     if (ollamaReadyForGenerate) {
       try {
         const segs = Array.isArray(transcript) ? transcript : [];
-        const ollamaResult = await analyzeTranscriptOllama(segs);
+        const ollamaResult = await analyzeTranscriptOllama(segs, req.body.language || 'en');
         // Map Ollama result to transcribe-and-generate format
         suggestions = ollamaResult.suggestions.map((s) => ({
           id: s.id,
@@ -312,10 +312,10 @@ router.post('/transcribe-and-generate', auth, async (req, res) => {
         }));
       } catch (ollamaErr) {
         console.warn('Ollama generation failed, falling back to Claude:', ollamaErr.message);
-        suggestions = await generateQuestionsWithClaude(transcript, video.title, educationLevel, learningObjectives, questionDensity, questionTypes);
+        suggestions = await generateQuestionsWithClaude(transcript, video.title, educationLevel, learningObjectives, questionDensity, questionTypes, req.body.language || 'en');
       }
     } else {
-      suggestions = await generateQuestionsWithClaude(transcript, video.title, educationLevel, learningObjectives, questionDensity, questionTypes);
+      suggestions = await generateQuestionsWithClaude(transcript, video.title, educationLevel, learningObjectives, questionDensity, questionTypes, req.body.language || 'en');
     }
 
     const generationTime = Date.now() - startTime;
@@ -355,7 +355,7 @@ router.post('/transcribe-and-generate', auth, async (req, res) => {
  * Generate questions using Claude API
  * @private
  */
-async function generateQuestionsWithClaude(transcript, videoTitle, educationLevel, objectives, density, types) {
+async function generateQuestionsWithClaude(transcript, videoTitle, educationLevel, objectives, density, types, language = 'en') {
   try {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({
@@ -373,7 +373,7 @@ async function generateQuestionsWithClaude(transcript, videoTitle, educationLeve
       transcriptText = transcript;
     }
 
-    const prompt = `You are an expert educator and instructional designer. Analyze this educational video transcript and generate interactive learning questions.
+    let prompt = `You are an expert educator and instructional designer. Analyze this educational video transcript and generate interactive learning questions.
 
 Video: ${videoTitle}
 Education Level: ${educationLevel}
@@ -406,6 +406,9 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no code b
     "difficulty": 0.5
   }
 ]`;
+    if (language === 'vi') {
+      prompt += "\n\nIMPORTANT: Produce ALL textual fields (questions, answers, explanations, and short labels) in Vietnamese (Tiếng Việt). Preserve numeric timestamps and the JSON schema exactly. Return ONLY the JSON array.";
+    }
 
     const message = await client.messages.create({
       model: 'claude-3-5-sonnet-20241022',

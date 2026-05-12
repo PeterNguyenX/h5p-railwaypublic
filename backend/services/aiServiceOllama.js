@@ -196,9 +196,9 @@ function validateSuggestion(item, index) {
 /**
  * Build a directive prompt that small LLMs reliably follow.
  */
-function buildOllamaPrompt(segments) {
+function buildOllamaPrompt(segments, language = 'en') {
   const transcript = formatSegmentsForPrompt(segments);
-  return `Generate 4-6 H5P interactive questions for this video transcript.
+  const PROMPT = `Generate 4-6 H5P interactive questions for this video transcript.
 
 TRANSCRIPT:
 ${transcript}
@@ -208,17 +208,26 @@ MultiChoice config: {"question":"...","answers":[{"text":"...","correct":true},{
 TrueFalse config: {"question":"...","correct":true}
 
 JSON:`;
+  return PROMPT + (localLanguageInstruction(language) || '');
+}
+
+function localLanguageInstruction(lang) {
+  if (!lang || lang === 'en') return '';
+  if (lang === 'vi') {
+    return "\n\nIMPORTANT: Produce ALL question text and option labels in Vietnamese (Tiếng Việt). Keep technical terms in English only if no clear Vietnamese equivalent exists. Return ONLY the JSON array as requested.";
+  }
+  return '';
 }
 
 /**
  * Analyze transcript using Ollama (non-streaming).
  */
-async function analyzeTranscriptOllama(segments) {
+async function analyzeTranscriptOllama(segments, language = 'en') {
   if (!segments || segments.length === 0) {
     throw new Error('No transcript segments provided');
   }
 
-  const userMessage = buildOllamaPrompt(segments);
+  const userMessage = buildOllamaPrompt(segments, language);
 
   const response = await ollamaRequest('/api/generate', {
     model: OLLAMA_MODEL,
@@ -251,12 +260,12 @@ async function analyzeTranscriptOllama(segments) {
  * Analyze transcript using Ollama with SSE streaming to Express response.
  * Optionally saves suggestions to Video.h5pContent if videoId and video are provided.
  */
-async function analyzeTranscriptOllamaStream(segments, res, videoId, video) {
+async function analyzeTranscriptOllamaStream(segments, res, videoId, video, language = 'en') {
   if (!segments || segments.length === 0) {
     throw new Error('No transcript segments provided');
   }
 
-  const userMessage = buildOllamaPrompt(segments);
+  const userMessage = buildOllamaPrompt(segments, language);
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',

@@ -10,7 +10,8 @@ const transcriptSegmentSchema = z.object({
 
 const analyzeRequestSchema = z.object({
   segments: z.array(transcriptSegmentSchema).min(1),
-  videoId: z.string().min(1)
+  videoId: z.string().min(1),
+  language: z.enum(['en', 'vi']).optional()
 });
 
 const h5pSuggestionSchema = z.object({

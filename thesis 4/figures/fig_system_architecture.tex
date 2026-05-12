@@ -1,0 +1,88 @@
+% Three-tier system architecture diagram
+% Diagram prompt/description: thesis 3/data/diagram_descriptions.md — fig_system_architecture.tex
+% Input this file inside a figure environment (no wrapping figure here)
+\begin{tikzpicture}[
+  font=\small,
+  tier/.style={draw, rounded corners=4pt, fill=#1, minimum width=13cm,
+               minimum height=0.5cm, text centered},
+  box/.style={draw, rounded corners=3pt, fill=white, align=center,
+              minimum width=2.8cm, minimum height=1.2cm, font=\scriptsize},
+  arrow/.style={-{Stealth[length=4pt]}, thick},
+  dasharrow/.style={-{Stealth[length=4pt]}, dashed, gray},
+]
+
+% ── Tier labels (left margin) ─────────────────────────────────────────────────
+\node[anchor=east, align=right, font=\footnotesize\bfseries] at (-0.5, 0)
+  {Presentation\\Tier};
+\node[anchor=east, align=right, font=\footnotesize\bfseries] at (-0.5,-3.2)
+  {Application\\Tier};
+\node[anchor=east, align=right, font=\footnotesize\bfseries] at (-0.5,-6.4)
+  {Data Tier};
+\node[anchor=east, align=right, font=\footnotesize\bfseries] at (-0.5,-8.8)
+  {External\\Services};
+
+% ── Tier background bands ─────────────────────────────────────────────────────
+\fill[blue!6,  rounded corners=6pt] (-0.2, 0.9) rectangle (13.2,-1.6);
+\fill[green!6, rounded corners=6pt] (-0.2,-2.3) rectangle (13.2,-4.8);
+\fill[orange!6,rounded corners=6pt] (-0.2,-5.5) rectangle (13.2,-7.3);
+\fill[gray!6,  rounded corners=6pt] (-0.2,-8.1) rectangle (13.2,-9.7);
+
+% ── Presentation Tier ─────────────────────────────────────────────────────────
+\node[box, fill=blue!12] (dashboard) at (1.6,0)
+  {\textbf{Dashboard}\\ Video list \\ Folders, trash\\ Export};
+\node[box, fill=blue!12] (editor) at (5.0,0)
+  {\textbf{Editor}\\ Video player\\H5P Timeline\\Timestamp capture};
+\node[box, fill=blue!12] (aipanel) at (8.4,0)
+  {\textbf{AI Panel}\\ Suggestion cards\\Accept/Reject/Edit\\Bloom's badges};
+\node[box, fill=blue!12] (auth) at (11.8,0)
+  {\textbf{Auth UI}\\ Login / Register\\JWT storage\\(Zustand)};
+\node[above, font=\footnotesize\itshape] at (6.7, 0.75)
+  {React 18 + TypeScript SPA (Vite)};
+
+% ── HTTP REST / SSE arrows ────────────────────────────────────────────────────
+\draw[arrow] (6.7,-0.65) -- node[right,font=\scriptsize]{HTTPS REST + SSE} (6.7,-2.25);
+
+% ── Application Tier ──────────────────────────────────────────────────────────
+\node[box, fill=green!12] (authapi) at (1.6,-3.5)
+  {\textbf{Auth Routes}\\/api/auth\\JWT middleware\\bcrypt hashing};
+\node[box, fill=green!12] (videoapi) at (4.4,-3.5)
+  {\textbf{Video Routes}\\/api/videos\\Upload, YouTube\\FFmpeg processing};
+\node[box, fill=green!12] (h5papi) at (7.2,-3.5)
+  {\textbf{H5P Routes}\\/api/h5p\\CRUD, export\\Preview render};
+\node[box, fill=green!12] (aiapi) at (10.0,-3.5)
+  {\textbf{AI Routes}\\/api/ai\\analyze, inject\\transcribe-and-gen};
+\node[above, font=\footnotesize\itshape] at (6.7,-2.35)
+  {Express.js + Helmet + Rate Limit + CORS};
+
+% ── Application $\to$ Data arrows ─────────────────────────────────────────────
+\draw[arrow] (authapi.south) -- (1.6,-5.55);
+\draw[arrow] (videoapi.south) -- (4.4,-5.55);
+\draw[arrow] (h5papi.south)   -- (7.2,-5.55);
+\draw[arrow] (aiapi.south)    -- (10.0,-5.55);
+
+% ── Data Tier ─────────────────────────────────────────────────────────────────
+\node[box, fill=orange!15] (sqlite) at (2.8,-6.4)
+  {\textbf{SQLite DB}\\ (h5p.db)\\ Sequelize ORM\\ Users, Videos};
+\node[box, fill=orange!15] (h5pstore) at (6.5,-6.4)
+  {\textbf{H5P Content Store}\\ h5p-content/\\ h5p-libraries/\\ h5p-temp/};
+\node[box, fill=orange!15] (fs) at (10.2,-6.4)
+  {\textbf{File System}\\ uploads/videos\\ uploads/thumbnails\\ caption files};
+\node[above, font=\footnotesize\itshape] at (6.7,-5.55)
+  {Data Layer};
+
+% ── External Services ─────────────────────────────────────────────────────────
+\node[box, fill=gray!15] (claude) at (2.2,-8.9)
+  {\textbf{Anthropic Claude}\\ API (cloud)\\ claude-sonnet-4\\ (fallback)};
+\node[box, fill=gray!15] (ollama) at (6.0,-8.9)
+  {\textbf{Ollama}\\ Local LLM\\ localhost:11434\\ (first choice)};
+\node[box, fill=gray!15] (youtube) at (9.8,-8.9)
+  {\textbf{YouTube}\\ Transcript API\\ oEmbed metadata\\ ytdl-core};
+\node[above, font=\footnotesize\itshape] at (6.7,-8.15)
+  {External Service Dependencies};
+
+% ── AI routes $\to$ External arrows ──────────────────────────────────────────
+\draw[dasharrow] (aiapi.south) -- (6.0,-7.3) -- (ollama.north);
+\draw[dasharrow] (aiapi.south) -- (2.2,-7.3) -- (claude.north);
+\draw[dasharrow] (videoapi.south) -- (9.8,-7.3) -- (youtube.north);
+
+\end{tikzpicture}

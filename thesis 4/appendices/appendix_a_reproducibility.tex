@@ -1,0 +1,97 @@
+\section{SYSTEM SETUP AND API REFERENCE}
+
+\subsection{Runtime Environment}
+
+Table~\ref{tab:runtime} lists the software versions used during development
+and testing.
+
+\begin{table}[H]
+  \centering
+  \caption{Key runtime components (representative versions)}
+  \label{tab:runtime}
+  \begin{tabularx}{\linewidth}{lX}
+    \toprule
+    \textbf{Component} & \textbf{Notes} \\
+    \midrule
+    Node.js 18 LTS & Backend runtime; required by H5P server package. \\
+    React 18 + Vite & Frontend runtime and build tool (TypeScript used throughout). \\
+    SQLite (sqlite3) & Lightweight relational store used in development; Sequelize ORM. \\
+    AI tooling & Optional: OpenAI/Anthropic APIs, Ollama local inference, faster-whisper for transcription. \\
+    Utilities & Nodemailer (email), Helmet (security), CORS and rate-limiting middleware. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Starting the Platform}
+
+\begin{enumerate}
+  \item \textbf{Install backend dependencies:}
+\begin{lstlisting}[language={}]
+cd backend && npm install
+\end{lstlisting}
+
+  \item \textbf{Configure environment:} Copy \texttt{backend/.env.example}
+  to \texttt{backend/.env} and set \texttt{JWT\_SECRET} and optionally
+  \texttt{ANTHROPIC\_API\_KEY}.
+
+  \item \textbf{Start the backend} (runs on port~5001 by default):
+\begin{lstlisting}[language={}]
+cd backend && npm run dev
+\end{lstlisting}
+
+  \item \textbf{Install frontend dependencies:}
+\begin{lstlisting}[language={}]
+cd "Simple UX UI Design" && npm install
+\end{lstlisting}
+
+  \item \textbf{Start the frontend} (runs on port~3002 by default):
+\begin{lstlisting}[language={}]
+cd "Simple UX UI Design" && npm run dev
+\end{lstlisting}
+
+  \item \textbf{Open the application} at
+  \texttt{http://localhost:3002} in a modern web browser.
+\end{enumerate}
+
+\subsection{Key API Endpoints Reference}
+
+\begin{longtable}{lll}
+  \caption{Key API endpoints} \label{tab:api_ref} \\
+  \toprule
+  \textbf{Method} & \textbf{Path} & \textbf{Description} \\
+  \midrule
+  \endfirsthead
+  \multicolumn{3}{c}{\tablename\ \thetable{} (continued)} \\
+  \toprule
+  \textbf{Method} & \textbf{Path} & \textbf{Description} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endlastfoot
+  POST & /api/auth/register        & Create a new user account. \\
+  POST & /api/auth/login            & Authenticate and receive JWT. \\
+  GET  & /api/videos                & List authenticated user's videos. \\
+  POST & /api/videos                & Upload a new video file. \\
+  POST & /api/videos/youtube        & Import a YouTube video by URL. \\
+  GET  & /api/videos/:id            & Get a single video's metadata. \\
+  DELETE & /api/videos/:id          & Soft-delete a video. \\
+  GET  & /api/h5p/:videoId/content  & Get H5P interactions for a video. \\
+  POST & /api/h5p/:videoId/content  & Add an H5P interaction manually. \\
+  GET  & /api/h5p/:videoId/export   & Export H5P package (binary download). \\
+  GET  & /api/ai/status             & Check AI provider availability. \\
+  POST & /api/ai/analyze            & Analyse transcript (non-streaming). \\
+  POST & /api/ai/analyze-stream     & Analyse transcript (SSE streaming). \\
+  POST & /api/ai/inject             & Inject accepted suggestions into H5P. \\
+  POST & /api/transcript/youtube    & Extract captions from YouTube video. \\
+  GET  & /api/admin/users           & List all users (admin only). \\
+  PATCH & /api/admin/users/:id      & Update user role or active status (admin only). \\
+  POST & /api/admin/users           & Create a new account (admin only). \\
+  GET  & /api/admin/audit-log       & Retrieve admin audit log (admin only). \\
+  GET  & /api/admin/settings        & Get all system settings (admin only). \\
+  PUT  & /api/admin/settings/:key   & Update a system setting (admin only). \\
+  PUT  & /api/users/profile         & Update authenticated user's profile. \\
+  POST & /api/auth/verify-email     & Submit 6-digit email verification code. \\
+  POST & /api/auth/forgot-password  & Request password reset email. \\
+  POST & /api/auth/reset-password   & Submit new password with reset token. \\
+  GET  & /api/lti/launch            & LTI~1.3 launch endpoint for LMS integration. \\
+\end{longtable}

@@ -22,6 +22,14 @@ function isOllamaAvailable() {
   }
 }
 
+function languageInstruction(lang) {
+  if (!lang || lang === 'en') return '';
+  if (lang === 'vi') {
+    return '\n\nIMPORTANT: Produce ALL question text, option labels, feedback text, and short UI labels in Vietnamese (Tiếng Việt). Keep technical terms in English only if there is no clear Vietnamese equivalent. Do not output any extra explanation — only follow the requested JSON schema, but with textual fields localized to Vietnamese.';
+  }
+  return '';
+}
+
 const AI_SYSTEM_PROMPT = `You are an expert instructional designer. Analyze the timestamped lecture transcript and return a structured JSON object containing topics, subtopics, and one quiz question per node. Return ONLY a valid JSON object — no markdown, no code fences, no preamble, no trailing text.
 
 ══════════════════════════
@@ -30,8 +38,11 @@ STEP 1 — TOPIC SEGMENTATION
 Identify 2–5 main topics and 1–3 subtopics per topic.
 
 Detect topic boundaries using:
-• Transition markers: "Next", "Moving on", "Now let's", "Another", "Finally", "Turning to", "Let me now"
-• Summary cues: "To summarize", "In conclusion", "To wrap up", "The key takeaway", "So in short"
+• English transition markers: "Next", "Moving on", "Now let's", "Another", "Finally", "Turning to", "Let me now"
+• English summary cues: "To summarize", "In conclusion", "To wrap up", "The key takeaway", "So in short"
+• Vietnamese transition markers: "Tiếp theo", "Bây giờ", "Hãy xem", "Chuyển sang", "Thứ hai", "Thứ ba", "Ngoài ra", "Đặc biệt", "Quan trọng hơn"
+• Vietnamese summary cues: "Tóm lại", "Kết luận", "Tóm tắt", "Điểm chính", "Cuối cùng", "Như vậy", "Nhìn chung"
+• Also segment by clear shifts in subject matter even without explicit markers — this applies to ALL languages
 
 CRITICAL TIMESTAMP RULES - ENFORCE STRICTLY:
 - Each transcript line is formatted as: [MM:SS (Xs) → MM:SS (Xs)] text
@@ -222,8 +233,9 @@ const H5P_TYPE_MAP = {
   TrueFalse: 'H5P.TrueFalse 1.6',
   FillBlanks: 'H5P.Blanks 1.14',
   DragText: 'H5P.DragText 1.10',
-  MarkWords: 'H5P.MarkWords 1.9',
-  Matching: 'H5P.DragText 1.10',
+  MarkWords: 'H5P.MarkTheWords 1.9',
+  // Matching should use the H5P Matching content type rather than DragText
+  Matching: 'H5P.Matching 1.0',
 };
 
 function formatSegmentsForPrompt(segments) {
@@ -281,7 +293,7 @@ function extractJsonObject(text) {
   throw new Error('No JSON object found in AI response');
 }
 
-async function analyzeTranscript(segments, apiKey) {
+async function analyzeTranscript(segments, apiKey, language = 'en') {
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured');
   if (!segments?.length) throw new Error('No transcript segments provided');
 
@@ -292,7 +304,9 @@ async function analyzeTranscript(segments, apiKey) {
     model: 'claude-sonnet-4-20250514',
     max_tokens: 6000,
     system: AI_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` }]
+    messages: [
+      { role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` + languageInstruction(language) }
+    ]
   });
 
   const text = response.content.find(b => b.type === 'text')?.text || '';
@@ -301,7 +315,7 @@ async function analyzeTranscript(segments, apiKey) {
 }
 
 // ─── Groq (FREE, Ultra-fast) ───────────────────────────────────────────────────────
-async function analyzeTranscriptStreamGroq(segments, res, videoId, video) {
+async function analyzeTranscriptStreamGroq(segments, res, videoId, video, language = 'en') {
   const groqApiKey = process.env.GROQ_API_KEY;
   if (!groqApiKey) throw new Error('GROQ_API_KEY is not configured');
   if (!segments?.length) throw new Error('No transcript segments provided');
@@ -309,6 +323,30 @@ async function analyzeTranscriptStreamGroq(segments, res, videoId, video) {
   const Groq = require('groq-sdk');
   const groq = new Groq({ apiKey: groqApiKey });
 
+  // Initiate the streaming request BEFORE sending HTTP headers so that auth errors
+  // (401 Invalid API Key) throw here and the outer router can fall through to Ollama/Claude.
+  let stream;
+  try {
+    stream = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 4000,
+      messages: [
+        { role: 'system', content: AI_SYSTEM_PROMPT },
+        { role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` + languageInstruction(language) },
+      ],
+      stream: true,
+    });
+  } catch (initErr) {
+    // Re-throw so the outer provider router can try the next provider (Ollama / Claude).
+    const hint = initErr.status === 401
+      ? ' — check that GROQ_API_KEY in backend/.env is valid (get a free key at console.groq.com)'
+      : '';
+    const err = new Error((initErr.message || 'Groq init failed') + hint);
+    err.status = initErr.status;
+    throw err;
+  }
+
+  // API call succeeded — now safe to commit the SSE response.
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -324,17 +362,6 @@ async function analyzeTranscriptStreamGroq(segments, res, videoId, video) {
     send({ type: 'progress', message: 'Using Groq (FREE AI) for analysis...', percent: 10 });
     send({ type: 'progress', message: 'Identifying topics and subtopics...', percent: 25 });
     send({ type: 'progress', message: 'Mapping questions to content patterns...', percent: 40 });
-
-    const stream = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: 4000,
-      messages: [
-        { role: 'system', content: AI_SYSTEM_PROMPT },
-        { role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` },
-      ],
-      stream: true,
-    });
-
     send({ type: 'progress', message: 'Generating questions with Groq AI...', percent: 50 });
 
     for await (const event of stream) {
@@ -403,7 +430,7 @@ async function analyzeTranscriptStreamGroq(segments, res, videoId, video) {
   }
 }
 
-function buildOllamaPrompt(segments) {
+function buildOllamaPrompt(segments, language = 'en') {
   const transcript = formatSegmentsForPrompt(segments);
   const lastSeg = segments[segments.length - 1];
   const duration = lastSeg ? Math.round(lastSeg.end) : 0;
@@ -411,7 +438,7 @@ function buildOllamaPrompt(segments) {
 
   // Few-shot: provide a complete worked example so mistral mirrors the structure exactly
   // Includes all 5 question types so the model knows their schemas
-  return `You are a JSON API. Output ONLY a valid JSON object.
+  const PROMPT = `You are a JSON API. Output ONLY a valid JSON object.
 
 AVAILABLE QUESTION TYPES AND WHEN TO USE THEM:
 - "TrueFalse": binary fact or absolute rule (correct must be boolean)
@@ -440,10 +467,12 @@ ${transcript}
 </transcript>
 
 OUTPUT JSON:`;
+  const langInstr = languageInstruction(language);
+  return PROMPT + (langInstr ? `\n${langInstr}` : '');
 }
 
 // ─── Ollama (FREE, Local) ─────────────────────────────────────────────────────────
-async function analyzeTranscriptStreamOllama(segments, res, videoId, video) {
+async function analyzeTranscriptStreamOllama(segments, res, videoId, video, language = 'en') {
   if (!segments?.length) throw new Error('No transcript segments provided');
 
   const http = require('http');
@@ -467,7 +496,7 @@ async function analyzeTranscriptStreamOllama(segments, res, videoId, video) {
     // Use /api/generate with few-shot example prompt — mistral mirrors concrete examples reliably
     const requestBody = {
       model: modelName,
-      prompt: buildOllamaPrompt(segments),
+      prompt: buildOllamaPrompt(segments, language),
       format: 'json',
       stream: true,
       options: { num_predict: 8192, temperature: 0.1 },
@@ -570,7 +599,7 @@ async function analyzeTranscriptStreamOllama(segments, res, videoId, video) {
 }
 
 // ─── Claude (Paid, Fallback) ───────────────────────────────────────────────────────
-async function analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, video) {
+async function analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, video, language = 'en') {
   if (!segments?.length) throw new Error('No transcript segments provided');
 
   const Anthropic = require('@anthropic-ai/sdk');
@@ -596,7 +625,7 @@ async function analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, vid
       model: 'claude-sonnet-4-20250514',
       max_tokens: 6000,
       system: AI_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` }],
+      messages: [{ role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` + languageInstruction(language) }],
     });
 
     send({ type: 'progress', message: 'Generating questions with AI...', percent: 42 });
@@ -682,12 +711,12 @@ async function analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, vid
 }
 
 // ─── Smart Provider Router (Priority: Groq → Ollama → Claude) ─────────────────────
-async function analyzeTranscriptStream(segments, apiKey, res, videoId, video) {
+async function analyzeTranscriptStream(segments, apiKey, res, videoId, video, language = 'en') {
   // Priority 1: Groq (FREE, ultra-fast)
   if (process.env.GROQ_API_KEY) {
     try {
       console.log('[AI] Attempting Groq (FREE, ultra-fast)...');
-      return await analyzeTranscriptStreamGroq(segments, res, videoId, video);
+      return await analyzeTranscriptStreamGroq(segments, res, videoId, video, language);
     } catch (err) {
       console.warn('[AI] Groq failed, attempting Ollama:', err.message);
     }
@@ -697,7 +726,7 @@ async function analyzeTranscriptStream(segments, apiKey, res, videoId, video) {
   if (process.env.OLLAMA_ENABLED !== 'false') {
     try {
       console.log('[AI] Attempting Ollama (FREE, local)...');
-      return await analyzeTranscriptStreamOllama(segments, res, videoId, video);
+      return await analyzeTranscriptStreamOllama(segments, res, videoId, video, language);
     } catch (err) {
       console.warn('[AI] Ollama failed, falling back to Claude:', err.message);
     }
@@ -706,7 +735,7 @@ async function analyzeTranscriptStream(segments, apiKey, res, videoId, video) {
   // Priority 3: Claude (Paid fallback)
   if (apiKey) {
     console.log('[AI] Using Claude (paid fallback)...');
-    return await analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, video);
+    return await analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, video, language);
   }
 
   // No provider available

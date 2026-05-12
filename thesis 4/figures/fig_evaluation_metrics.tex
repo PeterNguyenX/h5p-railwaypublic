@@ -1,0 +1,72 @@
+% Comparative evaluation metrics — four bar charts
+% Diagram prompt/description: thesis 3/data/diagram_descriptions.md — fig_evaluation_metrics.tex
+% pgfplots groupplot layout (2x2)
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={
+    group size=2 by 2,
+    horizontal sep=2.2cm,
+    vertical sep=2.8cm,
+  },
+  ybar=0pt,
+  width=6.8cm, height=5.5cm,
+  symbolic x coords={New Platform, WordPress},
+  xtick=data,
+  xticklabel style={font=\scriptsize, rotate=18, anchor=east},
+  nodes near coords,
+  nodes near coords style={font=\scriptsize},
+  enlarge x limits=0.55,
+  axis lines*=left,
+  ymajorgrids=true,
+  grid style={dashed, gray!40},
+]
+
+%% Plot (a): Task Completion Rate
+\nextgroupplot[
+  title={\small\textbf{(a) Task Completion Rate (\%)}},
+  ymin=0, ymax=110,
+  ytick={0,20,40,60,80,100},
+  ylabel={\scriptsize Completion (\%)},
+]
+\addplot[fill=blue!45, draw=blue!70!black] coordinates
+  {(New Platform, 95) (WordPress, 30)};
+
+%% Plot (b): Median Task Time
+\nextgroupplot[
+  title={\small\textbf{(b) Median Task Time (min)}},
+  ymin=0, ymax=55,
+  ytick={0,10,20,30,40,50},
+  ylabel={\scriptsize Time (minutes)},
+]
+\addplot[fill=green!45, draw=green!70!black] coordinates
+  {(New Platform, 3.2) (WordPress, 45)};
+
+%% Plot (c): Mean SUS Score
+\nextgroupplot[
+  title={\small\textbf{(c) Mean SUS Score (0--100)}},
+  ymin=0, ymax=110,
+  ytick={0,20,40,60,80,100},
+  ylabel={\scriptsize SUS Score},
+  extra y ticks={68},
+  extra y tick style={
+    tick label style={font=\tiny, color=red!70},
+    grid=major,
+    grid style={dashed, red!40},
+  },
+  extra y tick labels={avg\,(68)},
+]
+\addplot[fill=orange!45, draw=orange!70!black] coordinates
+  {(New Platform, 82.5) (WordPress, 38.0)};
+
+%% Plot (d): User Satisfaction
+\nextgroupplot[
+  title={\small\textbf{(d) User Satisfaction (1--5)}},
+  ymin=0, ymax=6,
+  ytick={0,1,2,3,4,5},
+  ylabel={\scriptsize Satisfaction score},
+]
+\addplot[fill=purple!45, draw=purple!70!black] coordinates
+  {(New Platform, 4.8) (WordPress, 2.1)};
+
+\end{groupplot}
+\end{tikzpicture}

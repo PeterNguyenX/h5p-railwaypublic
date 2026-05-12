@@ -1,0 +1,216 @@
+\documentclass[a4paper,12pt]{report}
+\usepackage{geometry}
+\geometry{
+  a4paper,
+  left=30mm,
+  top=25mm,
+  bottom=20mm,
+  right=20mm
+}
+
+% ── Typography ───────────────────────────────────────────────────────────────
+\usepackage{setspace}
+\usepackage[utf8]{inputenc}
+
+% ── Maths ────────────────────────────────────────────────────────────────────
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+
+% ── Graphics and figures ─────────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\newcommand{\diagrambox}[1]{%
+  \fbox{%
+    \begin{minipage}[c][0.28\textheight][c]{0.9\linewidth}
+      \centering\small #1
+    \end{minipage}%
+  }%
+}
+\newcommand{\wideDiagrambox}[1]{%
+  \fbox{%
+    \begin{minipage}[c][0.34\textheight][c]{0.94\linewidth}
+      \centering\small #1
+    \end{minipage}%
+  }%
+}
+
+% ── Tables ───────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{colortbl}
+\usepackage[table]{xcolor}
+
+% ── Code listings ────────────────────────────────────────────────────────────
+\usepackage{listings}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.1,0.1,0.8}
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{codeblue}\bfseries,
+  stringstyle=\color{orange},
+  frame=single,
+  framesep=3pt,
+  numbers=left,
+  numberstyle=\tiny\color{codegray},
+  showspaces=false,
+  showstringspaces=false,
+  tabsize=2,
+  xleftmargin=1em
+}
+
+% ── Enumeration and lists ─────────────────────────────────────────────────────
+\usepackage{enumitem}
+\setlist{itemsep=2pt,parsep=2pt}
+
+% ── References ───────────────────────────────────────────────────────────────
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{url}
+\renewcommand{\bibname}{REFERENCES}
+\renewcommand{\chaptername}{CHAPTER}
+\renewcommand{\contentsname}{TABLE OF CONTENTS}
+\renewcommand{\listfigurename}{LIST OF FIGURES}
+\renewcommand{\listtablename}{LIST OF TABLES}
+
+% ── Spacing ──────────────────────────────────────────────────────────────────
+\onehalfspacing
+\setlength{\parindent}{1.5em}
+\setlength{\parskip}{0.3em}
+
+% ── Acronyms (manual abbreviation table) ──────────────────────────────────────
+% Abbreviations are listed manually in the front matter
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+\pagenumbering{roman}
+\pagestyle{plain}
+
+% ── Cover page ───────────────────────────────────────────────────────────────
+\begin{titlepage}
+  \begin{center}
+    \vspace{1.0cm}
+
+    \large
+    VIETNAM NATIONAL UNIVERSITY OF HO CHI MINH CITY\\
+    THE INTERNATIONAL UNIVERSITY\\
+    SCHOOL OF COMPUTER SCIENCE AND ENGINEERING
+
+    \vspace{2.5cm}
+    \includegraphics[scale=0.8]{images/download.png}
+    \vspace{1.8cm}
+
+    \Huge \textbf{Autonomous AI-Based Generation of Interactive Questions for MOOC Videos}\\
+
+    \Large
+    By\\
+    {NGUYEN TOAN PHUC\\
+    Student ID: ITITIU21093}
+
+    \vspace{1.2cm}
+
+    \large
+    A thesis submitted to the School of Computer Science and Engineering\\
+    in partial fulfillment of the requirements for the degree of\\
+    Bachelor of Science in Computer Science
+
+    \vfill
+    Ho Chi Minh City, Vietnam\\
+    2026
+  \end{center}
+\end{titlepage}
+
+% ── Approval page ─────────────────────────────────────────────────────────────
+\clearpage
+\thispagestyle{empty} 
+\begin{center}
+  {\Large\bfseries Design and Development of an H5P Interactive Video\\
+  Content Creation Platform for University E-Learning}
+
+  \vspace{2cm}
+
+  \large
+  APPROVED BY:\\[1cm]
+  \underline{\hspace{8cm}} , \\
+  Le Thanh Son, M.Sc., Supervisor\\[1cm]
+  \underline{\hspace{8cm}} ,\\
+  Tran Manh Ha, Assoc.\ Prof., Ph.D.\\[3cm]
+
+  THESIS COMMITTEE\\[1cm]
+  \underline{\hspace{8cm}} ,\\[1cm]
+  \underline{\hspace{8cm}} ,\\[1cm]
+  \underline{\hspace{8cm}} ,\\[1cm]
+  \underline{\hspace{8cm}}
+\end{center}
+
+% ── Acknowledgements ─────────────────────────────────────────────────────────
+\clearpage
+\chapter*{ACKNOWLEDGMENTS}
+\addcontentsline{toc}{chapter}{ACKNOWLEDGMENTS}
+\thispagestyle{empty} 
+\input{chapters/acknowledgements}
+
+% ── Table of contents ─────────────────────────────────────────────────────────
+\clearpage
+\setcounter{tocdepth}{1}
+\tableofcontents
+
+% ── List of figures ───────────────────────────────────────────────────────────
+\clearpage
+\listoffigures
+\addcontentsline{toc}{chapter}{LIST OF FIGURES}
+
+% ── List of tables ────────────────────────────────────────────────────────────
+\clearpage
+\listoftables
+\addcontentsline{toc}{chapter}{LIST OF TABLES}
+
+% ── List of abbreviations ─────────────────────────────────────────────────────
+\clearpage
+\chapter*{LIST OF ABBREVIATIONS}
+\addcontentsline{toc}{chapter}{LIST OF ABBREVIATIONS}
+\input{chapters/abbreviations}
+
+% ── Abstract ─────────────────────────────────────────────────────────────────
+\clearpage
+\chapter*{ABSTRACT}
+\addcontentsline{toc}{chapter}{ABSTRACT}
+\input{chapters/abstract}
+
+% ── Main matter ───────────────────────────────────────────────────────────────
+\clearpage
+\pagenumbering{arabic}
+\pagestyle{plain}
+\input{chapters/chapter1_introduction}
+\input{chapters/chapter2_literature_review}
+\input{chapters/chapter3_requirements_and_methodology}
+\input{chapters/chapter4_system_architecture}
+\input{chapters/chapter5_implementation}
+\input{chapters/chapter6_conclusion_and_future_work}
+
+% ── References ───────────────────────────────────────────────────────────────
+\clearpage
+\addcontentsline{toc}{chapter}{REFERENCES}
+\input{references_compiled}
+
+% ── Appendices ───────────────────────────────────────────────────────────────
+\clearpage
+\appendix
+\chapter*{APPENDIX}
+\addcontentsline{toc}{chapter}{APPENDIX}
+\setcounter{section}{0}
+\renewcommand{\thesection}{A.\arabic{section}}
+\input{appendices/appendix_a_reproducibility}
+\input{appendices/appendix_b_extended_tables}
+
+\end{document}
