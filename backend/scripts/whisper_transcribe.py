@@ -15,6 +15,8 @@ def main():
 
     file_path = sys.argv[1]
     model_size = sys.argv[2] if len(sys.argv) > 2 else "base"
+    # Optional explicit language code (e.g. "vi", "en"). None = auto-detect.
+    forced_language = sys.argv[3] if len(sys.argv) > 3 else None
 
     if not os.path.exists(file_path):
         print(json.dumps({"error": f"File not found: {file_path}"}))
@@ -29,7 +31,7 @@ def main():
         segments_gen, info = model.transcribe(
             file_path,
             beam_size=5,
-            language=None,  # auto-detect
+            language=forced_language,  # None = auto-detect; explicit code forces the language
             vad_filter=True,  # skip silent parts
             vad_parameters={"min_silence_duration_ms": 500},
         )

@@ -68,8 +68,9 @@ ONLY these 6 types: "MultiChoice", "TrueFalse", "FillBlanks", "DragText", "MarkW
 CRITICAL: Every topic and subtopic MUST have a question field. Do not omit any.
 
 SPECIAL RULE — MATCHING RECAP AFTER ALL TOPICS:
-After all topics are listed, add ONE extra topic at the very end titled "Video Recap".
-Set its start = end time of the last topic, end = last transcript timestamp.
+After all content topics are listed in the JSON array, append ONE extra sibling topic at the very end of the "topics" array titled "Video Recap".
+"Video Recap" must be a top-level item in the "topics" array — NOT a parent of other topics, NOT containing other topics as subtopics.
+Set its start = end time of the last topic, end = last transcript timestamp. Its subtopics array must be empty [].
 Its question MUST be type "Matching" covering 4–5 key concept pairs drawn from the ENTIRE video.
 Use "Matching" ONLY for this final recap topic — never inside other topics or subtopics.
 
@@ -203,10 +204,13 @@ RULES
 
 const QuestionSchema = z.object({
   type: z.enum(['MultiChoice', 'TrueFalse', 'FillBlanks', 'DragText', 'MarkWords', 'Matching']),
-  question: z.string().optional(),
-  answers: z.array(z.object({ text: z.string(), correct: z.boolean() })).optional(),
+  question: z.string().min(1).optional(),
+  answers: z.array(z.object({ text: z.string().min(1), correct: z.boolean() })).optional(),
   correct: z.boolean().optional(),
-  fillText: z.string().optional(),
+  fillText: z.string().min(1).optional(),
+  taskDescription: z.string().min(1).optional(),
+  textField: z.string().min(1).optional(),
+  pairs: z.array(z.object({ prompt: z.string().min(1), answer: z.string().min(1) })).optional(),
   feedback: z.object({
     correct: z.string(),
     incorrect: z.string(),
@@ -251,6 +255,35 @@ function formatSegmentsForPrompt(segments) {
   return segs
     .map(seg => `[${fmt(seg.start)} (${Math.round(seg.start)}s) → ${fmt(seg.end)} (${Math.round(seg.end)}s)] ${seg.text}`)
     .join('\n');
+}
+
+const GENERIC_TITLES = ['ai-generated interaction', 'topic', 'subtopic', 'untitled', ''];
+
+function questionHasTextLocal(q) {
+  if (!q) return false;
+  return !!(q.question?.trim() || q.fillText?.trim() || q.taskDescription?.trim() || q.textField?.trim() || q.pairs?.length);
+}
+
+function sanitizeAndNormalizeTopics(topics) {
+  function sanitize(nodes) {
+    return nodes
+      .filter(n => n.title && !GENERIC_TITLES.includes(n.title.toLowerCase().trim()))
+      .map(n => ({
+        ...n,
+        question: questionHasTextLocal(n.question) ? n.question : undefined,
+        subtopics: n.subtopics ? sanitize(n.subtopics) : [],
+      }));
+  }
+
+  let result = sanitize(topics);
+
+  // If AI mistakenly made Video Recap the only root with other topics as subtopics, flatten them
+  if (result.length === 1 && result[0].title?.toLowerCase().includes('recap') && (result[0].subtopics?.length ?? 0) >= 2) {
+    const recap = result[0];
+    result = [...(recap.subtopics || []), { ...recap, subtopics: [] }];
+  }
+
+  return result;
 }
 
 function extractJsonObject(text) {
@@ -329,7 +362,7 @@ async function analyzeTranscriptStreamGroq(segments, res, videoId, video, langua
   try {
     stream = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [
         { role: 'system', content: AI_SYSTEM_PROMPT },
         { role: 'user', content: `Transcript:\n\n${formatSegmentsForPrompt(segments)}\n\nReturn the JSON object now.` + languageInstruction(language) },
@@ -385,14 +418,7 @@ async function analyzeTranscriptStreamGroq(segments, res, videoId, video, langua
       return;
     }
 
-    // Sanitize: remove topics/subtopics with missing or generic titles
-    const GENERIC_TITLES = ['ai-generated interaction', 'topic', 'subtopic', 'untitled', ''];
-    function sanitizeTopics(nodes) {
-      return nodes
-        .filter(n => n.title && !GENERIC_TITLES.includes(n.title.toLowerCase().trim()))
-        .map(n => ({ ...n, subtopics: n.subtopics ? sanitizeTopics(n.subtopics) : [] }));
-    }
-    parsed = { topics: sanitizeTopics(parsed.topics) };
+    parsed = { topics: sanitizeAndNormalizeTopics(parsed.topics) };
 
     if (parsed.topics.length === 0) {
       send({ type: 'error', message: 'AI could not identify meaningful topics. Please try again.' });
@@ -407,6 +433,8 @@ async function analyzeTranscriptStreamGroq(segments, res, videoId, video, langua
         await video.update({
           captions: JSON.stringify({
             topics: parsed.topics,
+            // Save the transcript segments passed into the AI processing so results are replayable
+            segments,
             generatedAt: new Date().toISOString(),
             provider: 'groq'
           })
@@ -556,20 +584,22 @@ async function analyzeTranscriptStreamOllama(segments, res, videoId, video, lang
         }
 
         if (videoId && video) {
-          try {
-            await video.update({
-              captions: JSON.stringify({
-                topics: parsed.topics,
-                generatedAt: new Date().toISOString(),
-                provider: 'ollama',
-                model: modelName
-              })
-            });
-            console.log(`[Ollama] Persisted AI results for video ${videoId} with ${parsed.topics.length} topics`);
-          } catch (e) {
-            console.error('Failed to persist topics snapshot:', e.message);
-          }
-        }
+              try {
+                await video.update({
+                  captions: JSON.stringify({
+                    topics: parsed.topics,
+                    // Keep the segments used for AI so the topic->transcript mapping is saved
+                    segments,
+                    generatedAt: new Date().toISOString(),
+                    provider: 'ollama',
+                    model: modelName
+                  })
+                });
+                console.log(`[Ollama] Persisted AI results for video ${videoId} with ${parsed.topics.length} topics`);
+              } catch (e) {
+                console.error('Failed to persist topics snapshot:', e.message);
+              }
+            }
 
         send({ type: 'result', topics: parsed.topics });
         res.write('data: [DONE]\n\n');
@@ -649,6 +679,8 @@ async function analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, vid
       return;
     }
 
+    parsed = { topics: sanitizeAndNormalizeTopics(parsed.topics) };
+
     // Convert topics to suggestions format (include both topics and their questions with correct timestamps)
     const suggestions = [];
     parsed.topics.forEach(topic => {
@@ -688,6 +720,8 @@ async function analyzeTranscriptStreamClaude(segments, apiKey, res, videoId, vid
         await video.update({
           captions: JSON.stringify({
             topics: parsed.topics,
+            // Persist the segments used so AI-processed transcript text is available later
+            segments,
             generatedAt: new Date().toISOString()
           })
         });

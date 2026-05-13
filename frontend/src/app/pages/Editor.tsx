@@ -67,7 +67,7 @@ const H5P_LIBRARIES: Record<H5PType, string> = {
   MultiChoice: "H5P.MultiChoice 1.16",
   TrueFalse: "H5P.TrueFalse 1.6",
   FillBlanks: "H5P.Blanks 1.14",
-  Matching: "H5P.DragText 1.10",
+  Matching: "H5P.Matching 1.0",
   DragText: "H5P.DragText 1.10",
   MarkWords: "H5P.MarkWords 1.9",
 };
@@ -164,7 +164,8 @@ function inferType(libraryOrType: string): H5PType {
   if (s.includes("truefalse") || s.includes("true")) return "TrueFalse";
   if (s.includes("blank") || s.includes("fill")) return "FillBlanks";
   if (s.includes("markwords") || s.includes("mark")) return "MarkWords";
-  if (s.includes("dragtext") || s.includes("matching") || s.includes("drag")) return "Matching";
+  if (s.includes("matching")) return "Matching";
+  if (s.includes("dragtext") || s.includes("drag")) return "DragText";
   return "MultiChoice";
 }
 
@@ -391,7 +392,7 @@ function H5PEditorPanel({
     if (showTypePicker) {
       const iconMap = { ListChecks, ToggleLeft, PenLine, Shuffle, MoveHorizontal, Highlighter } as Record<string, React.ElementType>;
       return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+        <div className="flex flex-col h-full">
           <div className="p-4 border-b border-slate-100 flex items-center gap-3">
             <button
               type="button"
@@ -414,16 +415,16 @@ function H5PEditorPanel({
                   key={type}
                   type="button"
                   onClick={() => startNew(type)}
-                  className="flex items-center gap-4 w-full p-4 rounded-xl border border-slate-200 hover:border-[#f5832a]/40 hover:bg-[#fff8f4] transition-all text-left group"
+                  className="flex items-center gap-4 w-full p-4 rounded-xl border border-slate-200 dark:border-white/10 hover:border-[#f5832a]/40 dark:hover:border-[#f5832a]/30 hover:bg-[#fff8f4] dark:hover:bg-black/20 transition-all text-left group"
                 >
                   <div className={`p-2.5 rounded-xl shrink-0 ${TYPE_COLORS[type]} group-hover:scale-105 transition-transform`}>
                     {Icon && <Icon className="w-5 h-5" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-slate-700 group-hover:text-[#f5832a] transition-colors">{TYPE_LABELS[type]}</div>
-                    <div className="text-xs text-slate-400 mt-0.5 leading-snug">{TYPE_DESCRIPTIONS[type]}</div>
+                    <div className="text-sm font-bold text-slate-700 dark:text-gray-200 group-hover:text-[#f5832a] dark:group-hover:text-gray-400 transition-colors">{TYPE_LABELS[type]}</div>
+                    <div className="text-xs text-slate-400 dark:text-gray-500 mt-0.5 leading-snug">{TYPE_DESCRIPTIONS[type]}</div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#f5832a] shrink-0 transition-colors" />
+                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-gray-600 group-hover:text-[#f5832a] dark:group-hover:text-gray-500 shrink-0 transition-colors" />
                 </button>
               );
             })}
@@ -434,7 +435,7 @@ function H5PEditorPanel({
 
     // ── Interactions list ──────────────────────────────────────────────────
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+      <div className="flex flex-col h-full">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
             {h5pContents.length > 0 ? `${t("editor.interactions", "Interactions")} (${h5pContents.length})` : t("editor.interactions", "Interactions")}
@@ -512,7 +513,7 @@ function H5PEditorPanel({
   const isEditing = Boolean(form.editingId);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full">
       {/* Discard warning banner */}
       {showDiscardWarning && (
         <div className="mx-4 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
@@ -698,7 +699,7 @@ function H5PEditorPanel({
               className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none font-mono"
             />
             <p className="text-xs text-slate-500 mt-1.5">
-              {t("editor.wrapBlanks", "Wrap words that should be blank with")} <code className="bg-slate-100 px-1 rounded font-mono">*asterisks*</code>
+              {t("editor.wrapBlanks", "Wrap words that should be blank with")} <code className="bg-slate-100 px-1 rounded font-mono">*{t("editor.asterisks", "asterisks")}*</code>
             </p>
             {form.fillText && (
               <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700">
@@ -798,7 +799,7 @@ function H5PEditorPanel({
                 className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none font-mono"
               />
               <p className="text-xs text-slate-500 mt-1.5">
-                {t("editor.draggableWrap", "Wrap each draggable word in")} <code className="bg-slate-100 px-1 rounded font-mono">*asterisks*</code> — {t("editor.draggableWrapHint", "students drag them into the blanks")}
+                {t("editor.draggableWrap", "Wrap each draggable word in")} <code className="bg-slate-100 px-1 rounded font-mono">*{t("editor.asterisks", "asterisks")}*</code> — {t("editor.draggableWrapHint", "students drag them into the blanks")}
               </p>
               {form.textField && (
                 <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700">
@@ -839,7 +840,7 @@ function H5PEditorPanel({
                 className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a] resize-none font-mono"
               />
               <p className="text-xs text-slate-500 mt-1.5">
-                {t("editor.wrapKeyTerms", "Wrap each key term in")} <code className="bg-slate-100 px-1 rounded font-mono">*asterisks*</code> {t("editor.studentsClickHighlight", "students click to highlight them")}
+                {t("editor.wrapKeyTerms", "Wrap each key term in")} <code className="bg-slate-100 px-1 rounded font-mono">*{t("editor.asterisks", "asterisks")}*</code> {t("editor.studentsClickHighlight", "students click to highlight them")}
               </p>
               {form.textField && (
                 <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 leading-relaxed">
@@ -931,6 +932,7 @@ function TopicsPanel({
   segments: { start: number; end: number; text: string }[];
   onSeek: (t: number) => void;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = (key: string) =>
@@ -942,11 +944,24 @@ function TopicsPanel({
 
   if (topics.length === 0) return null;
 
+  // Pull readable text from any question type
+  function qText(q: { question?: string; fillText?: string; taskDescription?: string; textField?: string; statement?: string } | undefined): string {
+    if (!q) return '';
+    return (q.question || q.taskDescription || q.fillText || q.textField || q.statement || '').trim();
+  }
+
+  // Find transcript segments for a time range with ±3 s tolerance
+  function segsFor(start: number, end: number) {
+    return segments.filter((seg) => seg.start >= start - 3 && seg.start <= end + 3);
+  }
+
   return (
     <div className="space-y-0.5 px-1">
       {topics.map((topic, ti) => {
         const tKey = `t${ti}`;
         const isTopicOpen = expanded.has(tKey);
+        const hasSubtopics = topic.subtopics && topic.subtopics.length > 0;
+        const topicQText = qText(topic.question as any);
         return (
           <div key={ti}>
             <button
@@ -954,22 +969,16 @@ function TopicsPanel({
               className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-bold hover:bg-slate-50 text-slate-800"
             >
               {isTopicOpen ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
-              <span className="font-mono text-[11px] shrink-0 text-slate-400">{formatTime(topic.start)}</span>
+              <span className="font-mono text-[11px] shrink-0 text-slate-400">{formatTime(topic.start)}–{formatTime(topic.end)}</span>
               <span className="truncate">{topic.title}</span>
             </button>
             {isTopicOpen && (
               <div className="ml-4 border-l border-slate-200 pl-2 space-y-0.5 mb-1">
-                {topic.question && (
-                  <div className="px-2 py-1 mb-1 text-xs text-[#1e3a5f] bg-[#e8f0fa] rounded italic border-l-2 border-[#1e3a5f]">
-                    <span className="font-semibold block mb-0.5 text-[10px] uppercase tracking-wider">Quiz Question</span>
-                    {(topic.question as any).question || (topic.question as any).fillText || (topic.question as any).statement}
-                  </div>
-                )}
-                {topic.subtopics && topic.subtopics.length > 0 ? (
-                  topic.subtopics.map((sub, si) => {
+                {hasSubtopics ? (
+                  topic.subtopics!.map((sub, si) => {
                     const sKey = `t${ti}s${si}`;
                     const isSubOpen = expanded.has(sKey);
-                    const subSegs = segments.filter((seg) => seg.start >= sub.start && seg.start <= sub.end + 1);
+                    const subSegs = segsFor(sub.start, sub.end);
                     return (
                       <div key={si}>
                         <button
@@ -977,29 +986,19 @@ function TopicsPanel({
                           className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-xs font-semibold hover:bg-slate-50 text-slate-700"
                         >
                           {isSubOpen ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-                          <span className="font-mono text-[10px] text-slate-400 shrink-0">{formatTime(sub.start)}</span>
+                          <span className="font-mono text-[10px] text-slate-400 shrink-0">{formatTime(sub.start)}–{formatTime(sub.end)}</span>
                           <span className="truncate">{sub.title}</span>
                         </button>
-                        {isSubOpen && (
-                          <>
-                            {sub.question && (
-                              <div className="ml-2 px-2 py-1 mb-1 text-[11px] text-[#1e3a5f] bg-[#e8f0fa] rounded italic border-l-2 border-[#1e3a5f]">
-                                <span className="font-semibold block mb-0.5 text-[9px] uppercase tracking-wider">Quiz Question</span>
-                                {(sub.question as any).question || (sub.question as any).fillText || (sub.question as any).statement}
-                              </div>
-                            )}
-                            {subSegs.length > 0 && (
-                              <p className="ml-2 px-2 py-1 text-[11px] text-slate-500 leading-relaxed">
-                                {subSegs.map(s => s.text).join(' ')}
-                              </p>
-                            )}
-                          </>
+                        {isSubOpen && subSegs.length > 0 && (
+                          <p className="ml-2 px-2 py-1 text-[11px] text-slate-500 leading-relaxed">
+                            {subSegs.map(s => s.text).join(' ')}
+                          </p>
                         )}
                       </div>
                     );
                   })
                 ) : (() => {
-                  const topicSegs = segments.filter((seg) => seg.start >= topic.start && seg.start <= topic.end + 1);
+                  const topicSegs = segsFor(topic.start, topic.end);
                   return topicSegs.length > 0 ? (
                     <p className="px-2 py-1 text-[11px] text-slate-500 leading-relaxed">
                       {topicSegs.map(s => s.text).join(' ')}
@@ -1059,11 +1058,14 @@ function InteractionPreview({
     } else if (type === "Matching") {
       const allCorrect = pairs.every((pair, i) => matchSelections[i]?.toLowerCase() === pair.answer.toLowerCase());
       setIsCorrect(allCorrect);
-    } else {
-      const text = (p.text as string) || "";
+    } else if (type === "FillBlanks") {
+      const text = (p.fillText as string) || (p.text as string) || "";
       const blanks = [...text.matchAll(/\*([^*]+)\*/g)].map((m) => m[1].trim().toLowerCase());
       const userParts = fillAnswer.trim().split(/\s+/);
       setIsCorrect(blanks.length > 0 && blanks.every((b) => userParts.some((u) => u.toLowerCase() === b)));
+    } else {
+      // DragText and MarkWords: correctness shown inline per item
+      setIsCorrect(true);
     }
     setSubmitted(true);
   };
@@ -1072,10 +1074,12 @@ function InteractionPreview({
     (type === "MultiChoice" && selectedAnswers.length > 0) ||
     (type === "TrueFalse" && tfAnswer !== null) ||
     (type === "Matching" && Object.keys(matchSelections).length === pairs.length && pairs.length > 0) ||
-    (type === "FillBlanks" && fillAnswer.trim().length > 0);
+    (type === "FillBlanks" && fillAnswer.trim().length > 0) ||
+    type === "DragText" ||
+    type === "MarkWords";
 
   return (
-    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[90%] overflow-y-auto">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90%] overflow-y-auto">
       <div>
         {/* Header */}
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
@@ -1093,7 +1097,7 @@ function InteractionPreview({
             return (
               <>
                 <p className="font-semibold text-slate-800 text-[15px] leading-snug">{(p.question as string) || ""}</p>
-                {isMultiple && <p className="text-xs text-[#1e3a5f] font-semibold mb-1">Please select all correct answers.</p>}
+                {isMultiple && <p className="text-xs text-[#1e3a5f] font-semibold mb-1">{t("editor.quiz.selectCorrect")}</p>}
                 <div className="space-y-2">
                   {answers.map((ans, i) => (
                     <button
@@ -1144,7 +1148,7 @@ function InteractionPreview({
                           : "border-slate-200 hover:border-slate-300 text-slate-700"
                       }`}
                     >
-                      {val ? "True" : "False"}
+                      {val ? t("editor.true") : t("editor.false")}
                     </button>
                   );
                 })}
@@ -1153,7 +1157,8 @@ function InteractionPreview({
           )}
 
           {type === "FillBlanks" && (() => {
-            const rawText = (p.text as string) || "";
+            // AI stores the text in fillText; H5P import stores it in text
+            const rawText = (p.fillText as string) || (p.text as string) || "";
             const parts = rawText.split(/\*([^*]+)\*/);
             const userAnswers = fillAnswer.trim().split(/\s+/);
             let blankIndex = 0;
@@ -1174,7 +1179,7 @@ function InteractionPreview({
                         {!wordCorrect && userWord && (
                           <span className="text-xs line-through text-red-500 font-semibold">{userWord}</span>
                         )}
-                        <span className={`px-2 py-0.5 rounded font-bold text-sm ${wordCorrect ? "bg-green-100 text-green-800" : "bg-green-100 text-green-800"}`}>
+                        <span className="px-2 py-0.5 rounded font-bold text-sm bg-green-100 text-green-800">
                           {correctWord}
                         </span>
                       </span>
@@ -1192,6 +1197,106 @@ function InteractionPreview({
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#f5832a]/30 focus:border-[#f5832a]"
                   />
                 )}
+              </>
+            );
+          })()}
+
+          {type === "DragText" && (() => {
+            const desc = (p.taskDescription as string) || "";
+            const rawText = (p.textField as string) || "";
+            // Words marked with *word* are the draggable answers
+            const parts = rawText.split(/\*([^*]+)\*/);
+            const correctWords = parts.filter((_, i) => i % 2 === 1).map(w => w.trim());
+            const shuffled = useState(() => [...correctWords].sort(() => Math.random() - 0.5))[0];
+            const [placed, setPlaced] = useState<(string | null)[]>(() => correctWords.map(() => null));
+            const [dragging, setDragging] = useState<string | null>(null);
+            const usedWords = placed.filter(Boolean) as string[];
+            if (submitted) {
+              return (
+                <>
+                  {desc && <p className="font-semibold text-slate-800 text-[15px] leading-snug">{desc}</p>}
+                  <div className="text-[15px] text-slate-800 leading-relaxed">
+                    {parts.map((part, i) => {
+                      if (i % 2 === 0) return <span key={i}>{part}</span>;
+                      const correct = part.trim();
+                      const userWord = placed[Math.floor(i / 2)];
+                      const ok = userWord?.toLowerCase() === correct.toLowerCase();
+                      return <span key={i} className={`inline-block mx-1 px-2 py-0.5 rounded font-bold text-sm ${ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>{userWord || "___"}</span>;
+                    })}
+                  </div>
+                </>
+              );
+            }
+            return (
+              <>
+                {desc && <p className="font-semibold text-slate-800 text-[15px] leading-snug">{desc}</p>}
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  {shuffled.map((w, i) => {
+                    const used = usedWords.includes(w);
+                    return (
+                      <span key={i} draggable={!used} onDragStart={() => setDragging(w)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold border cursor-grab select-none transition-all ${used ? "opacity-30 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400" : "bg-[#e8f0fa] border-[#1e3a5f]/20 text-[#1e3a5f] hover:bg-[#1e3a5f]/10"}`}>
+                        {w}
+                      </span>
+                    );
+                  })}
+                </div>
+                <div className="text-[15px] text-slate-800 leading-relaxed mt-2">
+                  {parts.map((part, i) => {
+                    if (i % 2 === 0) return <span key={i}>{part}</span>;
+                    const slotIdx = Math.floor(i / 2);
+                    const val = placed[slotIdx];
+                    return (
+                      <span key={i} onDragOver={e => e.preventDefault()} onDrop={() => { if (dragging) { const n = [...placed]; n[slotIdx] = dragging; setPlaced(n); setDragging(null); } }}
+                        className={`inline-block mx-1 min-w-16 px-2 py-0.5 rounded border-b-2 ${val ? "border-[#f5832a] text-[#1e3a5f] font-bold" : "border-[#f5832a] text-slate-400"} text-sm cursor-pointer`}
+                        onClick={() => { if (val) { const n = [...placed]; n[slotIdx] = null; setPlaced(n); } }}>
+                        {val || "___"}
+                      </span>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+
+          {type === "MarkWords" && (() => {
+            const desc = (p.taskDescription as string) || "";
+            const rawText = (p.textField as string) || "";
+            const parts = rawText.split(/\*([^*]+)\*/);
+            // Build set of correct words from between *...* markers, stripped of punctuation
+            const stripPunct = (s: string) => s.trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+            const correctWords = new Set(
+              parts.filter((_, i) => i % 2 === 1).map(w => stripPunct(w))
+            );
+            // Render the text without asterisks, word by word
+            const allWords = rawText.replace(/\*/g, '').split(/\s+/).filter(Boolean);
+            const [marked, setMarked] = useState<Set<number>>(new Set());
+            const toggleWord = (i: number) => {
+              if (submitted) return;
+              setMarked(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; });
+            };
+            return (
+              <>
+                {desc && <p className="font-semibold text-slate-800 text-[15px] leading-snug">{desc}</p>}
+                <p className="text-xs text-slate-500">Click to highlight key words</p>
+                <div className="text-[15px] text-slate-800 leading-relaxed flex flex-wrap gap-1">
+                  {allWords.map((w, i) => {
+                    const isCorrect = correctWords.has(stripPunct(w));
+                    const isMarked = marked.has(i);
+                    const bg = submitted
+                      ? isCorrect && isMarked ? "bg-green-200 text-green-900"
+                        : isCorrect ? "bg-yellow-100 text-yellow-800 ring-1 ring-yellow-400"
+                        : isMarked ? "bg-red-100 text-red-700"
+                        : ""
+                      : isMarked ? "bg-[#fff0e6] text-[#1e3a5f] ring-2 ring-[#f5832a]" : "hover:bg-slate-100";
+                    return (
+                      <span key={i} onClick={() => toggleWord(i)}
+                        className={`px-1 py-0.5 rounded cursor-pointer transition-colors select-none ${bg}`}>
+                        {w}
+                      </span>
+                    );
+                  })}
+                </div>
               </>
             );
           })()}
@@ -1415,7 +1520,7 @@ function VideoControls({
   const progress = duration > 0 ? currentTime / duration : 0;
 
   return (
-    <div className="bg-slate-800 rounded-b-2xl border border-slate-700 border-t-0 px-4 py-3 shadow-sm select-none">
+    <div className="bg-[#1e3a5f] px-4 py-3 select-none rounded-b-2xl">
       <div className="flex items-center gap-3">
         {/* Play/Pause */}
         <button
@@ -1527,6 +1632,21 @@ export default function Editor() {
   const [aiUsage, setAiUsage] = useState<{ usedToday: number; limit: number | null; isAdmin: boolean } | null>(null);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
 
+  const aiIsRunning = isExtractingTranscript || store.isAnalyzing || store.injectProgress > 0;
+  const aiIsDone = !aiIsRunning && store.analysisProgress === 100;
+  let aiUnifiedProgress = 0;
+  let aiUnifiedMessage = "";
+  if (isExtractingTranscript) {
+    aiUnifiedProgress = 20;
+    aiUnifiedMessage = t("editor.transcribing", "Transcribing video...");
+  } else if (store.isAnalyzing) {
+    aiUnifiedProgress = 25 + Math.round((store.analysisProgress / 100) * 60);
+    aiUnifiedMessage = store.progressMessage || "AI is generating questions...";
+  } else if (store.injectProgress > 0) {
+    aiUnifiedProgress = 85 + Math.round((store.injectProgress / 100) * 15);
+    aiUnifiedMessage = t("editor.applyingH5P", "Applying H5P interactions...");
+  }
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
@@ -1545,6 +1665,100 @@ export default function Editor() {
   // Interaction preview (student-facing popup)
   const [previewContent, setPreviewContent] = useState<H5PContent | null>(null);
   const triggeredTimestampsRef = useRef<Set<number>>(new Set());
+
+  // ── Resizable 3-column layout ──────────────────────────────────────────────
+  const COL_STORAGE_KEY = 'editor-col-widths-v1';
+  const COL_DEFAULTS: [number, number, number] = [22, 45, 33];
+  const COL_MIN = 12; // minimum % for any column
+
+  const [colWidths, setColWidths] = useState<[number, number, number]>(() => {
+    try {
+      const saved = localStorage.getItem(COL_STORAGE_KEY);
+      if (saved) {
+        const p = JSON.parse(saved) as number[];
+        if (p.length === 3 && p.every(n => typeof n === 'number' && n > 0)) return p as [number, number, number];
+      }
+    } catch { /* ignore */ }
+    return COL_DEFAULTS;
+  });
+
+  const [isWideLayout, setIsWideLayout] = useState(() => window.innerWidth >= 1280);
+  const colContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = () => setIsWideLayout(window.innerWidth >= 1280);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
+  const startColDrag = useCallback((dividerIdx: 0 | 1, e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidths: [number, number, number] = [...colWidths] as [number, number, number];
+    const containerWidth = colContainerRef.current?.offsetWidth ?? 1;
+
+    const clamp = (v: number) => Math.max(COL_MIN, Math.min(100 - COL_MIN * 2, v));
+
+    const onMove = (ev: MouseEvent) => {
+      const deltaPct = ((ev.clientX - startX) / containerWidth) * 100;
+      setColWidths(() => {
+        const w: [number, number, number] = [...startWidths];
+        if (dividerIdx === 0) {
+          // Adjust only column 0 and 1, keep column 2 fixed
+          const new0 = clamp(startWidths[0] + deltaPct);
+          const delta0 = new0 - startWidths[0];
+          let new1 = Math.max(COL_MIN, startWidths[1] - delta0);
+          if (new1 < COL_MIN) {
+            new1 = COL_MIN;
+            w[0] = Math.max(COL_MIN, 100 - startWidths[2] - new1);
+            w[1] = new1;
+          } else {
+            w[0] = new0;
+            w[1] = new1;
+          }
+          w[2] = startWidths[2];
+        } else {
+          // Adjust only column 1 and 2, keep column 0 fixed
+          const new2 = clamp(startWidths[2] - deltaPct);
+          const delta2 = new2 - startWidths[2];
+          let new1 = Math.max(COL_MIN, startWidths[1] + delta2);
+          if (new1 < COL_MIN) {
+            new1 = COL_MIN;
+            w[2] = Math.max(COL_MIN, 100 - startWidths[0] - new1);
+            w[1] = new1;
+          } else {
+            w[2] = new2;
+            w[1] = new1;
+          }
+          w[0] = startWidths[0];
+        }
+        // normalize to avoid tiny rounding errors that may cause horizontal scroll
+        const total = w[0] + w[1] + w[2];
+        if (Math.abs(total - 100) > 0.001) {
+          w[1] = Math.max(COL_MIN, 100 - w[0] - w[2]);
+        }
+        return w;
+      });
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setColWidths(prev => { localStorage.setItem(COL_STORAGE_KEY, JSON.stringify(prev)); return prev; });
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    // hide page scrollbars while dragging so viewport width doesn't change
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    const restoreOverflow = () => { document.body.style.overflow = prevOverflow; document.removeEventListener('mouseup', restoreOverflow); };
+    document.addEventListener('mouseup', restoreOverflow);
+  }, [colWidths]);
   const prevTimeRef = useRef(0);
 
   // Ref to latest h5pContents so YouTube polling never reads stale closure
@@ -1555,6 +1769,18 @@ export default function Editor() {
   const videoDurationRef = useRef(0);
 
   useEffect(() => { if (!token) navigate("/"); }, [token, navigate]);
+
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
 
   // Close share menu on outside click
   useEffect(() => {
@@ -1618,8 +1844,13 @@ export default function Editor() {
         if (typeof captionData === 'string') {
           try { captionData = JSON.parse(captionData); } catch { captionData = null; }
         }
-        if (captionData && typeof captionData === 'object' && 'topics' in (captionData as object)) {
-          store.setTopics((captionData as any).topics || []);
+        if (captionData && typeof captionData === 'object') {
+          if ('topics' in (captionData as object)) {
+            store.setTopics((captionData as any).topics || []);
+          }
+          if ('segments' in (captionData as object)) {
+            store.setSegments((captionData as any).segments || []);
+          }
         }
         recordVideoVisit(id);
         await store.loadH5PContents(id);
@@ -1875,17 +2106,22 @@ export default function Editor() {
     setIsExtractingTranscript(true);
     try {
       let segments;
-      if (store.video.youtubeId) {
+      const lang = i18n.language || 'en';
+      const useWhisper = lang !== 'en';
+      if (store.video.youtubeId && !useWhisper) {
+        // English UI: try YouTube's own captions first (fast, no audio download needed)
         try {
           segments = await extractTranscriptFromVideo(store.video.id);
           store.setTranscriptFilename("Extracted from YouTube captions");
         } catch {
-          // No captions — fall back to Whisper (downloads audio from YouTube)
-          segments = await whisperTranscribeVideo(store.video.id);
+          // No captions — fall back to Whisper
+          segments = await whisperTranscribeVideo(store.video.id, 'base', lang);
           store.setTranscriptFilename("Transcribed with Whisper AI");
         }
       } else {
-        segments = await whisperTranscribeVideo(store.video.id);
+        // Non-English UI: always use Whisper with the explicit language so the
+        // transcript is produced in the audio's language, not YouTube's English captions
+        segments = await whisperTranscribeVideo(store.video.id, 'base', lang);
         store.setTranscriptFilename("Transcribed with Whisper AI");
       }
       store.setSegments(segments);
@@ -1993,7 +2229,7 @@ export default function Editor() {
   const sortedContents = [...store.h5pContents].sort((a, b) => a.timestamp - b.timestamp);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
+    <div className="h-screen flex flex-col bg-white overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
@@ -2052,7 +2288,7 @@ export default function Editor() {
                 className="flex items-center gap-1.5 h-9 px-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 <Link className="w-4 h-4" />
-                Share
+                {t("editor.share", "Share")}
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${shareMenuOpen ? "rotate-180" : ""}`} />
               </button>
               {shareMenuOpen && (
@@ -2068,7 +2304,7 @@ export default function Editor() {
                     className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                   >
                     <Link className="w-4 h-4 text-slate-400" />
-                    Copy LTI Link
+                    {t("editor.copyLtiLink", "Copy LTI Link")}
                   </button>
                   <button
                     type="button"
@@ -2184,8 +2420,8 @@ export default function Editor() {
       )}
 
       {/* ── Main ───────────────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center w-full">
-        <div className="w-full max-w-6xl flex flex-col gap-5">
+      <main className="flex-1 overflow-hidden p-4 sm:p-6 w-full flex flex-col min-h-0">
+        <div className="w-full flex flex-col gap-5 flex-1 min-h-0">
 
           {/* ── STEP 1: Upload ───────────────────────────────────────────── */}
           {currentStep === 1 && (
@@ -2348,170 +2584,124 @@ export default function Editor() {
 
           {/* ── STEP 2: Edit ─────────────────────────────────────────────── */}
           {currentStep === 2 && (
-            <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+            <div className="animate-in fade-in slide-in-from-right-8 duration-500 flex-1 min-h-0 flex flex-col">
 
-              {/*
-                Layout: 2 columns, ratio 1:2
-                  Left  (1/3): Interactions editor
-                  Right (2/3): Video player + AI panel stacked
-              */}
-              <div className="grid grid-cols-[1fr_2fr] gap-5 items-start">
+              {/* ── Reusable panels ─────────────────────────────────────────── */}
 
-                {/* RIGHT: Video + Controls + AI panel — right 2/3 column */}
-                <div className="col-start-2 row-start-1 flex flex-col gap-3">
+              {/* Video player node — extracted so it can be placed in either layout */}
+              {(() => {
+                const videoNode = (
+                  <div className="flex flex-col gap-3 min-w-0">
+                    <div className="relative bg-slate-900 rounded-t-2xl shadow-sm border border-slate-800 border-b-0 sticky top-0" style={{ aspectRatio: "16/9" }}>
+                      <div className="absolute inset-0 rounded-t-2xl overflow-hidden">
+                        {videoSrc ? (
+                          <video
+                            ref={videoRef}
+                            src={videoSrc}
+                            onClick={flashAndToggle}
+                            onTimeUpdate={() => {
+                              const ct = videoRef.current?.currentTime || 0;
+                              store.setCurrentTime(ct);
+                              checkInteractionTrigger(ct);
+                            }}
+                            onLoadedMetadata={() => {
+                              const dur = videoRef.current?.duration || 0;
+                              setVideoDuration(dur);
+                              videoDurationRef.current = dur;
+                            }}
+                            onPlay={() => setIsPlaying(true)}
+                            onPause={() => setIsPlaying(false)}
+                            className="w-full h-full object-contain cursor-pointer"
+                          />
+                        ) : store.video?.youtubeId ? (
+                          <div className="relative w-full h-full">
+                            <div ref={ytContainerRef} className="w-full h-full" />
+                            <div className="absolute inset-0 cursor-pointer" onClick={flashAndToggle} />
+                          </div>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <p>{t("editor.noVideoSource", "No video source")}</p>
+                          </div>
+                        )}
+                      </div>
 
-                  {/* Video player */}
-                  <div className="relative bg-slate-900 rounded-t-2xl shadow-sm border border-slate-800 border-b-0" style={{ aspectRatio: "16/9" }}>
-                    {/* Video content */}
-                    <div className="absolute inset-0 rounded-t-2xl overflow-hidden">
-                      {videoSrc ? (
-                        <video
-                          ref={videoRef}
-                          src={videoSrc}
-                          onClick={flashAndToggle}
-                          onTimeUpdate={() => {
-                            const t = videoRef.current?.currentTime || 0;
-                            store.setCurrentTime(t);
-                            checkInteractionTrigger(t);
-                          }}
-                          onLoadedMetadata={() => {
-                            const dur = videoRef.current?.duration || 0;
-                            setVideoDuration(dur);
-                            videoDurationRef.current = dur;
-                          }}
-                          onPlay={() => setIsPlaying(true)}
-                          onPause={() => setIsPlaying(false)}
-                          className="w-full h-full object-contain cursor-pointer"
-                        />
-                      ) : store.video?.youtubeId ? (
-                        <div className="relative w-full h-full">
-                          <div ref={ytContainerRef} className="w-full h-full" />
-                          <div className="absolute inset-0 cursor-pointer" onClick={flashAndToggle} />
+                      {clickFlash && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                          <div className="bg-black/40 rounded-full p-5 animate-ping-once">
+                            {clickFlash === "play"
+                              ? <Play className="w-12 h-12 text-white fill-white" />
+                              : <Pause className="w-12 h-12 text-white fill-white" />}
+                          </div>
                         </div>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <p>{t("editor.noVideoSource", "No video source")}</p>
+                      )}
+
+                      {previewContent && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 rounded-t-2xl">
+                          <InteractionPreview
+                            content={previewContent}
+                            onContinue={() => {
+                              setPreviewContent(null);
+                              if (videoRef.current) videoRef.current.play().catch(() => {});
+                              if (ytPlayerRef.current) ytPlayerRef.current.playVideo();
+                            }}
+                          />
                         </div>
                       )}
                     </div>
 
-                    {/* Click-to-play flash overlay */}
-                    {clickFlash && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                        <div className="bg-black/40 rounded-full p-5 animate-ping-once">
-                          {clickFlash === "play"
-                            ? <Play className="w-12 h-12 text-white fill-white" />
-                            : <Pause className="w-12 h-12 text-white fill-white" />}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Interaction overlay */}
-                    {previewContent && (
-                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 rounded-t-2xl">
-                        <InteractionPreview
-                          content={previewContent}
-                          onContinue={() => {
-                            setPreviewContent(null);
-                            if (videoRef.current) videoRef.current.play().catch(() => {});
-                            if (ytPlayerRef.current) ytPlayerRef.current.playVideo();
-                          }}
-                        />
-                      </div>
-                    )}
+                    <VideoControls
+                      currentTime={store.currentTime}
+                      duration={videoDuration}
+                      isPlaying={isPlaying}
+                      sortedContents={sortedContents}
+                      onSeek={seekTo}
+                      onTogglePlay={togglePlay}
+                      onDotClick={(c) => setOpenForContent(c)}
+                    />
                   </div>
+                );
 
-                  {/* Custom video controls */}
-                  <VideoControls
-                    currentTime={store.currentTime}
-                    duration={videoDuration}
-                    isPlaying={isPlaying}
-                    sortedContents={sortedContents}
-                    onSeek={seekTo}
-                    onTogglePlay={togglePlay}
-                    onDotClick={(c) => setOpenForContent(c)}
-                  />
-
-                  {/* AI panel — below video in the right column */}
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-
-                    {/* Panel header */}
-                    <div className="px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Sparkles className="w-4 h-4 text-[#f5832a]" />
-                        <h3 className="font-bold text-slate-800 text-base">{t("editor.aiPanelTitle", "AI Transcribing & Applying H5P")}</h3>
-                        {aiUsage && (
-                          aiUsage.isAdmin
-                            ? <span className="ml-auto text-xs text-slate-400">{t("editor.aiUnlimited", "Unlimited")}</span>
-                            : <span className={`ml-auto text-xs font-semibold ${aiUsage.usedToday >= (aiUsage.limit ?? 3) ? 'text-red-500' : 'text-slate-400'}`}>{aiUsage.usedToday}/{aiUsage.limit} today</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        {t("editor.aiPanelDesc", "One click: transcribe your video, generate H5P questions with AI, and apply them automatically.")}
-                      </p>
-                    </div>
-
-                    {/* Main action + unified progress */}
-                    <div className="px-5 py-4 border-b border-slate-100 shrink-0 space-y-3">
-                      {(() => {
-                        const isRunning = isExtractingTranscript || store.isAnalyzing || store.injectProgress > 0;
-                        const isDone = !isRunning && store.analysisProgress === 100;
-                        let unifiedProgress = 0;
-                        let unifiedMessage = "";
-                        if (isExtractingTranscript) {
-                          unifiedProgress = 20;
-                          unifiedMessage = t("editor.transcribing", "Transcribing video...");
-                        } else if (store.isAnalyzing) {
-                          unifiedProgress = 25 + Math.round((store.analysisProgress / 100) * 60);
-                          unifiedMessage = store.progressMessage || "AI is generating questions...";
-                        } else if (store.injectProgress > 0) {
-                          unifiedProgress = 85 + Math.round((store.injectProgress / 100) * 15);
-                          unifiedMessage = t("editor.applyingH5P", "Applying H5P interactions...");
-                        }
-                        return (
+                const aiNode = (
+                  <div className="flex flex-col h-full">
+                    <div className="px-5 pt-5 pb-4 border-b border-slate-100 dark:border-white/10 shrink-0">
+                      <div className="flex items-center gap-3">
+                        {!aiIsRunning && !aiIsDone && (
                           <>
-                            {!isRunning && !isDone && (
-                              <button
-                                type="button"
-                                onClick={handleTranscribeAndGenerate}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
-                              >
-                                <Sparkles className="w-4 h-4" />
-                                {t("editor.transcribeAndGenerate", "Transcribe & Generate H5P with AI")}
-                              </button>
-                            )}
-                            {isRunning && (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <Loader2 className="w-4 h-4 animate-spin text-[#f5832a] shrink-0" />
-                                  <span className="text-sm text-[#1e3a5f] dark:text-gray-200 font-semibold truncate flex-1">{unifiedMessage}</span>
-                                  <span className="font-mono text-xs text-slate-500 shrink-0">{unifiedProgress}%</span>
-                                </div>
-                                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                                  <div
-                                    className="bg-[#1e3a5f] h-full rounded-full transition-all duration-500 ease-out"
-                                    style={{ width: `${unifiedProgress}%` }}
-                                  />
-                                </div>
+                            <button
+                              type="button"
+                              onClick={handleTranscribeAndGenerate}
+                              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white font-bold rounded-xl transition-colors text-sm shadow-sm"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                              {t("editor.transcribeAndGenerate", "Transcribe & Generate H5P with AI")}
+                            </button>
+                            {aiUsage && (
+                              <div className="w-12 h-12 flex items-center justify-center bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg shrink-0">
+                                <span className={`text-sm font-bold ${aiUsage.isAdmin ? 'text-slate-700 dark:text-gray-300' : aiUsage.usedToday >= (aiUsage.limit ?? 3) ? 'text-red-500' : 'text-slate-700 dark:text-gray-300'}`}>
+                                  {aiUsage.isAdmin ? '∞' : `${aiUsage.usedToday}/${aiUsage.limit}`}
+                                </span>
                               </div>
                             )}
-                            {isDone && (
-                              <p className="text-sm font-semibold text-green-700 flex items-center gap-1.5">
-                                <CheckCircle2 className="w-4 h-4 shrink-0" /> {store.progressMessage}
-                              </p>
-                            )}
-                            {store.analyzeError && (
-                              <p className="text-xs text-red-700 flex items-start gap-1.5">
-                                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                {store.analyzeError}
-                              </p>
-                            )}
                           </>
-                        );
-                      })()}
+                        )}
+                        {aiIsRunning && (
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-[#f5832a] shrink-0" />
+                              <span className="text-sm text-[#1e3a5f] dark:text-gray-200 font-semibold truncate flex-1">{aiUnifiedMessage}</span>
+                              <span className="font-mono text-xs text-slate-500 shrink-0">{aiUnifiedProgress}%</span>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-white/10 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="bg-[#1e3a5f] h-full rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${aiUnifiedProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
-                      {/* Manual transcript upload */}
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-2 pt-3">
                         <input ref={transcriptInputRef} type="file" accept=".vtt,.srt" onChange={handleTranscriptUpload} className="hidden" title="Upload transcript file" aria-label="Upload transcript file" />
                         <button
                           type="button"
@@ -2524,14 +2714,9 @@ export default function Editor() {
                       </div>
                     </div>
 
-                    {/* Topics tree */}
-                    <div className="overflow-y-auto max-h-72 px-3 py-3">
+                    <div className="overflow-y-auto flex-1 px-3 py-3">
                       {store.topics.length > 0 ? (
-                        <TopicsPanel
-                          topics={store.topics}
-                          segments={store.segments}
-                          onSeek={seekTo}
-                        />
+                        <TopicsPanel topics={store.topics} segments={store.segments} onSeek={seekTo} />
                       ) : (
                         <div className="flex flex-col items-center justify-center py-8 text-slate-400">
                           <FileText className="w-10 h-10 mb-3 text-slate-200" />
@@ -2544,34 +2729,90 @@ export default function Editor() {
                         </div>
                       )}
                     </div>
-
                   </div>
-                </div>
+                );
 
-                {/* LEFT: Interactions editor */}
-                <div className="col-start-1 row-start-1 flex flex-col min-h-[500px]">
-                  {store.video?.id && (
+                const interactionsNode = store.video?.id ? (
+                  <div className="flex flex-col h-full">
                     <H5PEditorPanel
-                      h5pContents={sortedContents}
-                      currentTime={store.currentTime}
-                      videoId={store.video.id}
-                      openForContent={openForContent}
-                      clearOpen={() => setOpenForContent(null)}
-                      onFormDirtyChange={setHasUnsavedChanges}
-                      onSaved={async () => {
-                        await store.loadH5PContents(store.video!.id);
-                        notify("Interaction saved!", "success");
-                      }}
-                      onDeleted={async (id) => {
-                        await store.removeH5PContent(id);
-                        notify("Interaction deleted", "info");
-                      }}
-                      onSeek={seekTo}
-                    />
-                  )}
-                </div>
+                    h5pContents={sortedContents}
+                    currentTime={store.currentTime}
+                    videoId={store.video.id}
+                    openForContent={openForContent}
+                    clearOpen={() => setOpenForContent(null)}
+                    onFormDirtyChange={setHasUnsavedChanges}
+                    onSaved={async () => {
+                      await store.loadH5PContents(store.video!.id);
+                      notify("Interaction saved!", "success");
+                    }}
+                    onDeleted={async (id) => {
+                      await store.removeH5PContent(id);
+                      notify("Interaction deleted", "info");
+                    }}
+                    onSeek={seekTo}
+                  />
+                  </div>
+                ) : null;
 
-              </div>
+                if (isWideLayout) {
+                  // ── 3-column resizable layout (xl+) ─────────────────────────
+                    return (
+                      <div ref={colContainerRef} className="flex items-stretch w-full flex-1 min-h-0 overflow-hidden">
+                      {/* AI column */}
+                      <div className="flex flex-col min-w-0 overflow-hidden h-full" style={{ width: `${colWidths[0]}%` }}>
+                        {aiNode}
+                      </div>
+
+                      {/* Divider 0 */}
+                      <div
+                        className="w-2 shrink-0 flex items-center justify-center cursor-col-resize group relative z-10"
+                        onMouseDown={(e) => startColDrag(0, e)}
+                      >
+                        <div className="w-0.5 h-full bg-slate-200 dark:bg-white/10 group-hover:bg-[#1e3a5f]/50 dark:group-hover:bg-[#3d6ba6]/60 transition-colors rounded-full" />
+                        <div className="absolute top-1/2 -translate-y-1/2 flex flex-col gap-0.5 pointer-events-none">
+                          <div className="w-1 h-1 rounded-full bg-slate-400 dark:bg-white/30 group-hover:bg-[#1e3a5f] dark:group-hover:bg-[#3d6ba6] transition-colors" />
+                          <div className="w-1 h-1 rounded-full bg-slate-400 dark:bg-white/30 group-hover:bg-[#1e3a5f] dark:group-hover:bg-[#3d6ba6] transition-colors" />
+                          <div className="w-1 h-1 rounded-full bg-slate-400 dark:bg-white/30 group-hover:bg-[#1e3a5f] dark:group-hover:bg-[#3d6ba6] transition-colors" />
+                        </div>
+                      </div>
+
+                      {/* Video column */}
+                      <div className="flex flex-col min-w-0 h-full" style={{ width: `${colWidths[1]}%` }}>
+                        {videoNode}
+                      </div>
+
+                      {/* Divider 1 */}
+                      <div
+                        className="w-2 shrink-0 flex items-center justify-center cursor-col-resize group relative z-10"
+                        onMouseDown={(e) => startColDrag(1, e)}
+                      >
+                        <div className="w-0.5 h-full bg-slate-200 dark:bg-white/10 group-hover:bg-[#1e3a5f]/50 dark:group-hover:bg-[#3d6ba6]/60 transition-colors rounded-full" />
+                        <div className="absolute top-1/2 -translate-y-1/2 flex flex-col gap-0.5 pointer-events-none">
+                          <div className="w-1 h-1 rounded-full bg-slate-400 dark:bg-white/30 group-hover:bg-[#1e3a5f] dark:group-hover:bg-[#3d6ba6] transition-colors" />
+                          <div className="w-1 h-1 rounded-full bg-slate-400 dark:bg-white/30 group-hover:bg-[#1e3a5f] dark:group-hover:bg-[#3d6ba6] transition-colors" />
+                          <div className="w-1 h-1 rounded-full bg-slate-400 dark:bg-white/30 group-hover:bg-[#1e3a5f] dark:group-hover:bg-[#3d6ba6] transition-colors" />
+                        </div>
+                      </div>
+
+                      {/* Interactions column */}
+                      <div className="flex flex-col min-w-0 overflow-hidden h-full" style={{ width: `${colWidths[2]}%` }}>
+                        {interactionsNode}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // ── Narrow layout: video on top, AI + Interactions below ──────
+                return (
+                  <div className="flex flex-col gap-5">
+                    {videoNode}
+                    <div className="grid grid-cols-2 gap-5 items-stretch">
+                      <div className="flex flex-col min-h-[400px]">{aiNode}</div>
+                      <div className="flex flex-col min-h-[400px]">{interactionsNode}</div>
+                    </div>
+                  </div>
+                );
+              })()}
 
             </div>
           )}

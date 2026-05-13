@@ -43,7 +43,15 @@
       "Bash(Get-ChildItem -Path \"d:\\\\5 Cloud storage\\\\OneDrive\\\\1 Working Projects\\\\Other docs\\\\GitHub\\\\h5p-railwaypublic\" -Force)",
       "Bash(Select-Object Name, PSIsContainer)",
       "PowerShell(Get-Command node -ErrorAction SilentlyContinue; Get-Command npm -ErrorAction SilentlyContinue; [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\) -split \";\" | Select-String -Pattern \"node|npm\" -SimpleMatch)",
-      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:APPDATA\\\\npm\\\\npm.cmd\" -ErrorAction SilentlyContinue; where.exe node 2>$null; where.exe npm 2>$null)"
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:APPDATA\\\\npm\\\\npm.cmd\" -ErrorAction SilentlyContinue; where.exe node 2>$null; where.exe npm 2>$null)",
+      "Bash(awk 'NR>=2570 && NR<=2600' /Users/peternguyen/Downloads/itp-h5p/frontend/src/app/pages/Editor.tsx)",
+      "Bash(sqlite3 h5p.db \"SELECT id, library, params FROM H5PContents WHERE library LIKE '%match%' OR library LIKE '%drag%' LIMIT 5;\")",
+      "Bash(sqlite3 h5p.db \".tables\")",
+      "Bash(sqlite3 h5p.db \"SELECT id, library, params FROM h5p_content WHERE library LIKE '%match%' OR library LIKE '%drag%' LIMIT 5;\")",
+      "Bash(sqlite3 h5p.db \".schema h5p_content\")",
+      "Bash(sqlite3 h5p.db \"SELECT json_extract\\(json_data, '$.library'\\) as lib, substr\\(json_extract\\(json_data, '$.params'\\), 1, 200\\) as params FROM h5p_content WHERE json_extract\\(json_data, '$.library'\\) LIKE '%match%' OR json_extract\\(json_data, '$.library'\\) LIKE '%drag%' LIMIT 5;\")",
+      "Bash(sqlite3 h5p.db \"SELECT COUNT\\(*\\) FROM h5p_content; SELECT json_extract\\(json_data, '$.library'\\) as lib FROM h5p_content LIMIT 10;\")",
+      "Bash(sqlite3 h5p.db \"SELECT id, substr\\(h5pContent, 1, 500\\) FROM Videos WHERE h5pContent IS NOT NULL LIMIT 1;\")"
     ]
   }
 }

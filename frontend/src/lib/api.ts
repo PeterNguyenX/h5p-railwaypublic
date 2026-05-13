@@ -271,8 +271,10 @@ export async function extractTranscriptFromVideo(videoId: string): Promise<Trans
   return data.segments as TranscriptSegment[];
 }
 
-export async function whisperTranscribeVideo(videoId: string, model = 'base'): Promise<TranscriptSegment[]> {
-  const res = await fetch(`${API_BASE}/transcript/whisper/${videoId}?model=${model}`, {
+export async function whisperTranscribeVideo(videoId: string, model = 'base', lang = ''): Promise<TranscriptSegment[]> {
+  const params = new URLSearchParams({ model });
+  if (lang) params.set('lang', lang);
+  const res = await fetch(`${API_BASE}/transcript/whisper/${videoId}?${params}`, {
     method: 'POST',
     headers: authHeaders(),
   });

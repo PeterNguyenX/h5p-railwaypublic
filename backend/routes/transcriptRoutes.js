@@ -234,20 +234,24 @@ router.post('/whisper/:videoId', auth, async (req, res) => {
       }
 
       // Resolve yt-dlp binary cross-platform
-      const os = require('os');
+      // Check .venv inside the project root (pip install yt-dlp adds it there)
+      const venvYtDlpUnix = path.join(__dirname, '..', '..', '.venv', 'bin', 'yt-dlp');
+      const venvYtDlpWin  = path.join(__dirname, '..', '..', '.venv', 'Scripts', 'yt-dlp.exe');
       const ytDlpCandidates = process.platform === 'win32'
         ? [
             process.env.YTDLP_BIN || '',
+            venvYtDlpWin,
             'C:\\Users\\ASUS\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\yt-dlp.exe',
             'yt-dlp.exe',
           ]
         : [
             process.env.YTDLP_BIN || '',
+            venvYtDlpUnix,
             '/usr/local/bin/yt-dlp',
             '/opt/homebrew/bin/yt-dlp',
             'yt-dlp',
           ];
-      const ytDlpBin = ytDlpCandidates.find(p => p && (fs.existsSync(p) || !path.isAbsolute(p))) || 'yt-dlp';
+      const ytDlpBin = ytDlpCandidates.find(p => p && fs.existsSync(p)) || 'yt-dlp';
 
       try {
         await execFileAsync(ytDlpBin, [
@@ -277,6 +281,8 @@ router.post('/whisper/:videoId', auth, async (req, res) => {
 
     const scriptPath = path.join(__dirname, '..', 'scripts', 'whisper_transcribe.py');
     const modelSize = req.query.model || 'base';
+    // Optional explicit language (e.g. "vi", "en"). Blank = auto-detect.
+    const langHint = req.query.lang || '';
 
     // Prefer the project .venv Python which has faster-whisper installed
     const venvPythonUnix = path.join(__dirname, '..', '..', '.venv', 'bin', 'python3');
@@ -293,7 +299,9 @@ router.post('/whisper/:videoId', auth, async (req, res) => {
     let language = null;
 
     try {
-      const { stdout } = await execFileAsync(pythonBin, [scriptPath, videoFilePath, modelSize], {
+      const whisperArgs = [scriptPath, videoFilePath, modelSize];
+      if (langHint) whisperArgs.push(langHint);
+      const { stdout } = await execFileAsync(pythonBin, whisperArgs, {
         timeout: 10 * 60 * 1000, // 10 minute max
         maxBuffer: 10 * 1024 * 1024,
       });

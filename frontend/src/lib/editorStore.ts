@@ -11,6 +11,7 @@ const H5P_TYPE_MAP: Record<string, string> = {
   FillBlanks: 'H5P.Blanks 1.14',
   DragText: 'H5P.DragText 1.10',
   MarkWords: 'H5P.MarkWords 1.9',
+  Matching: 'H5P.Matching 1.0',
 };
 
 function buildSuggestion(question: TopicQuestion, timestamp: number, nodeTitle: string): AISuggestion {
@@ -43,22 +44,29 @@ function buildSuggestion(question: TopicQuestion, timestamp: number, nodeTitle: 
   };
 }
 
+function questionHasText(q: TopicQuestion): boolean {
+  return !!(q.question?.trim() || q.fillText?.trim() || q.taskDescription?.trim() || q.textField?.trim() || q.pairs?.length);
+}
+
 function extractSuggestions(topics: TopicNode[], existingTimestamps: number[], videoDuration?: number): AISuggestion[] {
   const allUsedTimestamps = [...existingTimestamps];
   const suggestions: AISuggestion[] = [];
 
-  function walk(node: TopicNode) {
-    node.subtopics?.forEach(walk);
+  function tryPlace(question: TopicQuestion, wantedTs: number, title: string) {
+    if (!questionHasText(question)) return;
+    // If the exact slot (within WINDOW_SIZE) is already taken, skip — don't bump
+    // into the next topic. Subtopics are processed first and claim their slots.
+    if (allUsedTimestamps.some((t) => Math.abs(t - wantedTs) < WINDOW_SIZE)) return;
+    if (videoDuration && wantedTs >= videoDuration - 2) return;
+    allUsedTimestamps.push(wantedTs);
+    suggestions.push(buildSuggestion(question, wantedTs, title));
+  }
 
+  function walk(node: TopicNode) {
+    // Subtopics first — they claim their timestamps before the parent tries
+    node.subtopics?.forEach(walk);
     if (node.question) {
-      let timestamp = Math.round(node.end) + 1;
-      while (allUsedTimestamps.some((t) => Math.abs(t - timestamp) < WINDOW_SIZE)) {
-        timestamp += WINDOW_SIZE;
-      }
-      // Drop if offset pushed past video end
-      if (videoDuration && timestamp >= videoDuration - 2) return;
-      allUsedTimestamps.push(timestamp);
-      suggestions.push(buildSuggestion(node.question, timestamp, node.title));
+      tryPlace(node.question, Math.round(node.end) + 1, node.title);
     }
   }
 
@@ -168,7 +176,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           break;
         case 'result': {
           const topics = (event as { type: string; topics?: TopicNode[] }).topics ?? [];
-          const existingTimestamps = get().h5pContents.map((c) => c.timestamp);
+          // Don't use existing timestamps when re-running AI — old interactions shouldn't block new placement
+          const existingTimestamps: number[] = [];
           // duration comes from the API as "M:SS" string — parse to seconds
           const rawDuration = get().video?.duration as string | number | undefined;
           const videoDurationSec = typeof rawDuration === 'number'

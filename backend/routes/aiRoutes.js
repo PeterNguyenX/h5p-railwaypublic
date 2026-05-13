@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
+const { createSafeErrorResponse, logErrorSafely } = require('../utils/securityUtils');
 const { analyzeTranscript, analyzeTranscriptStream } = require('../services/aiService');
 const {
   isOllamaAvailable,
@@ -74,7 +75,9 @@ router.get('/usage', auth, async (req, res) => {
     });
     res.json({ usedToday, limit: req.user.role === 'admin' ? null : 3, isAdmin: req.user.role === 'admin' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logErrorSafely(error, 'Error getting AI usage');
+    const safeResponse = createSafeErrorResponse(error, 'Unable to fetch usage information.');
+    res.status(500).json(safeResponse);
   }
 });
 
@@ -124,8 +127,9 @@ router.post('/analyze', auth, async (req, res) => {
 
     res.json({ topics, count: topics.length, videoId, model });
   } catch (error) {
-    console.error('Error in AI analysis:', error.message);
-    res.status(500).json({ error: error.message });
+    logErrorSafely(error, 'Error in AI analysis');
+    const safeResponse = createSafeErrorResponse(error, 'AI analysis failed. Please try again.');
+    res.status(500).json(safeResponse);
   }
 });
 
@@ -177,9 +181,10 @@ router.post('/analyze-stream', auth, async (req, res) => {
     // Use the unified provider router: Groq → Ollama → Claude
     await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res, videoId, video, language);
   } catch (error) {
-    console.error('Error in AI streaming analysis:', error.message);
+    logErrorSafely(error, 'Error in AI streaming analysis');
     if (!res.headersSent) {
-      res.status(500).json({ error: error.message });
+      const safeResponse = createSafeErrorResponse(error, 'AI analysis failed. Please try again.');
+      res.status(500).json(safeResponse);
     }
   }
 });
@@ -205,11 +210,12 @@ router.post('/inject', auth, async (req, res) => {
       ...result
     });
   } catch (error) {
-    console.error('Error injecting AI suggestions:', error.message);
+    logErrorSafely(error, 'Error injecting AI suggestions');
     if (error.message.includes('not found') || error.message.includes('access denied')) {
       return res.status(404).json({ error: error.message });
     }
-    res.status(500).json({ error: error.message });
+    const safeResponse = createSafeErrorResponse(error, 'Failed to inject suggestions. Please try again.');
+    res.status(500).json(safeResponse);
   }
 });
 
@@ -343,9 +349,10 @@ router.post('/transcribe-and-generate', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in transcribe-and-generate:', error);
+    logErrorSafely(error, 'Error in transcribe-and-generate');
+    const safeResponse = createSafeErrorResponse(error, 'Failed to generate interactive content');
     res.status(500).json({ 
-      error: error.message || 'Failed to generate interactive content',
+      ...safeResponse,
       code: 'GENERATION_ERROR'
     });
   }
@@ -485,7 +492,9 @@ router.get('/results/:videoId', auth, async (req, res) => {
     res.json({
       topics: captionData.topics || [],
       suggestions: captionData.suggestions || [],
-      generatedAt: captionData.generatedAt
+      generatedAt: captionData.generatedAt,
+      // Return the AI-processed transcript segments if they were saved alongside topics
+      transcriptSegments: captionData.segments || []
     });
   } catch (err) {
     console.error('Error retrieving AI results:', err);
