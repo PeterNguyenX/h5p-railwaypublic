@@ -46,10 +46,31 @@ router.get("/content/:contentId", async (req, res) => {
   }
 });
 
-// Get H5P content for a video
+// Get H5P content for a video (auto-ensures ScoreReview exists)
 router.get("/video/:videoId/content", auth, async (req, res) => {
   try {
+    const { v4: uuidv4 } = require('uuid');
     const contents = await h5pService.getVideoContent(req.params.videoId);
+
+    // Ensure the finishing-score-review system interaction is present
+    const hasReview = contents.some(c => c?.metadata?.systemType === 'finishing-score-review');
+    if (!hasReview) {
+      const video = await Video.findByPk(req.params.videoId);
+      if (video) {
+        const duration = video.duration ? Number(video.duration) : 0;
+        const review = {
+          id: 'system_finishing_score_review',
+          library: 'H5P.FinishingScoreReview 1.0',
+          params: { passThreshold: 50 },
+          metadata: { title: 'Score Review', license: 'U', systemInteraction: true, systemType: 'finishing-score-review' },
+          timestamp: Math.max(0, duration > 0 ? duration - 1 : 0),
+          status: 'active',
+        };
+        const updated = [...contents, review];
+        await video.update({ h5pContent: updated });
+        return res.json(updated);
+      }
+    }
     res.json(contents);
   } catch (error) {
     console.error("Error getting H5P content:", error);
@@ -109,14 +130,32 @@ router.put("/:contentId", auth, async (req, res) => {
   }
 });
 
-// Delete H5P content
+// Delete H5P content (ScoreReview is protected)
 router.delete("/content/:contentId", auth, async (req, res) => {
   try {
+    if (req.params.contentId === 'system_finishing_score_review') {
+      return res.status(403).json({ error: "The score review interaction cannot be deleted." });
+    }
     await h5pService.deleteContent(req.params.contentId);
     res.json({ message: "H5P content deleted successfully" });
   } catch (error) {
     console.error("Error deleting H5P content:", error);
     res.status(500).json({ error: "Error deleting H5P content" });
+  }
+});
+
+// Bulk delete all H5P content for a video (single DB write)
+router.delete("/video/:videoId/content", auth, async (req, res) => {
+  try {
+    const video = await Video.findOne({ where: { id: req.params.videoId, userId: req.user.id } });
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    const preservedSystemContent = (Array.isArray(video.h5pContent) ? video.h5pContent : [])
+      .filter(item => item?.metadata?.systemInteraction === true);
+    await video.update({ h5pContent: preservedSystemContent });
+    res.json({ message: "All editable H5P content cleared", h5pContent: preservedSystemContent });
+  } catch (error) {
+    console.error("Error clearing H5P content:", error);
+    res.status(500).json({ error: "Error clearing H5P content" });
   }
 });
 

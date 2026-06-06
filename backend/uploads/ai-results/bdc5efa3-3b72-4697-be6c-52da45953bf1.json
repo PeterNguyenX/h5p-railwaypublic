@@ -1,0 +1,142 @@
+{
+  "videoId": "bdc5efa3-3b72-4697-be6c-52da45953bf1",
+  "provider": "groq",
+  "generatedAt": "2026-05-28T21:15:29.648Z",
+  "topics": [
+    {
+      "title": "Introduction to Time Management",
+      "start": 0,
+      "end": 69,
+      "question": {
+        "type": "FillBlanks",
+        "fillText": "The speaker has spent thousands of hours *obsessing* over their time management.",
+        "feedback": {
+          "correct": "Correct!",
+          "incorrect": "The speaker has spent thousands of hours obsessing."
+        }
+      }
+    },
+    {
+      "title": "The Problem with Modern Productivity",
+      "start": 69,
+      "end": 142,
+      "question": {
+        "type": "TrueFalse",
+        "question": "The speaker believes that working harder leads to more free time.",
+        "correct": false,
+        "feedback": {
+          "correct": "Correct!",
+          "incorrect": "The speaker believes that working harder does not necessarily lead to more free time."
+        }
+      }
+    },
+    {
+      "title": "The Importance of Prioritization",
+      "start": 142,
+      "end": 230,
+      "question": {
+        "type": "MultiChoice",
+        "question": "What is the key to effective time management according to the speaker?",
+        "answers": [
+          {
+            "text": "Working harder",
+            "correct": false
+          },
+          {
+            "text": "Prioritizing tasks",
+            "correct": true
+          },
+          {
+            "text": "Multitasking",
+            "correct": false
+          },
+          {
+            "text": "Procrastination",
+            "correct": false
+          }
+        ],
+        "feedback": {
+          "correct": "Correct!",
+          "incorrect": "The key to effective time management is prioritizing tasks."
+        }
+      }
+    },
+    {
+      "title": "The Role of Self-Care in Time Management",
+      "start": 230,
+      "end": 315,
+      "question": {
+        "type": "MarkWords",
+        "taskDescription": "Identify the self-care activities mentioned in the passage:",
+        "textField": "The speaker mentions *exercise*, *meditation*, and *journaling* as important self-care activities.",
+        "feedback": {
+          "correct": "Correct!",
+          "incorrect": "The speaker mentions exercise, meditation, and journaling as important self-care activities."
+        }
+      }
+    },
+    {
+      "title": "The Speaker's Personal Time Management System",
+      "start": 315,
+      "end": 451,
+      "question": {
+        "type": "DragText",
+        "taskDescription": "Arrange the speaker's daily routine in order:",
+        "textField": "The speaker's daily routine consists of *exercise*, *work*, and *spending time with family*.",
+        "feedback": {
+          "correct": "Correct!",
+          "incorrect": "The speaker's daily routine consists of exercise, work, and spending time with family."
+        }
+      }
+    },
+    {
+      "title": "The Importance of Boundaries in Time Management",
+      "start": 451,
+      "end": 603,
+      "question": {
+        "type": "TrueFalse",
+        "question": "The speaker believes that setting boundaries is essential for effective time management.",
+        "correct": true,
+        "feedback": {
+          "correct": "Correct!",
+          "incorrect": "The speaker believes that setting boundaries is essential for effective time management."
+        }
+      }
+    },
+    {
+      "title": "Video Recap",
+      "start": 603,
+      "end": 751,
+      "question": {
+        "type": "Matching",
+        "taskDescription": "Match the following concepts to their descriptions:",
+        "pairs": [
+          {
+            "prompt": "Time management",
+            "answer": "The process of planning and controlling how much time to spend on different activities."
+          },
+          {
+            "prompt": "Prioritization",
+            "answer": "The process of determining the most important tasks to focus on."
+          },
+          {
+            "prompt": "Self-care",
+            "answer": "Activities that promote physical and mental well-being."
+          },
+          {
+            "prompt": "Boundaries",
+            "answer": "Limits set to protect one's time and energy."
+          },
+          {
+            "prompt": "Productivity",
+            "answer": "The ability to produce high-quality work efficiently."
+          }
+        ],
+        "feedback": {
+          "correct": "Excellent!",
+          "incorrect": "Review the lecture and try again."
+        }
+      }
+    }
+  ]
+}

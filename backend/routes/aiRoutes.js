@@ -10,6 +10,7 @@ const router = express.Router();
 const { auth } = require('../middleware/auth');
 const { createSafeErrorResponse, logErrorSafely } = require('../utils/securityUtils');
 const { analyzeTranscript, analyzeTranscriptStream } = require('../services/aiService');
+const { groqQueue, ollamaQueue } = require('../services/aiQueue');
 const {
   isOllamaAvailable,
   analyzeTranscriptOllama,
@@ -175,11 +176,44 @@ router.post('/analyze-stream', auth, async (req, res) => {
       }
     }
 
-    // Stamp the video immediately so concurrent requests don't bypass the limit
     await video.update({ aiProcessedAt: new Date() });
 
-    // Use the unified provider router: Groq → Ollama → Claude
-    await analyzeTranscriptStream(segments, ANTHROPIC_API_KEY, res, videoId, video, language);
+    // ── SSE headers committed immediately so we can stream queue-position events ──
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const send = (payload) => {
+      if (!res.writableEnded) res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    // ── Enqueue and broadcast position updates while waiting ──────────────────
+    const queue = process.env.GROQ_API_KEY ? groqQueue : ollamaQueue;
+    const { jobId, position, promise } = queue.enqueue(() =>
+      analyzeTranscriptStream(segments, send, videoId, video, language)
+    );
+
+    if (position > 1) {
+      send({ type: 'queued', position, message: `Queue position ${position} — please wait…` });
+    }
+
+    const posListener = (pos) => send({ type: 'queued', position: pos, message: `Queue position ${pos}…` });
+    queue.on(`pos:${jobId}`, posListener);
+
+    try {
+      await promise;
+    } catch (err) {
+      logErrorSafely(err, 'AI stream job failed');
+      send({ type: 'error', message: err.message || 'AI analysis failed. Please try again.' });
+    } finally {
+      queue.off(`pos:${jobId}`, posListener);
+      if (!res.writableEnded) {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      }
+    }
   } catch (error) {
     logErrorSafely(error, 'Error in AI streaming analysis');
     if (!res.headersSent) {

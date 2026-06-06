@@ -25,10 +25,10 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] dark:bg-[#1a1a1a] flex items-center justify-center p-4 transition-colors duration-300">
-      <div className="w-full max-w-[440px] bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#1e3a5f]/10 dark:border-white/10 overflow-hidden animate-fade-in">
+      <div className="w-full max-w-[440px] bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#2563a8]/10 dark:border-white/10 overflow-hidden animate-fade-in">
 
         {/* Header */}
-        <div className="bg-[#1e3a5f] px-8 py-6 flex items-center gap-3">
+        <div className="bg-[#2563a8] px-8 py-6 flex items-center gap-3">
           <div className="bg-[#f5832a] p-2 rounded-xl shadow-lg shadow-[#f5832a]/30">
             <Video className="w-5 h-5 text-white" />
           </div>
@@ -41,9 +41,9 @@ export default function ForgotPassword() {
               <div className="w-14 h-14 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-5">
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
               </div>
-              <h2 className="text-xl font-bold text-[#1e3a5f] dark:text-white mb-2">Check your inbox</h2>
+              <h2 className="text-xl font-bold text-[#2563a8] dark:text-white mb-2">Check your inbox</h2>
               <p className="text-slate-500 dark:text-gray-400 text-sm mb-6">
-                If an account exists for <span className="font-semibold text-[#1e3a5f] dark:text-white">{email}</span>,
+                If an account exists for <span className="font-semibold text-[#2563a8] dark:text-white">{email}</span>,
                 a reset link has been sent. It expires in 30 minutes.
               </p>
               <Link
@@ -57,7 +57,7 @@ export default function ForgotPassword() {
           ) : (
             <>
               <div className="mb-7">
-                <h2 className="text-2xl font-bold text-[#1e3a5f] dark:text-white mb-1">Forgot your password?</h2>
+                <h2 className="text-2xl font-bold text-[#2563a8] dark:text-white mb-1">Forgot your password?</h2>
                 <p className="text-slate-500 dark:text-gray-400 text-sm">
                   Enter your email and we'll send you a reset link.
                 </p>
@@ -72,7 +72,7 @@ export default function ForgotPassword() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[13px] font-semibold text-[#1e3a5f] dark:text-gray-300 ml-1">Email address</label>
+                  <label className="text-[13px] font-semibold text-[#2563a8] dark:text-gray-300 ml-1">Email address</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                       <Mail className="h-4 w-4 text-slate-400 group-focus-within:text-[#f5832a] transition-colors duration-200" />
@@ -82,7 +82,7 @@ export default function ForgotPassword() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="block w-full pl-10 pr-4 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
+                      className="block w-full pl-10 pr-4 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#2563a8] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
                       placeholder="teacher@school.edu"
                     />
                   </div>
@@ -106,7 +106,7 @@ export default function ForgotPassword() {
                 <div className="text-center pt-1">
                   <Link
                     to="/login"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1e3a5f] dark:text-gray-400 hover:text-[#f5832a] dark:hover:text-[#f5832a] transition-colors duration-200"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#2563a8] dark:text-gray-400 hover:text-[#f5832a] dark:hover:text-[#f5832a] transition-colors duration-200"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     Back to sign in

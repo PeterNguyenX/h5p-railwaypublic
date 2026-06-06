@@ -31,8 +31,8 @@ cd backend && npm install
 \end{lstlisting}
 
   \item \textbf{Configure environment:} Copy \texttt{backend/.env.example}
-  to \texttt{backend/.env} and set \texttt{JWT\_SECRET} and optionally
-  \texttt{ANTHROPIC\_API\_KEY}.
+  to \texttt{backend/.env} and set \texttt{JWT\_SECRET} and
+  \texttt{GROQ\_API\_KEY} (required for AI generation).
 
   \item \textbf{Start the backend} (runs on port~5001 by default):
 \begin{lstlisting}[language={}]
@@ -41,12 +41,12 @@ cd backend && npm run dev
 
   \item \textbf{Install frontend dependencies:}
 \begin{lstlisting}[language={}]
-cd "Simple UX UI Design" && npm install
+cd frontend && npm install
 \end{lstlisting}
 
   \item \textbf{Start the frontend} (runs on port~3002 by default):
 \begin{lstlisting}[language={}]
-cd "Simple UX UI Design" && npm run dev
+cd frontend && npm run dev
 \end{lstlisting}
 
   \item \textbf{Open the application} at
@@ -77,7 +77,7 @@ cd "Simple UX UI Design" && npm run dev
   DELETE & /api/videos/:id          & Soft-delete a video. \\
   GET  & /api/h5p/:videoId/content  & Get H5P interactions for a video. \\
   POST & /api/h5p/:videoId/content  & Add an H5P interaction manually. \\
-  GET  & /api/h5p/:videoId/export   & Export H5P package (binary download). \\
+  POST & /api/h5p/video/:videoId/export & Export H5P package (binary download). \\
   GET  & /api/ai/status             & Check AI provider availability. \\
   POST & /api/ai/analyze            & Analyse transcript (non-streaming). \\
   POST & /api/ai/analyze-stream     & Analyse transcript (SSE streaming). \\

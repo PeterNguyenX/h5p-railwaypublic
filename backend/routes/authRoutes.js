@@ -18,7 +18,11 @@ const logger = require('../utils/logger');
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET env var is not set. Refusing to start with an insecure default.');
+  process.exit(1);
+}
 
 function generateToken(userId, rememberMe = false) {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: rememberMe ? '30d' : '24h' });

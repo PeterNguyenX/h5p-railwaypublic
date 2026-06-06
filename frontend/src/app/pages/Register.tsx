@@ -111,10 +111,10 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] dark:bg-[#1a1a1a] flex items-center justify-center p-4 transition-colors duration-300">
-      <div className="w-full max-w-[500px] bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#1e3a5f]/10 dark:border-white/10 overflow-hidden animate-fade-in">
+      <div className="w-full max-w-[500px] bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#2563a8]/10 dark:border-white/10 overflow-hidden animate-fade-in">
 
         {/* Header bar */}
-        <div className="bg-[#1e3a5f] px-8 py-6 flex items-center gap-3">
+        <div className="bg-[#2563a8] px-8 py-6 flex items-center gap-3">
           <div className="bg-[#f5832a] p-2 rounded-xl shadow-lg shadow-[#f5832a]/30">
             <Video className="w-5 h-5 text-white" />
           </div>
@@ -127,7 +127,7 @@ export default function Register() {
           {step === "form" && (
             <>
               <div className="mb-7">
-                <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-white mb-1">Create Account</h1>
+                <h1 className="text-2xl font-bold text-[#2563a8] dark:text-white mb-1">Create Account</h1>
                 <p className="text-slate-500 dark:text-gray-400 text-sm">Start building interactive lessons in minutes.</p>
               </div>
 
@@ -144,7 +144,7 @@ export default function Register() {
                   { label: "Email", icon: Mail, type: "email", value: email, onChange: setEmail, placeholder: "teacher@school.edu" },
                 ].map(({ label, icon: Icon, type, value, onChange, placeholder }) => (
                   <div key={label} className="space-y-1.5">
-                    <label className="text-[13px] font-semibold text-[#1e3a5f] dark:text-gray-300 ml-1">{label}</label>
+                    <label className="text-[13px] font-semibold text-[#2563a8] dark:text-gray-300 ml-1">{label}</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                         <Icon className="h-4 w-4 text-slate-400 group-focus-within:text-[#f5832a] transition-colors duration-200" />
@@ -154,7 +154,7 @@ export default function Register() {
                         required
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
-                        className="block w-full pl-10 pr-4 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
+                        className="block w-full pl-10 pr-4 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#2563a8] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
                         placeholder={placeholder}
                       />
                     </div>
@@ -166,7 +166,7 @@ export default function Register() {
                   { label: "Confirm Password", value: confirmPassword, onChange: setConfirmPassword, placeholder: "Re-enter password" },
                 ].map(({ label, value, onChange, placeholder }) => (
                   <div key={label} className="space-y-1.5">
-                    <label className="text-[13px] font-semibold text-[#1e3a5f] dark:text-gray-300 ml-1">{label}</label>
+                    <label className="text-[13px] font-semibold text-[#2563a8] dark:text-gray-300 ml-1">{label}</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                         <Lock className="h-4 w-4 text-slate-400 group-focus-within:text-[#f5832a] transition-colors duration-200" />
@@ -176,7 +176,7 @@ export default function Register() {
                         required
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
-                        className="block w-full pl-10 pr-10 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
+                        className="block w-full pl-10 pr-10 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#2563a8] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
                         placeholder={placeholder}
                       />
                       {label === "Password" && (
@@ -205,7 +205,7 @@ export default function Register() {
 
               <div className="mt-6 text-center text-sm text-slate-500 dark:text-gray-300/50">
                 Already have an account?{" "}
-                <Link to="/login" className="font-semibold text-[#1e3a5f] dark:text-[#f5832a] hover:text-[#f5832a] dark:hover:text-[#ffa05c] transition-colors duration-200">
+                <Link to="/login" className="font-semibold text-[#2563a8] dark:text-[#f5832a] hover:text-[#f5832a] dark:hover:text-[#ffa05c] transition-colors duration-200">
                   Sign in
                 </Link>
               </div>
@@ -217,12 +217,12 @@ export default function Register() {
             <div className="animate-fade-in">
               <div className="mb-7 text-center">
                 <div className="w-14 h-14 bg-[#f0f5ff] dark:bg-[#2e2e2e] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Mail className="w-7 h-7 text-[#1e3a5f] dark:text-[#f5832a]" />
+                  <Mail className="w-7 h-7 text-[#2563a8] dark:text-[#f5832a]" />
                 </div>
-                <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-white mb-2">Check your email</h1>
+                <h1 className="text-2xl font-bold text-[#2563a8] dark:text-white mb-2">Check your email</h1>
                 <p className="text-slate-500 dark:text-gray-400 text-sm">
                   We sent a 6-digit code to<br />
-                  <span className="font-semibold text-[#1e3a5f] dark:text-white">{pendingEmail}</span>
+                  <span className="font-semibold text-[#2563a8] dark:text-white">{pendingEmail}</span>
                 </p>
               </div>
 
@@ -249,7 +249,7 @@ export default function Register() {
                       placeholder="·"
                       onChange={(e) => handleCodeChange(i, e.target.value)}
                       onKeyDown={(e) => handleCodeKeyDown(i, e)}
-                      className="w-11 h-13 text-center text-xl font-bold bg-[#f0f4f8] dark:bg-[#2e2e2e] border-2 border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-300 dark:placeholder-gray-600 focus:outline-none focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 select-none"
+                      className="w-11 h-13 text-center text-xl font-bold bg-[#f0f4f8] dark:bg-[#2e2e2e] border-2 border-transparent dark:border-white/10 rounded-xl text-[#2563a8] dark:text-white placeholder-slate-300 dark:placeholder-gray-600 focus:outline-none focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 select-none"
                     />
                   ))}
                 </div>
@@ -288,7 +288,7 @@ export default function Register() {
               <div className="w-16 h-16 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-5">
                 <CheckCircle2 className="w-9 h-9 text-green-500" />
               </div>
-              <h2 className="text-2xl font-bold text-[#1e3a5f] dark:text-white mb-2">Email verified!</h2>
+              <h2 className="text-2xl font-bold text-[#2563a8] dark:text-white mb-2">Email verified!</h2>
               <p className="text-slate-500 dark:text-gray-400 text-sm mb-7">
                 Your account is ready. Sign in to get started.
               </p>

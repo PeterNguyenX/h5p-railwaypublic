@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import type { AISuggestion, TranscriptSegment, Video, H5PContent, TopicNode, TopicQuestion } from '../lib/api';
-import { streamAnalysis, injectSuggestions, fetchH5PContent, deleteH5PContent } from '../lib/api';
+import { streamAnalysis, injectSuggestions, fetchH5PContent, deleteH5PContent, deleteAllH5PContent } from '../lib/api';
 
-const COLLISION_THRESHOLD = 5; // seconds
 const WINDOW_SIZE = 30; // seconds — min gap between H5P interactions
+
+// Throttle: only push progress updates to the store every 300ms during chunk streaming.
+// This prevents hundreds of React re-renders while the AI streams tokens.
+let lastChunkUpdate = 0;
 
 const H5P_TYPE_MAP: Record<string, string> = {
   MultiChoice: 'H5P.MultiChoice 1.16',
@@ -52,25 +55,15 @@ function extractSuggestions(topics: TopicNode[], existingTimestamps: number[], v
   const allUsedTimestamps = [...existingTimestamps];
   const suggestions: AISuggestion[] = [];
 
-  function tryPlace(question: TopicQuestion, wantedTs: number, title: string) {
-    if (!questionHasText(question)) return;
-    // If the exact slot (within WINDOW_SIZE) is already taken, skip — don't bump
-    // into the next topic. Subtopics are processed first and claim their slots.
-    if (allUsedTimestamps.some((t) => Math.abs(t - wantedTs) < WINDOW_SIZE)) return;
-    if (videoDuration && wantedTs >= videoDuration - 2) return;
+  for (const topic of topics) {
+    if (!topic.question || !questionHasText(topic.question)) continue;
+    const wantedTs = Math.round(topic.end) + 1;
+    if (allUsedTimestamps.some((t) => Math.abs(t - wantedTs) < WINDOW_SIZE)) continue;
+    if (videoDuration && wantedTs >= videoDuration - 2) continue;
     allUsedTimestamps.push(wantedTs);
-    suggestions.push(buildSuggestion(question, wantedTs, title));
+    suggestions.push(buildSuggestion(topic.question, wantedTs, topic.title));
   }
 
-  function walk(node: TopicNode) {
-    // Subtopics first — they claim their timestamps before the parent tries
-    node.subtopics?.forEach(walk);
-    if (node.question) {
-      tryPlace(node.question, Math.round(node.end) + 1, node.title);
-    }
-  }
-
-  topics.forEach(walk);
   return suggestions.sort((a, b) => a.timestamp - b.timestamp);
 }
 
@@ -82,35 +75,31 @@ interface EditorStore {
   setH5pContents: (c: H5PContent[]) => void;
   loadH5PContents: (videoId: string) => Promise<void>;
   removeH5PContent: (id: string) => Promise<void>;
+  clearAllH5PContents: (videoId: string) => Promise<void>;
 
   segments: TranscriptSegment[];
   setSegments: (s: TranscriptSegment[]) => void;
   transcriptFilename: string | null;
   setTranscriptFilename: (n: string | null) => void;
 
-  // AI topics
   topics: TopicNode[];
   setTopics: (t: TopicNode[]) => void;
 
-  // AI analysis
   suggestions: AISuggestion[];
   isAnalyzing: boolean;
   analysisProgress: number; // 0-100
   progressMessage: string;
-  streamedText: string;
   analyzeError: string | null;
-  runAnalysis: (videoId: string) => () => void;
+  runAnalysis: (videoId: string, language?: string) => () => void;
   resetAnalysis: () => void;
   resetEditor: () => void;
 
-  // Injection
   isInjecting: boolean;
   injectProgress: number; // 0-100
   injectError: string | null;
   lastInjectCount: number;
   injectAccepted: (videoId: string) => Promise<void>;
 
-  // Playback sync
   currentTime: number;
   setCurrentTime: (t: number) => void;
 }
@@ -133,6 +122,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     await deleteH5PContent(id);
     set((state) => ({ h5pContents: state.h5pContents.filter((c) => c.id !== id) }));
   },
+  clearAllH5PContents: async (videoId) => {
+    const preserved = await deleteAllH5PContent(videoId);
+    set({ h5pContents: preserved });
+  },
 
   segments: [],
   setSegments: (s) => set({ segments: s }),
@@ -146,7 +139,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   isAnalyzing: false,
   analysisProgress: 0,
   progressMessage: '',
-  streamedText: '',
   analyzeError: null,
 
   runAnalysis: (videoId: string, language = 'en') => {
@@ -156,36 +148,45 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       return () => {};
     }
 
-    set({ isAnalyzing: true, analyzeError: null, streamedText: '', progressMessage: 'Connecting to AI...', analysisProgress: 5 });
+    set({ isAnalyzing: true, analyzeError: null, progressMessage: 'Connecting to AI...', analysisProgress: 5 });
+    lastChunkUpdate = 0;
 
     const cleanup = streamAnalysis(segments, videoId, (event) => {
       switch (event.type) {
+        case 'queued':
+          set({ progressMessage: (event as { type: string; message?: string }).message ?? 'Waiting in queue…', analysisProgress: 3 });
+          break;
+
         case 'progress':
           set((s) => ({
             progressMessage: event.message,
-            // Use explicit percent from backend when available, otherwise increment
             analysisProgress: event.percent ?? Math.min(75, s.analysisProgress + 12),
           }));
           break;
-        case 'chunk':
-          set((s) => ({
-            streamedText: s.streamedText + event.text,
-            progressMessage: 'AI is generating questions...',
-            analysisProgress: event.percent ?? Math.min(85, s.analysisProgress + 1),
-          }));
+
+        case 'chunk': {
+          // Throttle to one store update per 300ms — the AI may stream 500+ tokens;
+          // without this every token re-renders the entire Editor component.
+          const now = Date.now();
+          if (now - lastChunkUpdate >= 300) {
+            lastChunkUpdate = now;
+            set((s) => ({
+              progressMessage: 'AI is generating questions...',
+              analysisProgress: event.percent ?? Math.min(85, s.analysisProgress + 1),
+            }));
+          }
           break;
+        }
+
         case 'result': {
           const topics = (event as { type: string; topics?: TopicNode[] }).topics ?? [];
-          // Don't use existing timestamps when re-running AI — old interactions shouldn't block new placement
-          const existingTimestamps: number[] = [];
-          // duration comes from the API as "M:SS" string — parse to seconds
           const rawDuration = get().video?.duration as string | number | undefined;
           const videoDurationSec = typeof rawDuration === 'number'
             ? rawDuration
             : typeof rawDuration === 'string'
               ? rawDuration.split(':').reduce((acc, part, i, arr) => acc + parseInt(part) * Math.pow(60, arr.length - 1 - i), 0)
               : undefined;
-          const suggestions = extractSuggestions(topics, existingTimestamps, videoDurationSec);
+          const suggestions = extractSuggestions(topics, [], videoDurationSec);
 
           set({
             topics,
@@ -207,6 +208,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           });
           break;
         }
+
         case 'error':
           set({ analyzeError: event.message, isAnalyzing: false, analysisProgress: 0, progressMessage: '' });
           break;
@@ -216,7 +218,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     return cleanup;
   },
 
-  resetAnalysis: () => set({ suggestions: [], progressMessage: '', analyzeError: null, streamedText: '', analysisProgress: 0, isAnalyzing: false }),
+  resetAnalysis: () => set({ suggestions: [], progressMessage: '', analyzeError: null, analysisProgress: 0, isAnalyzing: false }),
 
   resetEditor: () => set({
     video: null,
@@ -228,7 +230,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     isAnalyzing: false,
     analysisProgress: 0,
     progressMessage: '',
-    streamedText: '',
     analyzeError: null,
     isInjecting: false,
     injectProgress: 0,
@@ -246,16 +247,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const accepted = get().suggestions.filter((s) => s.status === 'accepted');
     if (!accepted.length) return;
 
-    set({ isInjecting: true, injectError: null, injectProgress: 10 });
-
-    // Fake progress animation while waiting for server
-    const progressTimer = setInterval(() => {
-      set((s) => ({ injectProgress: Math.min(85, s.injectProgress + 8) }));
-    }, 400);
+    set({ isInjecting: true, injectError: null, injectProgress: 50 });
 
     try {
       const result = await injectSuggestions(accepted, videoId);
-      clearInterval(progressTimer);
       const injectedIds = new Set(result.injected.map((i) => i.suggestionId));
       set((s) => ({
         isInjecting: false,
@@ -263,10 +258,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         lastInjectCount: result.injected.length,
         suggestions: s.suggestions.filter((sg) => !injectedIds.has(sg.id)),
       }));
-      setTimeout(() => set({ injectProgress: 0 }), 1500);
+      setTimeout(() => set({ injectProgress: 0 }), 800);
       await get().loadH5PContents(videoId);
     } catch (err: unknown) {
-      clearInterval(progressTimer);
       set({ isInjecting: false, injectError: err instanceof Error ? err.message : 'Injection failed', injectProgress: 0 });
     }
   },

@@ -45,7 +45,7 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => navigate("/app/dashboard")}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white transition-colors"
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold bg-[#2563a8] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#2563a8] dark:hover:border-[#3d6ba6] text-white transition-colors"
           >
             <Home className="w-4 h-4" />
             {t('action.home', 'Home')}
@@ -132,6 +132,11 @@ export default function Settings() {
             </button>
           </div>
         </section>
+
+        <div className="text-center text-xs text-slate-400 dark:text-gray-500 pb-2 space-y-0.5">
+          <p>Version 2.5.12</p>
+          <p>Thesis by Nguyen Toan Phuc — submitted to IU-VNU</p>
+        </div>
 
       </div>
     </div>

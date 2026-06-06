@@ -20,10 +20,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] dark:bg-[#1a1a1a] flex items-center justify-center p-4 transition-colors duration-300">
-      <div className="w-full max-w-[980px] flex overflow-hidden bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#1e3a5f]/10 dark:border-white/10 animate-fade-in">
+      <div className="w-full max-w-[980px] flex overflow-hidden bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#2563a8]/10 dark:border-white/10 animate-fade-in">
 
         {/* Left panel — Navy brand */}
-        <div className="hidden lg:flex w-5/12 bg-[#1e3a5f] p-12 flex-col justify-between relative overflow-hidden">
+        <div className="hidden lg:flex w-5/12 bg-[#2563a8] p-12 flex-col justify-between relative overflow-hidden">
           {/* Decorative circles */}
           <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-[#f5832a]/10 pointer-events-none" />
           <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-white/5 pointer-events-none" />
@@ -76,11 +76,11 @@ export default function Login() {
               <div className="bg-[#f5832a] p-2.5 rounded-xl shadow-lg shadow-[#f5832a]/30">
                 <Video className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-bold text-[#1e3a5f] dark:text-white tracking-tight">AI-ActivEdu</span>
+              <span className="text-2xl font-bold text-[#2563a8] dark:text-white tracking-tight">AI-ActivEdu</span>
             </div>
 
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-[#1e3a5f] dark:text-white tracking-tight mb-1">Welcome back</h2>
+              <h2 className="text-3xl font-bold text-[#2563a8] dark:text-white tracking-tight mb-1">Welcome back</h2>
               <p className="text-slate-500 dark:text-gray-400 text-sm">Sign in to your teacher account to continue.</p>
             </div>
 
@@ -94,7 +94,7 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Username/Email */}
               <div className="space-y-1.5">
-                <label className="text-[13px] font-semibold text-[#1e3a5f] dark:text-gray-300 ml-1">Username or Email</label>
+                <label className="text-[13px] font-semibold text-[#2563a8] dark:text-gray-300 ml-1">Username or Email</label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                     <Mail className="h-4.5 w-4.5 text-slate-400 group-focus-within:text-[#f5832a] transition-colors duration-200" />
@@ -104,7 +104,7 @@ export default function Login() {
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="block w-full pl-10 pr-4 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
+                    className="block w-full pl-10 pr-4 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#2563a8] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
                     placeholder="username or email@school.edu"
                   />
                 </div>
@@ -112,7 +112,7 @@ export default function Login() {
 
               {/* Password */}
               <div className="space-y-1.5">
-                <label className="text-[13px] font-semibold text-[#1e3a5f] dark:text-gray-300 ml-1">Password</label>
+                <label className="text-[13px] font-semibold text-[#2563a8] dark:text-gray-300 ml-1">Password</label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                     <Lock className="h-4.5 w-4.5 text-slate-400 group-focus-within:text-[#f5832a] transition-colors duration-200" />
@@ -122,7 +122,7 @@ export default function Login() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-10 pr-10 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
+                    className="block w-full pl-10 pr-10 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#2563a8] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
                     placeholder="••••••••"
                   />
                   <button
@@ -153,7 +153,7 @@ export default function Login() {
                       )}
                     </div>
                   </div>
-                  <span className="text-[13px] text-slate-600 dark:text-gray-400 group-hover:text-[#1e3a5f] dark:group-hover:text-gray-200 transition-colors duration-200">
+                  <span className="text-[13px] text-slate-600 dark:text-gray-400 group-hover:text-[#2563a8] dark:group-hover:text-gray-200 transition-colors duration-200">
                     Remember me for 30 days
                   </span>
                 </label>
@@ -184,7 +184,7 @@ export default function Login() {
 
             <div className="mt-6 text-center text-sm text-slate-500 dark:text-gray-300/50">
               Need an account?{" "}
-              <Link to="/register" className="font-semibold text-[#1e3a5f] dark:text-[#f5832a] hover:text-[#f5832a] dark:hover:text-[#ffa05c] transition-colors duration-200">
+              <Link to="/register" className="font-semibold text-[#2563a8] dark:text-[#f5832a] hover:text-[#f5832a] dark:hover:text-[#ffa05c] transition-colors duration-200">
                 Create account
               </Link>
             </div>

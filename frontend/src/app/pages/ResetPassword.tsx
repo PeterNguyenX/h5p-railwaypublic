@@ -38,10 +38,10 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] dark:bg-[#1a1a1a] flex items-center justify-center p-4 transition-colors duration-300">
-      <div className="w-full max-w-[440px] bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#1e3a5f]/10 dark:border-white/10 overflow-hidden animate-fade-in">
+      <div className="w-full max-w-[440px] bg-white dark:bg-[#242424] shadow-2xl rounded-3xl border border-[#2563a8]/10 dark:border-white/10 overflow-hidden animate-fade-in">
 
         {/* Header */}
-        <div className="bg-[#1e3a5f] px-8 py-6 flex items-center gap-3">
+        <div className="bg-[#2563a8] px-8 py-6 flex items-center gap-3">
           <div className="bg-[#f5832a] p-2 rounded-xl shadow-lg shadow-[#f5832a]/30">
             <Video className="w-5 h-5 text-white" />
           </div>
@@ -54,13 +54,13 @@ export default function ResetPassword() {
               <div className="w-14 h-14 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-5">
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
               </div>
-              <h2 className="text-xl font-bold text-[#1e3a5f] dark:text-white mb-2">Password reset!</h2>
+              <h2 className="text-xl font-bold text-[#2563a8] dark:text-white mb-2">Password reset!</h2>
               <p className="text-slate-500 dark:text-gray-400 text-sm">Redirecting to sign in...</p>
             </div>
           ) : (
             <>
               <div className="mb-7">
-                <h2 className="text-2xl font-bold text-[#1e3a5f] dark:text-white mb-1">Set a new password</h2>
+                <h2 className="text-2xl font-bold text-[#2563a8] dark:text-white mb-1">Set a new password</h2>
                 <p className="text-slate-500 dark:text-gray-400 text-sm">Choose a strong password for your account.</p>
               </div>
 
@@ -77,7 +77,7 @@ export default function ResetPassword() {
                   { label: "Confirm password", value: confirm, onChange: setConfirm, placeholder: "Repeat your password" },
                 ].map(({ label, value, onChange, placeholder }) => (
                   <div key={label} className="space-y-1.5">
-                    <label className="text-[13px] font-semibold text-[#1e3a5f] dark:text-gray-300 ml-1">{label}</label>
+                    <label className="text-[13px] font-semibold text-[#2563a8] dark:text-gray-300 ml-1">{label}</label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                         <Lock className="h-4 w-4 text-slate-400 group-focus-within:text-[#f5832a] transition-colors duration-200" />
@@ -87,7 +87,7 @@ export default function ResetPassword() {
                         required
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
-                        className="block w-full pl-10 pr-10 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#1e3a5f] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
+                        className="block w-full pl-10 pr-10 py-3 bg-[#f0f4f8] dark:bg-[#2e2e2e] border border-transparent dark:border-white/10 rounded-xl text-[#2563a8] dark:text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#f5832a]/40 focus:border-[#f5832a] focus:bg-white dark:focus:bg-[#333333] transition-all duration-200 text-sm"
                         placeholder={placeholder}
                       />
                       {label === "New password" && (
@@ -115,7 +115,7 @@ export default function ResetPassword() {
                 </div>
 
                 <div className="text-center pt-1">
-                  <Link to="/login" className="text-sm font-semibold text-[#1e3a5f] dark:text-gray-400 hover:text-[#f5832a] dark:hover:text-[#f5832a] transition-colors duration-200">
+                  <Link to="/login" className="text-sm font-semibold text-[#2563a8] dark:text-gray-400 hover:text-[#f5832a] dark:hover:text-[#f5832a] transition-colors duration-200">
                     Back to sign in
                   </Link>
                 </div>

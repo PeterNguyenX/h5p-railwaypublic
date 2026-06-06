@@ -279,7 +279,7 @@ export default function Admin() {
           <button
             type="button"
             onClick={() => navigate("/app/dashboard")}
-            className="flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-semibold bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white transition-colors"
+            className="flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-semibold bg-[#2563a8] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#2563a8] dark:hover:border-[#3d6ba6] text-white transition-colors"
           >
             <Home className="w-4 h-4" />
             {t('action.home', 'Home')}
@@ -316,7 +316,7 @@ export default function Admin() {
                 onClick={() => setActiveTab(tab)}
                 className={`flex items-center gap-2 px-4 py-3 font-semibold transition-colors whitespace-nowrap ${
                   activeTab === tab
-                    ? "border-b-2 border-[#1e3a5f] dark:border-[#f5832a] text-[#1e3a5f] dark:text-[#f5832a]"
+                    ? "border-b-2 border-[#2563a8] dark:border-[#f5832a] text-[#2563a8] dark:text-[#f5832a]"
                     : "text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-gray-200"
                 }`}
               >
@@ -335,7 +335,7 @@ export default function Admin() {
                 <p className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wide">Total Accounts</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{summary.total}</p>
               </div>
-              <div className="bg-white dark:bg-[#242424] border-2 border-[#1e3a5f] dark:border-[#1e3a5f] rounded-xl p-4">
+              <div className="bg-white dark:bg-[#242424] border-2 border-[#2563a8] dark:border-[#2563a8] rounded-xl p-4">
                 <p className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wide">Active Accounts</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{summary.active}</p>
               </div>
@@ -343,7 +343,7 @@ export default function Admin() {
                 <p className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wide">Admins</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{summary.administrators}</p>
               </div>
-              <div className="bg-white dark:bg-[#242424] border-2 border-[#1e3a5f] dark:border-[#1e3a5f] rounded-xl p-4">
+              <div className="bg-white dark:bg-[#242424] border-2 border-[#2563a8] dark:border-[#2563a8] rounded-xl p-4">
                 <p className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wide">Teachers</p>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{summary.teachers}</p>
               </div>
@@ -388,7 +388,7 @@ export default function Admin() {
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#2563a8] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#2563a8] dark:hover:border-[#3d6ba6] text-white font-semibold rounded-lg transition-colors whitespace-nowrap"
                   >
                     <Plus className="w-4 h-4" />
                     {t('admin.createAccount', 'Create Account')}
@@ -636,7 +636,7 @@ export default function Admin() {
             >
               {contextMenu.user.isActive
                 ? <><Ban className="w-4 h-4 text-[#f5832a]" /> {t('admin.deactivate', 'Deactivate')}</>
-                : <><CheckCircle2 className="w-4 h-4 text-[#1e3a5f] dark:text-[#3d6ba6]" /> {t('admin.activate', 'Activate')}</>}
+                : <><CheckCircle2 className="w-4 h-4 text-[#2563a8] dark:text-[#3d6ba6]" /> {t('admin.activate', 'Activate')}</>}
             </button>
             <button
               type="button"
@@ -712,7 +712,7 @@ export default function Admin() {
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="flex-1 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
+                  className="flex-1 px-4 py-2 bg-[#2563a8] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#2563a8] dark:hover:border-[#3d6ba6] disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
                 >
                   {isCreating ? t('admin.creating', 'Creating...') : t('admin.create', 'Create')}
                 </button>

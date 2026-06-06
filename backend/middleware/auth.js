@@ -25,7 +25,7 @@ const auth = async (req, res, next) => {
       throw new Error();
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('JWT decoded payload:', decoded);
     const userId = decoded.userId || decoded.id; // Handle both userId and id fields
     console.log('Extracted user ID:', userId);

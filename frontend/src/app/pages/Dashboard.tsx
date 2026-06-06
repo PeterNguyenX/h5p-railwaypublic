@@ -548,7 +548,7 @@ export default function Dashboard() {
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setSelectedFolder("all")}
-          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${selectedFolder === "all" ? "bg-[#1e3a5f] border-[#1e3a5f] text-white dark:bg-transparent dark:border-[#1e3a5f] dark:text-gray-200" : "bg-white dark:bg-transparent border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-white/5"}`}
+          className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${selectedFolder === "all" ? "bg-[#2563a8] border-[#2563a8] text-white dark:bg-transparent dark:border-[#2563a8] dark:text-gray-200" : "bg-white dark:bg-transparent border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-white/5"}`}
         >
           {t("dashboard.all", "All")}
         </button>
@@ -557,7 +557,7 @@ export default function Dashboard() {
           <div key={folder.id} className="inline-flex items-center">
             <button
               onClick={() => setSelectedFolder(folder.id)}
-              className={`px-3 py-2 rounded-l-lg border-y border-l text-sm font-medium inline-flex items-center gap-1.5 transition-colors ${selectedFolder === folder.id ? "bg-[#1e3a5f] border-[#1e3a5f] text-white dark:bg-transparent dark:border-[#1e3a5f] dark:text-gray-200" : "bg-white dark:bg-transparent border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-white/5"}`}
+              className={`px-3 py-2 rounded-l-lg border-y border-l text-sm font-medium inline-flex items-center gap-1.5 transition-colors ${selectedFolder === folder.id ? "bg-[#2563a8] border-[#2563a8] text-white dark:bg-transparent dark:border-[#2563a8] dark:text-gray-200" : "bg-white dark:bg-transparent border-slate-200 dark:border-white/10 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-white/5"}`}
             >
               <Folder className="w-4 h-4" />
               {folder.name}
@@ -674,7 +674,7 @@ export default function Dashboard() {
                     <div className="mt-3 flex items-center gap-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); restoreVideo(video.id); }}
-                        className="text-xs px-2.5 py-1.5 rounded-md border border-[#1e3a5f]/40 dark:border-[#1e3a5f] text-[#1e3a5f] dark:text-gray-300 hover:bg-[#1e3a5f]/10 dark:hover:bg-transparent dark:hover:border-[#3d6ba6] inline-flex items-center gap-1 transition-colors"
+                        className="text-xs px-2.5 py-1.5 rounded-md border border-[#2563a8]/40 dark:border-[#2563a8] text-[#2563a8] dark:text-gray-300 hover:bg-[#2563a8]/10 dark:hover:bg-transparent dark:hover:border-[#3d6ba6] inline-flex items-center gap-1 transition-colors"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> {t("dashboard.restore", "Restore")}
                       </button>
@@ -709,7 +709,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => restoreFolder(folder.id)}
-                      className="text-xs px-2.5 py-1.5 rounded-md border border-[#1e3a5f]/40 dark:border-[#1e3a5f] text-[#1e3a5f] dark:text-gray-300 hover:bg-[#1e3a5f]/10 dark:hover:bg-transparent dark:hover:border-[#3d6ba6] transition-colors"
+                      className="text-xs px-2.5 py-1.5 rounded-md border border-[#2563a8]/40 dark:border-[#2563a8] text-[#2563a8] dark:text-gray-300 hover:bg-[#2563a8]/10 dark:hover:bg-transparent dark:hover:border-[#3d6ba6] transition-colors"
                     >
                       {t("dashboard.restoreFolder", "Restore Folder")}
                     </button>
@@ -861,7 +861,7 @@ export default function Dashboard() {
       )}
 
       {notice && (
-        <div className={`fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg text-white text-sm z-[70] inline-flex items-center gap-2 ${notice && SUCCESS_NOTICE_KEYS.has(notice) ? "bg-[#1e3a5f] dark:border dark:border-[#1e3a5f] dark:bg-transparent" : "bg-[#333333] dark:border dark:border-white/20 dark:bg-transparent"}`}>
+        <div className={`fixed bottom-5 right-5 px-4 py-2.5 rounded-lg shadow-lg text-white text-sm z-[70] inline-flex items-center gap-2 ${notice && SUCCESS_NOTICE_KEYS.has(notice) ? "bg-[#2563a8] dark:border dark:border-[#2563a8] dark:bg-transparent" : "bg-[#333333] dark:border dark:border-white/20 dark:bg-transparent"}`}>
           <AlertCircle className="w-4 h-4" />
           {notice ? t(notice, notice) : null}
         </div>

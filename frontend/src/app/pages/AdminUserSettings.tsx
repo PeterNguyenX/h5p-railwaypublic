@@ -130,7 +130,7 @@ export default function AdminUserSettings() {
 
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#1e3a5f] dark:hover:border-[#3d6ba6] text-white font-bold rounded-xl shadow-sm transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#2563a8] hover:bg-[#2d5286] dark:bg-transparent dark:border dark:border-[#2563a8] dark:hover:border-[#3d6ba6] text-white font-bold rounded-xl shadow-sm transition-colors"
               >
                 <Save className="w-4 h-4" />
                 Save Profile

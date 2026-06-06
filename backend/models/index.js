@@ -7,6 +7,7 @@ const SystemSettings = require('./SystemSettings');
 const LoginAttempt = require('./LoginAttempt');
 const ContentFlag = require('./ContentFlag');
 const H5PContent = require('./H5PContent');
+const VideoProgress = require('./VideoProgress');
 
 module.exports = {
   User,
@@ -17,5 +18,6 @@ module.exports = {
   SystemSettings,
   LoginAttempt,
   ContentFlag,
-  H5PContent
+  H5PContent,
+  VideoProgress
 };

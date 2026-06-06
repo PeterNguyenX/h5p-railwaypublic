@@ -316,7 +316,6 @@ export interface TopicNode {
   title: string;
   start: number;
   end: number;
-  subtopics?: TopicNode[];
   question?: TopicQuestion;
 }
 
@@ -428,7 +427,13 @@ export interface H5PContent {
   id: string;
   library: string;
   params: Record<string, unknown>;
-  metadata: { title: string; license: string };
+  metadata: {
+    title: string;
+    license: string;
+    systemInteraction?: boolean;
+    systemType?: string;
+    hiddenFromAuthoring?: boolean;
+  };
   timestamp: number;
   status: string;
 }
@@ -493,10 +498,27 @@ export async function updateH5PContent(contentId: string, contentData: H5PConten
 }
 
 export async function deleteH5PContent(contentId: string): Promise<void> {
-  await fetch(`${API_BASE}/h5p/content/${contentId}`, {
+  const res = await fetch(`${API_BASE}/h5p/content/${contentId}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(err.error || 'Failed to delete H5P content');
+  }
+}
+
+export async function deleteAllH5PContent(videoId: string): Promise<H5PContent[]> {
+  const res = await fetch(`${API_BASE}/h5p/video/${videoId}/content`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to clear H5P content');
+  }
+  const data = await res.json().catch(() => ({}));
+  return Array.isArray(data.h5pContent) ? data.h5pContent : [];
 }
 
 export async function exportH5P(videoId: string): Promise<Blob> {
@@ -769,6 +791,36 @@ export async function fetchModerationStats() {
 }
 
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
+
+// ─── Video Progress ───────────────────────────────────────────────────────────
+
+export interface ProgressEntry { interactionId: string; score: number; answeredAt: string }
+
+export async function getVideoProgress(videoId: string): Promise<ProgressEntry[]> {
+  const res = await fetch(`${API_BASE}/videos/${videoId}/progress`, { headers: authHeaders() });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function saveVideoProgress(videoId: string, interactionId: string, score: number): Promise<void> {
+  await fetch(`${API_BASE}/videos/${videoId}/progress`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ interactionId, score }),
+  });
+}
+
+export async function updateScoreReviewThreshold(videoId: string, passThreshold: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/videos/${videoId}/score-review`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ passThreshold }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to update score review');
+  }
+}
 
 export async function fetchAdminDashboard() {
   const res = await fetch(`${API_BASE}/admin/dashboard`, {

@@ -48,10 +48,13 @@ export default function Layout() {
                 className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
                 onClick={(e) => { e.preventDefault(); window.location.href = '/app/dashboard'; }}
               >
-                <div className="bg-[#1e3a5f] p-2 rounded-lg flex items-center justify-center">
+                <div className="bg-[#2563a8] p-2 rounded-lg flex items-center justify-center">
                   <Video className="w-5 h-5 text-white" />
                 </div>
-                <h1 className="font-bold text-lg text-slate-900 dark:text-white tracking-tight leading-tight">AI-ActivEdu</h1>
+                <div className="flex flex-col leading-none">
+                  <h1 className="font-bold text-lg text-slate-900 dark:text-white tracking-tight leading-tight">AI-ActivEdu</h1>
+                  <p className="text-[10px] text-slate-400 dark:text-gray-500">A VNU-AI project</p>
+                </div>
               </Link>
             </div>
 
@@ -60,7 +63,7 @@ export default function Layout() {
               {user?.role === "admin" && (
                 <Link
                   to="/app/admin"
-                  className="flex items-center gap-1.5 h-9 px-3 border border-[#1e3a5f]/30 dark:border-[#1e3a5f] rounded-xl text-sm font-semibold text-[#1e3a5f] dark:text-gray-300 hover:bg-[#1e3a5f] hover:text-white dark:hover:bg-transparent dark:hover:border-[#3d6ba6] transition-colors"
+                  className="flex items-center gap-1.5 h-9 px-3 border border-[#2563a8]/30 dark:border-[#2563a8] rounded-xl text-sm font-semibold text-[#2563a8] dark:text-gray-300 hover:bg-[#2563a8] hover:text-white dark:hover:bg-transparent dark:hover:border-[#3d6ba6] transition-colors"
                   title={t("nav.adminConsole", "Admin Console")}
                 >
                   <Shield className="w-4 h-4" />
@@ -76,7 +79,7 @@ export default function Layout() {
                   className="hidden sm:flex items-center gap-2 h-9 px-3 border border-slate-200 dark:border-white/10 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-sm font-semibold text-slate-700 dark:text-gray-300"
                   title="Account"
                 >
-                  <div className="w-5 h-5 rounded-full bg-[#1e3a5f] flex items-center justify-center text-white font-bold text-[10px] shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-[#2563a8] flex items-center justify-center text-white font-bold text-[10px] shrink-0">
                     {initials}
                   </div>
                   {displayName}

@@ -17,11 +17,11 @@
     "latex-workshop.latex.tools": [
         {
             "name": "tectonic",
-            "command": "tectonic",
+            "command": "/usr/local/bin/tectonic",
             "args": [
                 "--keep-intermediates",
                 "--keep-logs",
-                "%DOC%"
+                "%DOCFILE_EXT%"
             ]
         }
     ],

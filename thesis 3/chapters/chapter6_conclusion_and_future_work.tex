@@ -1,0 +1,73 @@
+\chapter{CONCLUSION AND FUTURE WORK}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+
+This thesis described the design, development, and evaluation of a web-based H5P interactive video authoring platform built specifically for university instructors. Two primary goals drove the work: simplifying the authoring workflow through user-centred interface design, and making AI-assisted question generation practical enough to use in a production environment.
+
+The core technical achievement is an architecture that integrates a React~18 + TypeScript SPA~\cite{react2023,typescript2023}, a stateless Express.js REST API~\cite{expressjs2023}, a SQLite data tier via Sequelize ORM~\cite{sqlite2023,sequelize2023}, and the Lumieducation headless H5P server library~\cite{lumieducation2023}. An AI pipeline extracts timestamped transcripts from video sources (YouTube captions, uploaded WebVTT files, or local Whisper transcription~\cite{radford2023}), passes them to a large language model (\texttt{llama-3.3-70b-versatile} via Groq, with a local Ollama fallback), validates the structured output with Zod schemas, and streams results to the browser via Server-Sent Events. Each suggestion carries a Bloom's taxonomy classification so instructors can gauge cognitive depth at a glance~\cite{anderson2001}.
+
+The platform was evaluated against the WordPress H5P workflow in a comparative usability study with ten participants, each manually creating five randomly chosen interactions on the same video. The results: 95\% task completion versus 30\% for the baseline; median task time of 3.2 minutes versus 45.0 minutes; and a mean SUS score of 82.5 versus 38.0. These improvements hold across every metric, which makes it difficult to attribute them to any single design choice. Co-locating all authoring tools on a single screen, eliminating context switching, and adding AI suggestion review together removed the barriers that made the WordPress workflow so slow.
+
+\textbf{Revisiting the Research Questions.}
+
+\textbf{RQ1: What are the specific usability barriers in current H5P authoring workflows?}
+
+The primary barriers are multi-screen navigation fragmentation, the cognitive burden of managing CMS concepts irrelevant to the teaching task, the lack of real-time preview during form entry, and no AI scaffolding for question generation. All four were addressed in the new platform.
+
+\textbf{RQ2: How can user-centred design reduce extraneous cognitive load?}
+
+By co-locating the video player, timestamp capture, question editor, and AI suggestion panel on a single viewport, the platform eliminates the split-attention effect identified by Chandler and Sweller~\cite{chandler1991}. The total number of required interface interactions dropped from 47 in WordPress to 8 in the new platform. This structural change---putting everything in one place---drove the 42-minute reduction in median task time more than any individual feature.
+
+\textbf{RQ3: What architecture best supports AI-assisted H5P authoring?}
+
+A multi-provider LLM architecture with aggressive Zod-based structured output validation works well for this use case. The ``output automater'' prompting pattern~\cite{white2023} forces the LLM to conform to strict JSON schemas, which prevents hallucination of unknown field names or broken JSON structures. SSE streaming is essential for managing perceived latency---a 1.2-second Time-to-First-Token with an 8.4-second total generation time feels far more acceptable than a 15-second blank wait. Decoupling H5P from a CMS using the headless Lumieducation library~\cite{lumieducation2023} enables a clean three-tier REST architecture that can scale to institutional deployment~\cite{bass2012}.
+
+\textbf{RQ4: To what extent does the platform outperform the baseline?}
+
+The platform increases task completion by 65 percentage points, reduces time-on-task by 93\%, and raises the SUS score from 38.0 (rated ``Poor'' on Brooke's scale~\cite{brooke1996}) to 82.5 (rated ``Excellent''). Given that the Technology Acceptance Model identifies perceived ease of use as a prerequisite for adoption~\cite{davis1989}, these improvements have direct practical implications for how many VNU-HCM instructors will actually create interactive content.
+
+\textbf{Summary of Contributions.}
+
+Five contributions come out of this work:
+
+\begin{enumerate}
+  \item \textbf{A production-ready authoring platform:} An open-source, CMS-free H5P authoring environment designed for institutional deployment.
+  \item \textbf{A functional AI-to-H5P pipeline:} The first documented integration of a production LLM pipeline directly generating complex, schema-compliant H5P content types guided by Bloom's taxonomy.
+  \item \textbf{Structured output prompt engineering:} Reusable prompt matrices and Zod validation strategies that address the problem of forcing LLMs to produce valid nested instructional JSON.
+  \item \textbf{Empirical evidence for UCD in EdTech:} Quantitative proof that a purpose-built user-centred interface substantially outperforms a general-purpose CMS workflow for this specific task.
+  \item \textbf{Alignment with national digital education goals:} A locally deployable, open-source tool that supports VNU-HCM's digital transformation strategy without commercial licensing costs~\cite{vietnam_strategy2021}.
+\end{enumerate}
+
+\textbf{Limitations of the Study.}
+
+Several limitations constrain how broadly these findings can be interpreted. The ten-participant sample satisfies Nielsen's guidance for identifying usability problems~\cite{nielsen1994}, but lacks the statistical power for parametric hypothesis testing. The participants were technically literate IT students, not actual faculty members. University professors may behave differently, particularly in how they respond to AI suggestions and recover from errors.
+
+The AI quality evaluation used English-language transcripts. The platform technically supports Vietnamese prompts and bilingual UI strings, but the pedagogical quality of Vietnamese-language output has not been formally evaluated with human raters. This is a significant gap given the primary target institution. The Whisper transcription accuracy on Vietnamese academic speech with heavy domain-specific vocabulary is also an open question.
+
+Finally, this evaluation measured short-term usability. Long-term adoption rates, frequency of use over a full academic semester, and the actual impact of the generated interactive videos on student assessment scores are all outside the scope of this initial study.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Future work}
+
+Several extensions are naturally enabled by the modular architecture.
+
+\textbf{Longitudinal Faculty Evaluation Study.} A semester-long study with actual university faculty across diverse disciplines at VNU-HCM would provide the most ecologically valid evidence for the platform's impact. Measuring organic adoption rates, content production volume, and student performance data over a full academic term would answer questions this initial study could not.
+
+\textbf{AI Provider Upgrade for Greater Concurrency.} The Groq free-tier API limits simultaneous AI generation to roughly one or two concurrent requests before queuing begins. Upgrading to a paid Groq tier, or switching the primary provider to a higher-capacity API such as Anthropic Claude or OpenAI GPT-4o, would allow the platform to serve a full classroom of instructors generating content simultaneously without rate-limit delays. A longer-term option is deploying a dedicated GPU inference server running an open-weight model such as Llama-3.3-70B, which eliminates per-request API costs and rate limits entirely for institutional deployments.
+
+\textbf{Additional H5P Question Types.} The current platform supports six interaction types. Expanding the AI pipeline to cover additional types---Branching Scenario (for conditional learning paths), Course Presentation (slide-based mini-lectures with embedded questions), and Hotspot (click-on-image identification tasks)---would substantially broaden the range of instructional designs possible within the platform. Each new type requires adding a corresponding entry to the pattern matrix and a Zod validation schema for its JSON structure.
+
+\textbf{Vietnamese Language Validation.} A dedicated evaluation study using real Vietnamese lecture transcripts and bilingual instructional designers as raters is needed to formally assess the pedagogical quality of Vietnamese-language AI output. Fine-tuning the local Whisper model on VNU-HCM's academic terminology would also improve transcription accuracy for domain-specific content.
+
+\textbf{End-of-Video Score Summary Interaction.} The current platform places all interactions at specific timestamps during video playback, but provides no final summary once the video ends. A dedicated end-of-video interaction could calculate and display the learner's total score and percentage of correctly answered questions across the entire session. This gives learners immediate, contextualised feedback on their overall performance and helps instructors identify whether the embedded questions are collectively well-calibrated. The H5P \texttt{InteractiveVideo} format already reserves a summary screen slot in \texttt{content.json}; wiring the platform to populate that slot requires extending the \texttt{createH5PPackage()} function and adding a corresponding UI option in the editor.
+
+\textbf{Deep Learning Analytics and xAPI Integration.} The current platform exports standard \texttt{.h5p} packages but doesn't capture learner interaction data. Implementing xAPI tracking that reports events (video replays, question failures, time per interaction) to a Learning Record Store would unlock learning analytics, allowing instructors to see which specific concepts students are struggling with~\cite{siemens2011}.
+
+\textbf{Collaborative Real-Time Authoring.} Adding real-time collaborative editing would enable team-based content production between senior professors and teaching assistants. The backend already uses Express, so integrating WebSockets via \texttt{Socket.io} to broadcast state changes across connected clients is architecturally straightforward.
+
+\textbf{Local LLM Fine-Tuning.} The current pipeline relies on general-purpose LLMs constrained by complex prompt engineering. Fine-tuning a smaller open-weight model (7B or 8B Llama variant) on a curated dataset of validated H5P question-transcript pairs from the VNU-HCM MOOC platform would improve suggestion quality and reduce inference latency for the local Ollama fallback path.
+
+\textbf{Asynchronous Media Processing.} FFmpeg thumbnail generation and Whisper audio processing currently run synchronously in the main Express request handler, causing latency spikes on video upload. Moving these to an asynchronous job queue using Redis and BullMQ would decouple heavy computation from the API response cycle and improve scalability under institutional load.
+
+\textbf{WCAG 2.1 AA Accessibility Audit.} The current frontend uses basic accessibility primitives (keyboard focus trapping, semantic HTML, ARIA labels), but the interactive timeline and dynamic AI review panels have not been formally audited for WCAG 2.1 AA compliance. Full accessibility compliance is an ethical and legal prerequisite before the platform can be officially adopted as an institutional standard.

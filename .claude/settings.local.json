@@ -51,7 +51,31 @@
       "Bash(sqlite3 h5p.db \".schema h5p_content\")",
       "Bash(sqlite3 h5p.db \"SELECT json_extract\\(json_data, '$.library'\\) as lib, substr\\(json_extract\\(json_data, '$.params'\\), 1, 200\\) as params FROM h5p_content WHERE json_extract\\(json_data, '$.library'\\) LIKE '%match%' OR json_extract\\(json_data, '$.library'\\) LIKE '%drag%' LIMIT 5;\")",
       "Bash(sqlite3 h5p.db \"SELECT COUNT\\(*\\) FROM h5p_content; SELECT json_extract\\(json_data, '$.library'\\) as lib FROM h5p_content LIMIT 10;\")",
-      "Bash(sqlite3 h5p.db \"SELECT id, substr\\(h5pContent, 1, 500\\) FROM Videos WHERE h5pContent IS NOT NULL LIMIT 1;\")"
+      "Bash(sqlite3 h5p.db \"SELECT id, substr\\(h5pContent, 1, 500\\) FROM Videos WHERE h5pContent IS NOT NULL LIMIT 1;\")",
+      "WebSearch",
+      "Read(//Users/peternguyen/.claude/**)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(mkdir -p /Users/peternguyen/Downloads/itp-h5p/.claude/skills)",
+      "Bash(node -e \"require\\('./server.js'\\)\")",
+      "Bash(kill %1)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); console.log\\('GROQ:', process.env.GROQ_API_KEY ? 'set' : 'missing', '| JWT:', process.env.JWT_SECRET ? 'set' : 'missing'\\)\")",
+      "Bash(curl -s http://localhost:5001/api/ai/status)",
+      "Bash(node /Users/peternguyen/Downloads/itp-h5p/backend/server.js)",
+      "Bash(curl -s -X POST http://localhost:5001/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"admin123\"}')",
+      "Bash(npx playwright *)",
+      "Bash(curl -s -X POST https://api.groq.com/openai/v1/chat/completions -H 'Authorization: Bearer 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' -H 'Content-Type: application/json' -d '{\"model\":\"llama-3.3-70b-versatile\",\"messages\":[{\"role\":\"user\",\"content\":\"say hi\"}],\"max_tokens\":5}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Groq OK:', d.get\\('choices',[{}]\\)[0].get\\('message',{}\\).get\\('content','ERROR:'+str\\(d.get\\('error',''\\)\\)\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Running:', d['status']\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); console.log\\('Key prefix:', process.env.GROQ_API_KEY?.slice\\(0,20\\)\\)\")",
+      "Bash(/usr/local/bin/tectonic --keep-intermediates --keep-logs main.tex)",
+      "Bash(grep -v \"^warning.*[0-9]\\\\+pt too wide$\")",
+      "Bash(awk '/Overfull/{match\\($0,/\\([0-9]+\\\\.[0-9]+\\)pt/,a\\); if\\(a[1]+0>30\\) print}')",
+      "Bash(python3 -c ' *)"
+    ],
+    "additionalDirectories": [
+      "/Users/peternguyen/Downloads/itp-h5p/.claude/skills"
     ]
   }
 }

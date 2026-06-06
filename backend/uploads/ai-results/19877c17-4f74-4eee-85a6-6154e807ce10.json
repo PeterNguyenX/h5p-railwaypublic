@@ -1,0 +1,159 @@
+{
+  "videoId": "19877c17-4f74-4eee-85a6-6154e807ce10",
+  "provider": "groq",
+  "generatedAt": "2026-06-06T22:30:08.190Z",
+  "topics": [
+    {
+      "title": "Introduction to Caching",
+      "start": 0,
+      "end": 51,
+      "question": {
+        "type": "FillBlanks",
+        "fillText": "The secret to making apps load *instantly* is caching",
+        "feedback": {
+          "correct": "Caching is a key concept in software engineering",
+          "incorrect": "The blank should be filled with the term 'instantly' to describe the benefits of caching"
+        }
+      }
+    },
+    {
+      "title": "Understanding Databases",
+      "start": 51,
+      "end": 72,
+      "question": {
+        "type": "TrueFalse",
+        "question": "Databases are optimized for speed",
+        "correct": false,
+        "feedback": {
+          "correct": "Databases prioritize being complete and accurate over being fast",
+          "incorrect": "Databases are often slow due to their focus on being complete and accurate"
+        }
+      }
+    },
+    {
+      "title": "The Library Analogy",
+      "start": 72,
+      "end": 135,
+      "question": {
+        "type": "DragText",
+        "taskDescription": "Put the steps in order",
+        "textField": "The librarian has to *walk* to the *archives* and then *bring* the book *back*",
+        "feedback": {
+          "correct": "The correct order is walk, archives, bring, back",
+          "incorrect": "The steps should be in the order of walking to the archives, then bringing the book back"
+        }
+      }
+    },
+    {
+      "title": "Caching Fundamentals",
+      "start": 135,
+      "end": 174,
+      "question": {
+        "type": "MultiChoice",
+        "question": "What is caching",
+        "answers": [
+          {
+            "text": "Storing data in a database",
+            "correct": false
+          },
+          {
+            "text": "Storing the result of an expensive operation",
+            "correct": true
+          },
+          {
+            "text": "Updating data in real-time",
+            "correct": false
+          },
+          {
+            "text": "Deleting unnecessary data",
+            "correct": false
+          }
+        ],
+        "feedback": {
+          "correct": "Caching is the act of storing the result of an expensive operation to reduce the time it takes to retrieve the data",
+          "incorrect": "Caching is not about storing data in a database, updating data in real-time, or deleting unnecessary data"
+        }
+      }
+    },
+    {
+      "title": "Cache Hits and Misses",
+      "start": 174,
+      "end": 313,
+      "question": {
+        "type": "MarkWords",
+        "taskDescription": "Identify the key terms",
+        "textField": "A *cache hit* occurs when the data is found in the *cache*, while a *cache miss* occurs when the data is not found and the *librarian* has to go to the *archives*",
+        "feedback": {
+          "correct": "The key terms are cache hit, cache, cache miss, librarian, and archives",
+          "incorrect": "The key terms should include cache hit, cache, cache miss, librarian, and archives"
+        }
+      }
+    },
+    {
+      "title": "Cache Invalidation",
+      "start": 313,
+      "end": 392,
+      "question": {
+        "type": "MultiChoice",
+        "question": "What is cache invalidation",
+        "answers": [
+          {
+            "text": "Updating the cache with new data",
+            "correct": false
+          },
+          {
+            "text": "Actively removing data from the cache",
+            "correct": true
+          },
+          {
+            "text": "Checking the cache for errors",
+            "correct": false
+          },
+          {
+            "text": "Optimizing the cache for performance",
+            "correct": false
+          }
+        ],
+        "feedback": {
+          "correct": "Cache invalidation is the process of actively removing data from the cache to ensure it remains up-to-date",
+          "incorrect": "Cache invalidation is not about updating the cache with new data, checking for errors, or optimizing performance"
+        }
+      }
+    },
+    {
+      "title": "Video Recap",
+      "start": 392,
+      "end": 437,
+      "question": {
+        "type": "Matching",
+        "taskDescription": "Match each concept",
+        "pairs": [
+          {
+            "prompt": "Cache",
+            "answer": "A store of data that reduces the time it takes to retrieve the data"
+          },
+          {
+            "prompt": "Database",
+            "answer": "A store of data that prioritizes being complete and accurate"
+          },
+          {
+            "prompt": "Cache Hit",
+            "answer": "When the data is found in the cache"
+          },
+          {
+            "prompt": "Cache Miss",
+            "answer": "When the data is not found in the cache and the system has to go to the database"
+          },
+          {
+            "prompt": "Cache Invalidation",
+            "answer": "The process of actively removing data from the cache to ensure it remains up-to-date"
+          }
+        ],
+        "feedback": {
+          "correct": "The concepts are matched correctly",
+          "incorrect": "The concepts should be matched as follows: cache, database, cache hit, cache miss, and cache invalidation"
+        }
+      }
+    }
+  ]
+}

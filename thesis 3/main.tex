@@ -8,7 +8,6 @@
   right=20mm
 }
 \usepackage{listings}
-\usepackage{xcolor}
 
 \lstset{
     basicstyle=\ttfamily\scriptsize,
@@ -21,7 +20,20 @@
 
 % ── Typography ───────────────────────────────────────────────────────────────
 \usepackage{setspace}
-\usepackage[utf8]{inputenc}
+% Engine detection must come first so subsequent conditionals work correctly.
+\usepackage{iftex}
+\ifPDFTeX
+  % pdflatex needs explicit UTF-8 input encoding and T1 font encoding.
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  % Full microtype support: protrusion + font expansion + kerning + spacing.
+  \usepackage[final,protrusion=true,expansion=true,
+              tracking=false,kerning=true,spacing=true]{microtype}
+\else
+  % XeTeX / LuaTeX: UTF-8 and Unicode are native; T1/inputenc not needed.
+  % microtype supports protrusion only (expansion etc. are pdflatex-only).
+  \usepackage[final,protrusion=true]{microtype}
+\fi
 
 % ── Maths ────────────────────────────────────────────────────────────────────
 \usepackage{amsmath,amssymb}
@@ -53,11 +65,27 @@
 \usepackage{array}
 \usepackage{multirow}
 \usepackage{tabularx}
-\usepackage{colortbl}
 \usepackage[table]{xcolor}
+\usepackage{colortbl}
 
 % ── Code listings ────────────────────────────────────────────────────────────
 \usepackage{listings}
+\lstdefinelanguage{JavaScript}{
+  keywords={break,case,catch,class,const,continue,debugger,default,delete,do,
+             else,export,extends,finally,for,function,if,import,in,instanceof,
+             let,new,return,static,super,switch,this,throw,try,typeof,var,void,
+             while,with,yield,async,await,of,from,true,false,null,undefined},
+  keywordstyle=\color{codeblue}\bfseries,
+  ndkeywords={},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{codegreen}\itshape,
+  stringstyle=\color{orange},
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]`
+}
 \definecolor{codebg}{rgb}{0.97,0.97,0.97}
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -89,13 +117,77 @@
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{url}
 \usepackage[titles]{tocloft}
-\renewcommand{\cftchappresnum}{CHAPTER }
-\setlength{\cftchapnumwidth}{6em}
 \renewcommand{\bibname}{REFERENCES}
 \renewcommand{\chaptername}{CHAPTER}
 \renewcommand{\contentsname}{TABLE OF CONTENTS}
 \renewcommand{\listfigurename}{LIST OF FIGURES}
 \renewcommand{\listtablename}{LIST OF TABLES}
+
+% Two-line chapter TOC entries:
+%   CHAPTER N           <- line 1, no page number (number printed right after CHAPTER)
+%   TITLE . . . .  P   <- line 2, with dots and page number
+% Unnumbered entries (ABSTRACT, REFERENCES, etc.) stay single-line.
+\makeatletter
+\renewcommand*{\l@chapter}[2]{%
+  \ifnum \c@tocdepth >\m@ne
+    \addpenalty{-\@highpenalty}%
+    \vskip 1.0em \@plus\p@
+    % Reset the chapter-number capture (global so it survives the group below).
+    \gdef\@toc@cnum{}%
+    \begingroup
+      \parindent\z@
+      % First pass: typeset #1 silently to trigger \numberline (if present).
+      \def\numberline##1{\gdef\@toc@cnum{##1}}%
+      \setbox\@tempboxa\hbox{#1}%
+      %
+      \ifx\@toc@cnum\@empty
+        %--- Unnumbered entry (ABSTRACT, REFERENCES …) ---
+        \def\numberline##1{}%
+        \leavevmode
+        \begingroup\rightskip\@pnumwidth\parfillskip-\@pnumwidth
+          \bfseries#1\nobreak\cftchapleader\nobreak
+          \hb@xt@\@pnumwidth{\hss\bfseries#2}\par
+        \endgroup
+      \else
+        %--- Numbered chapter: two-line format ---
+        % Line 1: "CHAPTER N" left-aligned in a full-width box; no page number.
+        \noindent\hbox to\hsize{\bfseries CHAPTER~\@toc@cnum\hfil}\par\nobreak
+        % Line 2: chapter title + leader dots + page number.
+        \def\numberline##1{}%
+        \leavevmode
+        \begingroup\rightskip\@pnumwidth\parfillskip-\@pnumwidth
+          \bfseries#1\nobreak\cftchapleader\nobreak
+          \hb@xt@\@pnumwidth{\hss\bfseries#2}\par
+        \endgroup
+      \fi
+    \endgroup
+    \penalty\@highpenalty
+  \fi}
+\makeatother
+
+% ── Line-break and hyphenation control ───────────────────────────────────────
+%
+% TeX's line-breaking runs three passes:
+%   Pass 1: fit lines with badness ≤ \pretolerance, NO hyphenation.
+%   Pass 2: allow hyphenation; \hyphenpenalty makes it costly.
+%   Pass 3: add \emergencystretch rubber glue as last resort.
+%
+% Default \pretolerance=100 almost always fails → Pass 2 → lots of hyphens.
+% Raising it to 2000 means TeX accepts slightly loose spacing in Pass 1
+% instead of breaking words.  \hyphenpenalty=500 (10× default) further
+% discourages hyphenation in Pass 2 if Pass 1 still fails.
+%
+\pretolerance=2000   % try MUCH harder to fit lines without any hyphenation
+\tolerance=5000      % if pass 1 fails, allow looser lines before hyphenating
+\hyphenpenalty=500   % make mid-word hyphenation costly (default 50)
+\exhyphenpenalty=100 % keep explicit-hyphen breaks (user-centred etc.) cheaper
+
+% Emergency rubber glue used only when passes 1+2 both fail.
+\ifPDFTeX
+  \setlength{\emergencystretch}{3em}   % microtype expansion handles most cases
+\else
+  \setlength{\emergencystretch}{4em}   % XeTeX: wider safety net (no expansion)
+\fi
 
 % ── Spacing ──────────────────────────────────────────────────────────────────
 \onehalfspacing

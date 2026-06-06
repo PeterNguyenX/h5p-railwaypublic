@@ -1,23 +1,15 @@
 /**
  * AI Injection Service
- * Takes accepted AI suggestions and creates H5P content via the existing h5pService.
+ * Takes accepted AI suggestions and creates H5P content via a single batched DB write.
  */
 
-const h5pService = require('./h5pService');
 const { H5P_TYPE_MAP } = require('./aiService');
 
-/**
- * Build H5P contentData from an AI suggestion.
- * Maps the AI-generated config to the format expected by h5pService.createTimeBasedContent.
- * @param {object} suggestion
- * @returns {object} contentData for h5pService
- */
 function buildContentData(suggestion) {
   const library = suggestion.h5pLibrary || H5P_TYPE_MAP[suggestion.type];
   if (!library) {
     throw new Error(`Unknown H5P type: "${suggestion.type}"`);
   }
-
   return {
     library,
     params: suggestion.config || {},
@@ -28,11 +20,6 @@ function buildContentData(suggestion) {
   };
 }
 
-/**
- * Generate a human-readable title for the H5P content.
- * @param {object} suggestion
- * @returns {string}
- */
 function buildTitle(suggestion) {
   const typeLabels = {
     MultiChoice: 'Multiple Choice',
@@ -40,96 +27,78 @@ function buildTitle(suggestion) {
     FillBlanks: 'Fill in the Blanks',
     DragText: 'Drag Text',
     MarkWords: 'Mark Words',
+    Matching: 'Matching',
   };
-
   const minutes = Math.floor(suggestion.timestamp / 60);
   const seconds = Math.floor(suggestion.timestamp % 60);
   const timeStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   const typeLabel = typeLabels[suggestion.type] || suggestion.type;
-
   return `${typeLabel} @ ${timeStr}`;
 }
 
 /**
- * Inject a single accepted suggestion into the H5P service.
- * @param {object} suggestion - An accepted AI suggestion
- * @param {string} videoId - The video UUID
- * @returns {Promise<object>} The created H5P content
- */
-async function injectSuggestion(suggestion, videoId) {
-  const contentData = buildContentData(suggestion);
-  const content = await h5pService.createTimeBasedContent(
-    contentData,
-    videoId,
-    suggestion.timestamp
-  );
-  return content;
-}
-
-/**
- * Inject multiple accepted suggestions into the H5P service and update the Video model.
- * @param {object[]} suggestions - Array of accepted suggestions
- * @param {string} videoId - The video UUID
- * @param {string} userId - The requesting user's UUID (for ownership check)
- * @returns {Promise<{ injected: object[], video: object }>}
+ * Inject all accepted suggestions in a single DB write instead of N sequential writes.
  */
 async function injectAll(suggestions, videoId, userId) {
   const { Video } = require('../models');
 
-  // Verify video ownership
-  const video = await Video.findOne({
-    where: { id: videoId, userId }
-  });
+  const video = await Video.findOne({ where: { id: videoId, userId } });
+  if (!video) throw new Error('Video not found or access denied');
 
-  if (!video) {
-    throw new Error('Video not found or access denied');
-  }
+  const videoDuration = video.duration;
+  const h5pContent = Array.isArray(video.h5pContent) ? [...video.h5pContent] : [];
 
   const injected = [];
   const errors = [];
-  const videoDuration = video.duration; // raw seconds from DB
 
   for (const suggestion of suggestions) {
-    // Skip questions placed past the video end
     if (videoDuration && suggestion.timestamp >= videoDuration - 1) {
-      console.warn(`[Inject] Skipping timestamp ${suggestion.timestamp}s — exceeds video duration ${videoDuration}s`);
+      console.warn(`[Inject] Skipping ${suggestion.timestamp}s — exceeds duration ${videoDuration}s`);
       continue;
     }
     try {
-      const content = await injectSuggestion(suggestion, videoId);
-      // h5pService.createTimeBasedContent already persisted to DB; just record result
+      const contentData = buildContentData(suggestion);
+      const contentId = `h5p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const content = {
+        id: contentId,
+        library: contentData.library,
+        params: contentData.params,
+        metadata: contentData.metadata,
+        timestamp: suggestion.timestamp,
+        status: 'active',
+      };
+      h5pContent.push(content);
       injected.push({
         suggestionId: suggestion.id,
-        contentId: content.id,
+        contentId,
         timestamp: suggestion.timestamp,
         type: suggestion.type,
-        library: content.library
+        library: contentData.library,
       });
     } catch (error) {
-      errors.push({
-        suggestionId: suggestion.id,
-        error: error.message
-      });
+      errors.push({ suggestionId: suggestion.id, error: error.message });
     }
   }
 
-  // Reload and return the updated video
-  const updatedVideo = await Video.findByPk(videoId);
+  // Re-attach the ScoreReview if it was present (AI must not remove it)
+  const reviewItem = (Array.isArray(video.h5pContent) ? video.h5pContent : [])
+    .find(c => c?.metadata?.systemType === 'finishing-score-review');
+  if (reviewItem && !h5pContent.some(c => c?.metadata?.systemType === 'finishing-score-review')) {
+    h5pContent.push(reviewItem);
+  }
+
+  // Single DB write for all interactions
+  await video.update({ h5pContent });
 
   return {
     injected,
     errors,
     video: {
-      id: updatedVideo.id,
-      title: updatedVideo.title,
-      h5pContent: updatedVideo.h5pContent
-    }
+      id: video.id,
+      title: video.title,
+      h5pContent,
+    },
   };
 }
 
-module.exports = {
-  injectSuggestion,
-  injectAll,
-  buildContentData,
-  buildTitle
-};
+module.exports = { injectAll, buildContentData, buildTitle };

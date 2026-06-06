@@ -21,6 +21,46 @@ const { H5PContent } = require("../models");
 // Initialize video processing service
 const videoProcessor = new VideoProcessingService();
 
+function createFinishingScoreReviewInteraction(duration = 0) {
+  const safeDuration = Math.max(0, Math.floor(Number(duration) || 0));
+  return {
+    id: 'system_finishing_score_review',
+    library: 'H5P.FinishingScoreReview 1.0',
+    params: {
+      title: 'Score review',
+      passThreshold: 75,
+      redoMessage: 'Your score is below 75%. Please redo the whole video.',
+      passMessage: 'Great work. You can continue.'
+    },
+    metadata: {
+      title: 'Score Review',
+      license: 'U',
+      systemInteraction: true,
+      systemType: 'finishing-score-review',
+      hiddenFromAuthoring: true
+    },
+    timestamp: Math.max(0, safeDuration > 0 ? safeDuration - 1 : 0),
+    status: 'active'
+  };
+}
+
+function upsertFinishingScoreReview(h5pContent, duration = 0) {
+  const content = Array.isArray(h5pContent) ? h5pContent.filter(Boolean) : [];
+  const review = createFinishingScoreReviewInteraction(duration);
+  const idx = content.findIndex(item => item?.metadata?.systemType === 'finishing-score-review');
+  if (idx === -1) return [...content, review];
+
+  content[idx] = {
+    ...content[idx],
+    library: content[idx].library || review.library,
+    params: { ...review.params, ...(content[idx].params || {}) },
+    metadata: { ...review.metadata, ...(content[idx].metadata || {}) },
+    timestamp: review.timestamp,
+    status: content[idx].status || 'active'
+  };
+  return content;
+}
+
 // Configure multer for video upload
 const sanitize = (name) => name.replace(/[^a-zA-Z0-9-_\.]/g, '_');
 const storage = multer.diskStorage({
@@ -165,16 +205,17 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
     // Generate a system title if none provided (user can edit it later)
     let systemTitle = title && title.trim() ? title.trim() : `Video_${Date.now()}`;
 
-    // Auto-increment title if it exists
-    let baseTitle = systemTitle;
-    let counter = 1;
-    while (true) {
-      const existingVideo = await Video.findOne({
-        where: { userId: req.user.id, title: systemTitle }
+    // Auto-increment title if it already exists — single query instead of N+1 loop
+    {
+      const { Op: OpTitle } = require('sequelize');
+      const baseTitle = systemTitle;
+      const existing = await Video.findAll({
+        attributes: ['title'],
+        where: { userId: req.user.id, title: { [OpTitle.like]: `${baseTitle}%` } },
       });
-      if (!existingVideo) break;
-      systemTitle = `${baseTitle} ${counter}`;
-      counter++;
+      const usedTitles = new Set(existing.map(v => v.title));
+      let counter = 1;
+      while (usedTitles.has(systemTitle)) { systemTitle = `${baseTitle} ${counter}`; counter++; }
     }
 
     // Create video record in database with auto-generated ID
@@ -184,7 +225,8 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
       filePath: path.relative(process.cwd(), videoPath),
       userId: req.user.id,
       status: 'processing',
-      language: language || 'en'
+      language: language || 'en',
+      h5pContent: upsertFinishingScoreReview([], 0)
     });
 
     // Process video in the background
@@ -217,7 +259,8 @@ router.post("/upload", auth, upload.single("video"), async (req, res) => {
           status: 'ready',
           duration,
           thumbnailPath: finalThumbnailPath,
-          hlsPath
+          hlsPath,
+          h5pContent: upsertFinishingScoreReview(video.h5pContent, duration)
         });
         
         // Optionally clean up original file to save space (uncomment if desired)
@@ -284,15 +327,16 @@ router.post("/youtube", auth, validate(youtubeImportSchema), async (req, res) =>
       }
       
       let finalTitle = title || basicInfo.videoDetails.title;
-      let baseTitle = finalTitle;
-      let counter = 1;
-      while (true) {
-        const existingVideo = await Video.findOne({
-          where: { userId: req.user.id, title: finalTitle }
+      {
+        const { Op: OpTitle } = require('sequelize');
+        const baseTitle = finalTitle;
+        const existing = await Video.findAll({
+          attributes: ['title'],
+          where: { userId: req.user.id, title: { [OpTitle.like]: `${baseTitle}%` } },
         });
-        if (!existingVideo) break;
-        finalTitle = `${baseTitle} ${counter}`;
-        counter++;
+        const usedTitles = new Set(existing.map(v => v.title));
+        let counter = 1;
+        while (usedTitles.has(finalTitle)) { finalTitle = `${baseTitle} ${counter}`; counter++; }
       }
 
       // Create video record with basic info
@@ -306,7 +350,8 @@ router.post("/youtube", auth, validate(youtubeImportSchema), async (req, res) =>
         captions: extractedCaptions,
         userId: req.user.id,
         status: 'ready',
-        language: language || 'en'
+        language: language || 'en',
+        h5pContent: upsertFinishingScoreReview([], parseInt(basicInfo.videoDetails.lengthSeconds) || 0)
       });
 
       console.log("Creating video with thumbnailPath:", basicInfo.videoDetails.thumbnails[0]?.url || '/default-thumbnail.svg');
@@ -330,15 +375,16 @@ router.post("/youtube", auth, validate(youtubeImportSchema), async (req, res) =>
       });
       
       let finalTitle = title || 'YouTube Video';
-      let baseTitle = finalTitle;
-      let counter = 1;
-      while (true) {
-        const existingVideo = await Video.findOne({
-          where: { userId: req.user.id, title: finalTitle }
+      {
+        const { Op: OpTitle } = require('sequelize');
+        const baseTitle = finalTitle;
+        const existing = await Video.findAll({
+          attributes: ['title'],
+          where: { userId: req.user.id, title: { [OpTitle.like]: `${baseTitle}%` } },
         });
-        if (!existingVideo) break;
-        finalTitle = `${baseTitle} ${counter}`;
-        counter++;
+        const usedTitles = new Set(existing.map(v => v.title));
+        let counter = 1;
+        while (usedTitles.has(finalTitle)) { finalTitle = `${baseTitle} ${counter}`; counter++; }
       }
 
       // Fallback: Create video with minimal info if ytdl fails
@@ -350,7 +396,8 @@ router.post("/youtube", auth, validate(youtubeImportSchema), async (req, res) =>
         thumbnailPath: `https://img.youtube.com/vi/${videoId}/0.jpg`,
         userId: req.user.id,
         status: 'ready',
-        language: language || 'en'
+        language: language || 'en',
+        h5pContent: upsertFinishingScoreReview([], 0)
       });
 
       console.log("⚠️ Created video with fallback info (ytdl failed)");
@@ -731,8 +778,12 @@ router.get('/:id/stream', auth, validateParams(idParamSchema), async (req, res) 
       return res.status(404).json({ message: 'Video not found' });
     }
 
-    const videoPath = path.join(__dirname, '..', video.filePath);
-    const stat = fs.statSync(videoPath);
+    const uploadsRoot = path.resolve(path.join(__dirname, '..', 'uploads'));
+    const videoPath = path.resolve(path.join(__dirname, '..', video.filePath));
+    if (!videoPath.startsWith(uploadsRoot + path.sep)) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const stat = await fs.stat(videoPath);
     const fileSize = stat.size;
     const range = req.headers.range;
 
@@ -761,6 +812,73 @@ router.get('/:id/stream', auth, validateParams(idParamSchema), async (req, res) 
   } catch (error) {
     console.error('Error streaming video:', error);
     res.status(500).json({ message: 'Error streaming video' });
+  }
+});
+
+// GET /api/videos/:id/progress — fetch saved interaction scores for this user+video
+router.get('/:id/progress', auth, validateParams(idParamSchema), async (req, res) => {
+  try {
+    const { VideoProgress } = require('../models');
+    const rows = await VideoProgress.findAll({
+      where: { userId: req.user.id, videoId: req.params.id },
+      attributes: ['interactionId', 'score', 'answeredAt'],
+    });
+    res.json(rows.map(r => ({ interactionId: r.interactionId, score: r.score, answeredAt: r.answeredAt })));
+  } catch (err) {
+    console.error('Error fetching progress:', err);
+    res.status(500).json({ error: 'Error fetching progress' });
+  }
+});
+
+// PUT /api/videos/:id/progress — upsert score for one interaction
+router.put('/:id/progress', auth, validateParams(idParamSchema), async (req, res) => {
+  try {
+    const { interactionId, score } = req.body;
+    if (!interactionId || score === undefined || score === null) {
+      return res.status(400).json({ error: 'interactionId and score are required' });
+    }
+    const { VideoProgress } = require('../models');
+    const clampedScore = Math.max(0, Math.min(1, Number(score)));
+    const existing = await VideoProgress.findOne({
+      where: { userId: req.user.id, videoId: req.params.id, interactionId },
+    });
+    if (existing) {
+      await existing.update({ score: clampedScore, answeredAt: new Date() });
+    } else {
+      await VideoProgress.create({
+        userId: req.user.id,
+        videoId: req.params.id,
+        interactionId,
+        score: clampedScore,
+        answeredAt: new Date(),
+      });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error saving progress:', err);
+    res.status(500).json({ error: 'Error saving progress' });
+  }
+});
+
+// PUT /api/videos/:id/score-review — update passThreshold for the ScoreReview interaction
+router.put('/:id/score-review', auth, validateParams(idParamSchema), async (req, res) => {
+  try {
+    const { passThreshold } = req.body;
+    if (passThreshold === undefined) return res.status(400).json({ error: 'passThreshold required' });
+    const video = await Video.findOne({ where: { id: req.params.id, userId: req.user.id } });
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+    const content = Array.isArray(video.h5pContent) ? [...video.h5pContent] : [];
+    const idx = content.findIndex(c => c?.metadata?.systemType === 'finishing-score-review');
+    if (idx === -1) return res.status(404).json({ error: 'ScoreReview not found' });
+    content[idx] = {
+      ...content[idx],
+      params: { ...content[idx].params, passThreshold: Math.max(0, Math.min(100, Number(passThreshold))) },
+    };
+    await video.update({ h5pContent: content });
+    res.json({ success: true, passThreshold: content[idx].params.passThreshold });
+  } catch (err) {
+    console.error('Error updating score review:', err);
+    res.status(500).json({ error: 'Error updating score review' });
   }
 });
 

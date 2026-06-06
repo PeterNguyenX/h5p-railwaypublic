@@ -29,7 +29,6 @@ const { notFound, errorHandler } = require('./middleware/errorHandler');
 const sequelize = require('./config/database');
 const { getSupabaseConfig } = require('./config/supabase');
 
-dotenv.config();
 const app = express();
 
 // REQ-3: Strict CORS allowlist
@@ -145,8 +144,10 @@ if (!isDevelopment) {
   app.use('/api/ai', transcriptRateLimiter);
 }
 
-app.use(express.json({ limit: '200mb' }));
-app.use(express.urlencoded({ limit: '200mb', extended: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ limit: '2mb', extended: true }));
+// AI/transcript routes receive large JSON payloads (transcript segments) — override limit there
+app.use(['/api/ai', '/api/transcript'], express.json({ limit: '50mb' }));
 
 // Initialize H5P service
 async function initializeH5P() {
@@ -182,15 +183,19 @@ app.use('/api/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.m3u8')) {
       res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-    }
-    if (filePath.endsWith('.ts')) {
+      res.setHeader('Cache-Control', 'no-cache'); // HLS playlists must not be cached
+    } else if (filePath.endsWith('.ts')) {
       res.setHeader('Content-Type', 'video/mp2t');
-    }
-    if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    } else if (filePath.match(/\.(mp4|webm|mov|avi|mkv)$/i)) {
+      res.setHeader('Accept-Ranges', 'bytes'); // enable byte-range streaming
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
       res.setHeader('Content-Type', 'image/jpeg');
-    }
-    if (filePath.endsWith('.png')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    } else if (filePath.endsWith('.png')) {
       res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
     }
   }
 }));
@@ -285,7 +290,11 @@ app.get("/video/:videoPath", (req, res) => {
     return;
   }
 
-  const videoPath = path.join(__dirname, "uploads/videos", req.params.videoPath);
+  const uploadsDir = path.resolve(path.join(__dirname, 'uploads/videos'));
+  const videoPath = path.resolve(path.join(__dirname, 'uploads/videos', req.params.videoPath));
+  if (!videoPath.startsWith(uploadsDir + path.sep) && videoPath !== uploadsDir) {
+    return res.status(403).send('Forbidden');
+  }
   let videoSize;
   try {
     videoSize = fs.statSync(videoPath).size;

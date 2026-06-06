@@ -1,0 +1,50 @@
+\contentsline {chapter}{ACKNOWLEDGMENTS}{ii}{}%
+\contentsline {chapter}{LIST OF FIGURES}{v}{}%
+\contentsline {chapter}{LIST OF TABLES}{vi}{}%
+\contentsline {chapter}{ABSTRACT}{vii}{}%
+\contentsline {chapter}{\numberline {1}INTRODUCTION}{1}{}%
+\contentsline {section}{\numberline {1.1}Background}{1}{}%
+\contentsline {section}{\numberline {1.2}Problem Statement}{3}{}%
+\contentsline {section}{\numberline {1.3}Scope and Objectives}{4}{}%
+\contentsline {section}{\numberline {1.4}Research Contributions}{6}{}%
+\contentsline {section}{\numberline {1.5}Structure of thesis}{7}{}%
+\contentsline {chapter}{\numberline {2}LITERATURE REVIEW}{8}{}%
+\contentsline {section}{\numberline {2.1}E-Learning and Interactive Content Frameworks}{8}{}%
+\contentsline {subsection}{\numberline {2.1.1}Architecture and Content Types}{9}{}%
+\contentsline {subsection}{\numberline {2.1.2}Pedagogical Evidence for Interactive Video}{10}{}%
+\contentsline {section}{\numberline {2.2}User Experience Design and Usability}{11}{}%
+\contentsline {subsection}{\numberline {2.2.1}Cognitive Load Theory in Authoring Tools}{11}{}%
+\contentsline {section}{\numberline {2.3}Artificial Intelligence for Educational Content Generation}{13}{}%
+\contentsline {subsection}{\numberline {2.3.1}Automatic Speech Recognition and Prompt Engineering}{13}{}%
+\contentsline {section}{\numberline {2.4}Related Work and Research Gap}{14}{}%
+\contentsline {chapter}{\numberline {3}METHODOLOGY}{15}{}%
+\contentsline {section}{\numberline {3.1}Overview}{15}{}%
+\contentsline {section}{\numberline {3.2}User requirement analysis}{16}{}%
+\contentsline {subsection}{\numberline {3.2.1}Functional and Non-Functional Requirements}{17}{}%
+\contentsline {section}{\numberline {3.3}System Design}{18}{}%
+\contentsline {section}{\numberline {3.4}AI Pipeline Architecture}{20}{}%
+\contentsline {subsubsection}{Step 1 --- Hierarchical Topic Segmentation}{23}{}%
+\contentsline {subsubsection}{Step 2 --- Deterministic Question Generation via Pattern Matrix}{24}{}%
+\contentsline {subsubsection}{Resilient Provider Selection and Fallback Specification}{26}{}%
+\contentsline {chapter}{\numberline {4}IMPLEMENTATION AND RESULTS}{30}{}%
+\contentsline {section}{\numberline {4.1}Implement}{30}{}%
+\contentsline {subsection}{\numberline {4.1.1}Backend and Frontend Implementation}{30}{}%
+\contentsline {subsection}{\numberline {4.1.2}Security and H5P Integration}{31}{}%
+\contentsline {section}{\numberline {4.2}Results}{39}{}%
+\contentsline {subsection}{\numberline {4.2.1}AI Pipeline Performance Results}{39}{}%
+\contentsline {subsection}{\numberline {4.2.2}API and Platform Load Performance Results}{40}{}%
+\contentsline {subsection}{\numberline {4.2.3}Scalability Analysis}{41}{}%
+\contentsline {subsection}{\numberline {4.2.4}Frontend Results}{42}{}%
+\contentsline {chapter}{\numberline {5}DISCUSSION AND EVALUATION}{48}{}%
+\contentsline {section}{\numberline {5.1}Evaluation}{48}{}%
+\contentsline {section}{\numberline {5.2}Comparison}{49}{}%
+\contentsline {section}{\numberline {5.3}Discussion}{51}{}%
+\contentsline {chapter}{\numberline {6}CONCLUSION AND FUTURE WORK}{53}{}%
+\contentsline {section}{\numberline {6.1}Conclusion}{53}{}%
+\contentsline {section}{\numberline {6.2}Future work}{55}{}%
+\contentsline {chapter}{REFERENCES}{58}{}%
+\contentsline {chapter}{APPENDIX}{62}{}%
+\contentsline {section}{\numberline {A.1}SYSTEM SETUP AND API REFERENCE}{62}{}%
+\contentsline {subsection}{\numberline {A.1.1}Runtime Environment}{62}{}%
+\contentsline {subsection}{\numberline {A.1.2}Starting the Platform}{62}{}%
+\contentsline {subsection}{\numberline {A.1.3}Key API Endpoints Reference}{63}{}%

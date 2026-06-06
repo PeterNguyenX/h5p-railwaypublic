@@ -423,7 +423,9 @@ class H5PService {
             files: videoFiles
           },
           assets: {
-            interactions: h5pContents.map((content, index) => ({
+            interactions: h5pContents
+              .filter(content => content?.metadata?.systemInteraction !== true)
+              .map((content, index) => ({
               x: 10 + (index * 10), // Distribute horizontally
               y: 10 + (index * 5),  // Distribute vertically  
               width: 10,
