@@ -11,7 +11,7 @@
         "**/main.gz": true,
         "**/main.out": true
     },
-    "latex-workshop.latex.rootFile": "thesis 3/main.tex",
+    "latex-workshop.latex.rootFile.doNotPrompt": true,
     "latex-workshop.latex.autoBuild.enable": true,
     "latex-workshop.latex.autoBuild.run": "onSave",
     "latex-workshop.latex.tools": [

@@ -11,9 +11,11 @@ The software engineering effort and measured results are described, including th
 \textbf{User-Centred Design Process and Iterative Prototyping.}
 
 The interface was designed through a three-stage process before any frontend code was written.
-(1) \textbf{Conceptual Design:} User flow diagrams were created for the two primary workflows---manual authoring and AI-assisted generation. These flows were reviewed against Nielsen's heuristics to identify sources of extraneous cognitive load before any wireframing began.
-(2) \textbf{Wireframing and Heuristic Evaluation:} High-fidelity wireframes were built in Figma and evaluated against three heuristics: visibility of system status (ensuring loading indicators were present during AI generation), error prevention (disabling submit buttons until validation passes), and recognition over recall (displaying the transcript text alongside the video so instructors don't need to memorize dialogue).
-(3) \textbf{Prototype Testing:} The interactive Figma prototype was tested with two senior IT students using a think-aloud protocol. This revealed three usability problems: timestamp fields weren't auto-populated when adding a new question; AI-related status messages were too subtle to notice; and button labels on the injection panel were ambiguous. All three were fixed before formal evaluation. The resulting workflow reduced the total number of interface interactions needed to author a three-question interactive video from 47 (in the legacy WordPress baseline) to 8 in the new platform.
+\begin{itemize}
+    \item \textbf{(1) Conceptual Design:} User flow diagrams were created for the two primary workflows---manual authoring and AI-assisted generation. These flows were reviewed against Nielsen's heuristics to identify sources of extraneous cognitive load before any wireframing began.
+    \item \textbf{(2) Wireframing and Heuristic Evaluation:} High-fidelity wireframes were built in Figma and evaluated against three heuristics: visibility of system status (ensuring loading indicators were present during AI generation), error prevention (disabling submit buttons until validation passes), and recognition over recall (displaying the transcript text alongside the video so instructors don't need to memorize dialogue).
+    \item \textbf{(3) Prototype Testing:} The interactive Figma prototype was tested with two senior IT students using a think-aloud protocol. This revealed three usability problems: timestamp fields weren't auto-populated when adding a new question; AI-related status messages were too subtle to notice; and button labels on the injection panel were ambiguous. All three were fixed before formal evaluation. The resulting workflow reduced the total number of interface interactions needed to author a three-question interactive video from 47 (in the legacy WordPress baseline) to 8 in the new platform.
+\end{itemize}
 
 \textbf{Backend Engineering Architecture.}
 
@@ -28,7 +30,7 @@ The frontend is a React 18 SPA built with Vite~\cite{vite2023} and TypeScript~\c
 How the frontend handles the AI generation process is worth explaining in detail. LLM generation can take upwards of 15 seconds, and waiting for a synchronous HTTP response would freeze the UI. The frontend uses the native \texttt{EventSource} API to open an SSE connection with the backend instead. As questions are validated and enriched on the backend, they stream individually to the UI, appearing one at a time rather than all at once. From a user experience perspective, this makes the system feel responsive and active---the instructor can start reviewing the first questions while the rest are still being generated.
 
 Type safety is maintained across the network boundary. The frontend TypeScript interfaces mirror the backend Zod validation schemas, so a \texttt{MultiChoice} suggestion received from the AI has the same type shape as one the instructor creates manually.
-
+\clearpage
 \subsection{Security and H5P Integration}
 
 \textbf{Lumieducation H5P Server Library Integration.}
@@ -37,7 +39,7 @@ The headless \path{@lumieducation/h5p-server} library~\cite{lumieducation2023} p
 
 \begin{itemize}
   \item \textbf{Automated Library Management.} H5P library ZIP archives and their dependency trees are automatically downloaded from the H5P hub on first use and cached in \texttt{h5p-libraries/}. Library versions are locked per platform version.
-  \item \textbf{Decoupled Content CRUD.} H5P content parameters are stored as clean JSON documents in \texttt{h5p-content/}, indexed by UUID, rather than tangled in a CMS database.
+  \item \textbf{Decoupled Content CRUD.} H5P content parameters are stored as clean JSON documents in \texttt{h5p-content/}, indexed by UUID.
   \item \textbf{Standards-Compliant Package Export.} The library generates standards-compliant \texttt{.h5p} ZIP archives on demand, bundling the required JavaScript libraries, content JSON, and media assets. These archives are structurally identical to those produced by the official WordPress H5P plugin, ensuring 100\% importability into Moodle, Canvas, and Blackboard.
   \item \textbf{Preview Rendering.} The companion \path{@lumieducation/h5p-express} integration mounts an H5P rendering router at \texttt{/h5p/} that produces the HTML, CSS, and JavaScript bundle needed to embed H5P content in an instructor preview panel. When the preview iframe loads, the browser fetches the \texttt{H5P.InteractiveVideo} JavaScript library from \path{/h5p/libraries/}. This library registers a time-update listener on the video element; when playback reaches a registered timestamp, the library pauses the video and renders the interaction overlay---a question form matching the interaction type (e.g., Multiple Choice, Fill in the Blanks)---directly over the video. The learner submits a response before playback resumes. This same mechanism applies when the exported \texttt{.h5p} package is imported into Moodle or Canvas: the LMS serves the H5P libraries from its own cache but the interaction logic is identical.
 \end{itemize}
@@ -45,6 +47,7 @@ The headless \path{@lumieducation/h5p-server} library~\cite{lumieducation2023} p
 \textbf{How AI Suggestions Become H5P Interactions: The \texttt{injectAll()} Function.}
 
 When an instructor accepts a set of AI-generated suggestions in the UI, those suggestions are sent as a JSON array to the \texttt{POST}~\path{/api/ai/inject} endpoint. The backend calls \texttt{injectAll()} from \texttt{aiInjectionService.js}:
+\clearpage
 
 \begin{lstlisting}[language=JavaScript,caption={injectAll() — key structure: per-suggestion try/catch, single DB write}]
 async function injectAll(suggestions, videoId, userId) {
@@ -77,7 +80,7 @@ async function injectAll(suggestions, videoId, userId) {
 }
 \end{lstlisting}
 
-Each accepted suggestion is built into a content object by \texttt{buildContentData()}, which resolves the H5P library identifier from \texttt{H5P\_TYPE\_MAP} and constructs the content metadata:
+Each accepted suggestion is built into a content object by \texttt{buildContentData()}, which resolves the H5P library identifier from \texttt{H5P\_TYPE\_MAP} and constructs the metadata:
 
 \noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[language=JavaScript,caption={buildContentData() — resolves H5P library identifier and assembles content record}]
@@ -93,7 +96,7 @@ function buildContentData(suggestion) {
 }
 \end{lstlisting}
 \end{minipage}
-
+\clearpage
 The \texttt{buildTitle()} helper formats a human-readable label combining the question type and timestamp (e.g., ``Multiple Choice @ 05:30''). This gives the instructor a scannable label for each interaction in the timeline while making the timestamp immediately visible.
 
 After iterating through all accepted suggestions, the function performs a \textbf{single database write} (one \texttt{UPDATE} on the video row). The alternative---one write per suggestion---would produce N separate SQL UPDATE statements for N accepted suggestions. The single-write approach reduces database round-trips to one regardless of batch size, which matters when an instructor accepts a full batch of 6--10 AI-generated questions at once.
@@ -111,7 +114,7 @@ When an instructor clicks the export button, the frontend sends a \texttt{POST} 
 \end{itemize}
 
 The function first constructs the JSON documents in memory, then uses \texttt{adm-zip} to assemble them into a ZIP buffer returned directly to the HTTP response:
-
+\clearpage
 \begin{lstlisting}[language=JavaScript,caption={createH5PPackage() — key structure of ZIP assembly}]
 async createH5PPackage(video, h5pContents) {
   const AdmZip = require('adm-zip');
@@ -215,14 +218,13 @@ Security controls were built in from the start, explicitly targeting the OWASP T
   \label{tab:security}
 \end{table}
 
-\clearpage
 \textbf{Authentication Sequence and Workflows.}
 
 Figure~\ref{fig:seq_auth} shows the complete sequence for user registration, email verification, login, and protected-request authorization.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.85\linewidth,height=0.65\textheight,keepaspectratio]{images/Authentication Sequence.jpeg}
+  \includegraphics[width=1\linewidth,height=0.95\textheight,keepaspectratio]{images/Authentication Sequence.jpeg}
   \caption{User registration sequence diagram}
   \label{fig:seq_auth}
 \end{figure}
@@ -290,7 +292,7 @@ AI analysis latency was measured across 20 test runs using a standardized 5-minu
   \caption{AI analysis latency and failure rates ($n=20$ runs per provider)}
   \label{tab:ai_latency}
 \end{table}
-
+\clearpage
 Groq produced zero schema validation failures across all test runs. The local Ollama model produced two JSON format errors where the 8B model wrapped its response in markdown code fences (\texttt{```json}). These were caught by the \texttt{extractJsonObject()} parser and the Zod validator, preventing a frontend crash and returning a graceful error instead. The issue was fully resolved by adding an explicit instruction to the Ollama prompt: ``Return ONLY the raw JSON object. Do NOT wrap it in markdown code fences.''
 
 The 1.2-second Time-to-First-Token with Groq is practically significant. Even though total generation takes 8.4 seconds, the instructor sees the first suggestion appear within 1.2 seconds. This makes the wait feel much shorter than the number suggests.
@@ -302,7 +304,7 @@ The platform handles Vietnamese-language content at every stage of the pipeline.
 That said, while Vietnamese processing is functional end-to-end, its output quality falls noticeably short of the English pipeline. Two factors contribute to this gap. First, \texttt{faster-whisper}'s Vietnamese transcription is more sensitive to recording conditions: background noise, non-standard accents, and heavy domain-specific vocabulary (common in technical lectures) produce more transcription errors than equivalent English audio, which in turn degrades the quality of AI-generated questions downstream. Second, the \texttt{llama-3.3-70b-versatile} model has substantially less Vietnamese training data than English, meaning its understanding of Vietnamese sentence structure and its ability to identify appropriate topic boundaries and question-worthy content is weaker. In practice, Vietnamese-language suggestions require more instructor editing before they are ready to accept. Improving this --- through Whisper fine-tuning on Vietnamese academic speech and evaluation of Vietnamese-optimized LLM alternatives --- is a planned direction for future development.
 
 % ─────────────────────────────────────────────────────────────────────────────
-
+\clearpage
 \subsection{API and Platform Load Performance Results}
 
 API response times were measured with \texttt{autocannon} targeting the 12 most frequently used endpoints at 50 concurrent connections over 30 seconds.
@@ -339,7 +341,7 @@ Ten diverse H5P packages containing AI-generated interactions were exported and 
 \textbf{How 50 concurrent users are handled.}
 \begin{itemize}
   \item \textbf{Stateless authentication.} Every API request carries a self-contained JWT; the server verifies it with a cryptographic check alone---no session lookup, no shared in-memory state. This means any number of Node.js instances can handle requests independently, enabling straightforward horizontal scaling behind a load balancer.
-  \item \textbf{SQLite read concurrency.} SQLite uses a shared-reader / exclusive-writer locking model. Read operations (fetching video lists, loading H5P content) run concurrently without blocking each other, which covers the majority of requests during normal browsing.
+  \item \textbf{SQLite read concurrency.} SQLite uses a shared-reader / exclusive-writer locking model. Read operations (fetching video lists, loading H5P content) run concurrently without blocking each other, which covers the majority of requests during browsing.
   \item \textbf{SSE streaming.} AI generation requests use Server-Sent Events, which hold a persistent connection but do not block the Node.js event loop. Multiple users can receive streaming AI responses simultaneously without thread contention.
 \end{itemize}
 
@@ -356,7 +358,7 @@ Figures~\ref{fig:login_page}--\ref{fig:editor_page} show the three primary scree
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.9\linewidth,height=0.42\textheight,keepaspectratio]{images/login-lightmode.png}
+  \includegraphics[width=0.9\linewidth,height=0.25\textheight]{images/login-lightmode.png}
   \caption{Login page}
   \label{fig:login_page}
 \end{figure}

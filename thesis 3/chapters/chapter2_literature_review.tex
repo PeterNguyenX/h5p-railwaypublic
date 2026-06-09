@@ -56,10 +56,12 @@ When an instructor imports this file into Moodle or Canvas, the LMS unpacks the 
 
 From the instructor's perspective, producing the file is a single export action. The platform assembles the \texttt{h5p.json} manifest and \texttt{content/content.json} from the video's stored database record, bundles any locally uploaded video, and streams the resulting ZIP buffer to the browser as a file download. The saved \texttt{.h5p} file is structurally identical to one produced by the WordPress H5P plugin or the Lumi Desktop editor, so it imports without modification into any H5P-compatible LMS.
 
+
 \textbf{Server-Side H5P Libraries and Node.js Integration.}
 
 Traditional H5P deployments embed the content rendering engine inside a monolithic CMS like WordPress, Drupal, or Moodle. The CMS handles library management, database storage, and HTML generation. Lumi Education GmbH recognized the need for a headless alternative and publishes official Node.js libraries---specifically \path{@lumieducation/h5p-server} and \path{@lumieducation/h5p-express}---that expose H5P's core capabilities as a standalone microservice~\cite{lumieducation2023}. These libraries provide a complete API for H5P library management, content CRUD operations, on-the-fly package generation, and a rendering API that produces iframe-ready HTML. This project is built entirely around these libraries, making it possible to run a fast H5P authoring environment without any WordPress or Moodle overhead.
 
+\clearpage
 \textbf{Structural Limitations of WordPress-Based H5P Deployments.}
 
 The WordPress H5P plugin is functionally complete, but deploying it at institutional scale creates several structural problems:
@@ -77,7 +79,7 @@ The WordPress H5P plugin is functionally complete, but deploying it at instituti
 Controlled experiments consistently show that interactive video outperforms passive linear video on short-term retention and long-term knowledge transfer. Zhang et al.\ conducted one of the earliest such comparisons in a university e-learning context, finding that the interactive group scored 20--25\% higher on post-tests and reported significantly higher satisfaction~\cite{zhang2006}. Forcing active processing at regular intervals appears to prevent the shallow engagement that tends to accompany long-form lecture video.
 
 Merkt et al.\ examined the specific role of control features---pausing, rewinding, and forced interactions~\cite{merkt2011}. Videos with embedded forced-choice questions produced better retention than equivalent print materials, provided learners actually engaged with them. The effect was strongest for complex STEM content, which is relevant to the VNU-HCM curriculum context. Freeman et al.\ extended the picture with a meta-analysis across 225 STEM education studies: active learning interventions, including interactive video, increased final exam scores by 6\% on average and halved failure rates relative to traditional lecture formats~\cite{freeman2014}.
-
+\clearpage
 \textbf{Embedded Question Design and Cognitive Theory.}
 
 Vural identified concrete design principles for effective interactive video~\cite{vural2013}. Questions should appear immediately after a concept has been fully explained, not mid-sentence. They should be spaced at least 30--45 seconds apart to avoid fragmenting the experience. Each question should test the single most important idea from the preceding segment. These principles are encoded directly into the system prompt used by the AI pipeline in this project, as described in Chapter~\ref{ch:methodology}.
@@ -133,6 +135,7 @@ Radford et al.\ introduced Whisper~\cite{radford2023}, a large-vocabulary ASR mo
 Prompt engineering---the practice of crafting inputs to guide LLM behaviour toward desired outputs---is central to the AI pipeline. Work on structured output generation identifies the ``output automater'' pattern as particularly effective for producing JSON conforming to a strict schema~\cite{white2023}. Rather than prompting the LLM to generate free text and then parsing it, this pattern constrains the model's output space by providing explicit schema definitions and worked examples within the prompt itself. Combined with Zod-based post-generation validation, this is how the pipeline consistently produces valid H5P JSON.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\clearpage
 \section{Related Work and Research Gap}
 
 Table~\ref{tab:related_work} compares the most relevant existing tools against the four capabilities identified as gaps:
@@ -157,14 +160,14 @@ Table~\ref{tab:related_work} compares the most relevant existing tools against t
     \addlinespace
     Moodle Native H5P     & \checkmark & \checkmark & $\times$ & $\times$ & No formal study \\
     \addlinespace
-    Articulate Storyline  & \checkmark & $\times$ & Partial\textsuperscript{a} & $\times$ & Vendor-reported only \\
+    Articulate Storyline  & \checkmark & $\times$ & Partial & $\times$ & Vendor-reported only \\
     \addlinespace
-    Adobe Captivate       & \checkmark & $\times$ & Partial\textsuperscript{a} & $\times$ & Vendor-reported only \\
+    Adobe Captivate       & \checkmark & $\times$ & Partial & $\times$ & Vendor-reported only \\
     \addlinespace
     \textbf{This project} & \checkmark & \checkmark & \checkmark & \checkmark & \textbf{Controlled comparative study} \\
     \bottomrule
   \end{tabularx}
-  \footnotesize\textsuperscript{a}Quiz-generation features exist but are not transcript-driven and do not produce H5P-compatible output.
+  \footnotesize\textsuperscript{a}Quiz-generation features exist but are not transcript-driven and produce H5P-incompatible output.
   \caption{Comparison of H5P authoring tools against the four identified research gaps}
   \label{tab:related_work}
 \end{table}
@@ -172,7 +175,7 @@ Table~\ref{tab:related_work} compares the most relevant existing tools against t
 No current system simultaneously addresses all four gaps. Understanding why each tool falls short illuminates exactly what the present project needed to build.
 
 The most widely deployed free options --- the WordPress H5P plugin, Moodle's native H5P integration, and the Lumi Desktop Editor --- share the same fundamental limitation: they are passive authoring environments with no AI assistance. An instructor must independently decide which questions to ask, at which timestamps, and at which cognitive level, then navigate multi-step interfaces to enter each interaction manually. The WordPress plugin specifically compounds this problem by embedding the H5P editor inside a content management system designed for web publishing, forcing instructors to manage CMS concepts (posts, shortcodes, plugin settings) that are entirely unrelated to the teaching task. For a first-time user at a Vietnamese university with no CMS background, this mismatch creates a steep and unrewarding learning curve. Lumi Desktop reduces the CMS burden but requires local installation and does not integrate with the institutional MOOC infrastructure. None of these tools produce AI-generated question suggestions, and none have been evaluated in a controlled study.
-
+\clearpage
 The commercial tools --- Articulate Storyline and Adobe Captivate --- include partial AI features such as quiz-generation assistants, but these are not transcript-driven. They require the instructor to supply content manually, which means the AI saves time on formatting but not on the harder problem of deciding what to ask at a specific point in a video. Critically, neither tool produces H5P-compatible output: their question formats are proprietary and cannot be imported into Moodle or other LTI-compatible LMS platforms without conversion. For VNU-HCM and comparable Vietnamese institutions that have adopted H5P as a standard, this vendor lock-in is a practical barrier. Commercial licensing costs --- Articulate 360 at over USD~1,300 per user per year and Captivate at a similar price point --- also place these tools outside the budget of most public universities in the region.
 
 This project therefore addresses a gap that existing tools do not fill: a web-based, open-source platform that (1) integrates a transcript-driven AI pipeline producing H5P-compatible structured JSON output, (2) labels each suggestion with a Bloom's taxonomy level, (3) operates entirely within a browser with no installation required, and (4) has been evaluated in a controlled comparative study. The combination of technical novelty (transcript-to-H5P AI pipeline), cost profile (open-source, self-hostable), and institutional fit (VNU-HCM MOOC compatibility) is what distinguishes this work from all prior tools reviewed above.

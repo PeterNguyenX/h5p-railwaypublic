@@ -11,9 +11,9 @@
 \contentsline {table}{\numberline {3.6}{\ignorespaces Question type to H5P library identifier mapping\relax }}{31}{}%
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {4.1}{\ignorespaces Security controls mapped to OWASP Top Ten 2021\relax }}{39}{}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Expert AI suggestion quality ratings ($n=30$ suggestions)\relax }}{41}{}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Expert AI suggestion quality ratings ($n=30$ suggestions)\relax }}{42}{}%
 \contentsline {table}{\numberline {4.3}{\ignorespaces AI analysis latency and failure rates ($n=20$ runs per provider)\relax }}{42}{}%
-\contentsline {table}{\numberline {4.4}{\ignorespaces API endpoint response times at 50 concurrent connections\relax }}{43}{}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces API endpoint response times at 50 concurrent connections\relax }}{44}{}%
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {5.1}{\ignorespaces Evaluation metrics ($n=10$, task: manually create 5 interactions and export)\relax }}{48}{}%
 \addvspace {10\p@ }

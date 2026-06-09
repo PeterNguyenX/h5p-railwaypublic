@@ -16,23 +16,23 @@
 \contentsline {subsection}{\numberline {2.2.1}Cognitive Load Theory in Authoring Tools}{12}{}%
 \contentsline {section}{\numberline {2.3}Artificial Intelligence for Educational Content Generation}{13}{}%
 \contentsline {subsection}{\numberline {2.3.1}Automatic Speech Recognition and Prompt Engineering}{14}{}%
-\contentsline {section}{\numberline {2.4}Related Work and Research Gap}{14}{}%
+\contentsline {section}{\numberline {2.4}Related Work and Research Gap}{15}{}%
 \contentsline {chapter}{\numberline {3}METHODOLOGY}{17}{}%
 \contentsline {section}{\numberline {3.1}Overview}{17}{}%
 \contentsline {section}{\numberline {3.2}User requirement analysis}{18}{}%
 \contentsline {subsection}{\numberline {3.2.1}Functional and Non-Functional Requirements}{19}{}%
 \contentsline {section}{\numberline {3.3}System Design}{20}{}%
 \contentsline {section}{\numberline {3.4}AI Pipeline Architecture}{22}{}%
-\contentsline {subsubsection}{Step 1 --- Hierarchical Topic Segmentation}{25}{}%
+\contentsline {subsubsection}{Step 1 --- Hierarchical Topic Segmentation}{26}{}%
 \contentsline {subsubsection}{Step 2 --- Deterministic Question Generation via Pattern Matrix}{26}{}%
 \contentsline {subsubsection}{Resilient Provider Selection and Fallback Specification}{28}{}%
 \contentsline {chapter}{\numberline {4}IMPLEMENTATION AND RESULTS}{32}{}%
 \contentsline {section}{\numberline {4.1}Implement}{32}{}%
 \contentsline {subsection}{\numberline {4.1.1}Backend and Frontend Implementation}{32}{}%
-\contentsline {subsection}{\numberline {4.1.2}Security and H5P Integration}{33}{}%
+\contentsline {subsection}{\numberline {4.1.2}Security and H5P Integration}{34}{}%
 \contentsline {section}{\numberline {4.2}Results}{41}{}%
 \contentsline {subsection}{\numberline {4.2.1}AI Pipeline Performance Results}{41}{}%
-\contentsline {subsection}{\numberline {4.2.2}API and Platform Load Performance Results}{43}{}%
+\contentsline {subsection}{\numberline {4.2.2}API and Platform Load Performance Results}{44}{}%
 \contentsline {subsection}{\numberline {4.2.3}Scalability Analysis}{44}{}%
 \contentsline {subsection}{\numberline {4.2.4}Frontend Results}{45}{}%
 \contentsline {chapter}{\numberline {5}DISCUSSION AND EVALUATION}{47}{}%
