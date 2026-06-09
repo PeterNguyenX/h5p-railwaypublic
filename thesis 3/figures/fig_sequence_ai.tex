@@ -15,7 +15,7 @@
 \node[obj] (frontend) at (3.2,0)   {React SPA};
 \node[obj] (api)      at (6.4,0)   {Express API};
 \node[obj] (aiSvc)    at (9.6,0)   {AI Service};
-\node[obj] (provider) at (13.2,0)  {LLM Provider\\(Claude/Ollama)};
+\node[obj] (provider) at (13.2,0)  {LLM Provider\\(Groq/Ollama)};
 \node[obj] (db)       at (16.4,0)  {SQLite DB};
 
 % ── Lifelines ────────────────────────────────────────────────────────────────
@@ -44,8 +44,8 @@
 \node[font=\small\bfseries, anchor=west] at (-0.5,-6.2) {\textit{3. LLM Generation}};
 
 \draw[msg] (6.4,-6.5) -- node[above]{aiService.generateSuggestions(segments)} (9.6,-6.5);
-\draw[msg] (9.6,-6.9) -- node[above]{Check Ollama availability (localhost:11434)} (13.2,-6.9);
-\node[note] at (11.4,-7.4) {Ollama unavailable → fallback to Claude};
+\draw[msg] (9.6,-6.9) -- node[above]{Try Groq API (llama-3.3-70b-versatile)} (13.2,-6.9);
+\node[note] at (11.4,-7.4) {Groq rate-limited / unavailable → fallback to Ollama};
 \draw[msg] (9.6,-7.9) -- node[above]{Send system prompt + transcript} (13.2,-7.9);
 
 % Streaming tokens

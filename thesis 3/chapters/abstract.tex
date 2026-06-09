@@ -1,9 +1,28 @@
-The expansion of digital education has put real pressure on instructors to produce interactive learning content, but most existing tools still demand specialist technical skills that many educators simply do not have. At Vietnam National University -- Ho Chi Minh City (VNU-HCM), creating H5P interactive videos through the WordPress ecosystem is especially cumbersome---the process typically takes 45 minutes or more for even a basic three-question video.
+It is now expected that most university teachers create interactive learning materials, and
+widely-used authoring systems expect some degree of technical expertise that a working
+teacher may lack. Even preparing a simple three-question H5P interactive video in WordPress
+can take over 45~minutes at Vietnam National University~-- Ho Chi Minh City (VNU-HCM),
+making it difficult to incorporate interactive content into regular course preparation. To
+close this gap, this thesis introduces an H5P interactive video content creation
+platform designed to make authoring easier while keeping instructors in control of the
+content. The proposed system uses the following components:
+a front-end in React~18 and TypeScript, a back-end in Node.js/Express, and a SQLite
+database. At its heart, it is an AI pipeline capable of creating candidate H5P interactions
+based on uploaded caption files, YouTube transcripts, or audio recordings. Every item
+created is then validated in the pipeline before being displayed to instructors, enabling a
+human-in-the-loop process that promotes transparency and usability. The platform is
+designed to reduce the amount of AI processing knowledge that teachers must possess.
 
-This thesis describes the design and evaluation of a dedicated platform for AI-assisted H5P video authoring. The system brings together a React~18 and TypeScript frontend, a Node.js/Express backend, a SQLite database, and a transcript-driven AI pipeline that generates candidate H5P interactions for instructor review. Captions can come from uploaded files, YouTube, or audio transcription. Each suggestion is validated before it ever reaches the editor.
-
-A comparative usability study with ten Information Technology students showed consistent improvements over the WordPress baseline. Task completion rose from 30\% to 95\%. Median creation time dropped from 45 minutes to 3.2 minutes. The System Usability Scale score improved from 38.0 to 82.5---moving from ``Poor'' to ``Excellent'' on Brooke's scale. The results suggest that pairing user-centred design with generative AI can meaningfully lower the barrier to creating interactive pedagogical content for university teaching.
+A comparative usability evaluation was carried out with 10 students of information
+technology against an H5P authoring workflow in WordPress. The results show significant
+improvements in learning-content production efficiency and effectiveness: task completion
+climbed from 30\% to 95\%, and the median time to manually create five interactions was
+reduced from 18~minutes to 5~minutes. The System Usability Scale (SUS) score rose from 38.0 to
+82.5, indicating that the usability of the system improved from ``Poor'' to ``Excellent'' on
+Brooke's scale. Overall, the results indicate that, with appropriate constraints and a
+user-centred design approach, generative AI can make interactive video authoring accessible
+to teachers who might otherwise be discouraged by the technical complexity.
 
 \bigskip
 \noindent
-\textbf{Keywords:} H5P, interactive video, educational technology, AI-assisted content authoring, usability evaluation, user-centred design.
+\textbf{Keywords:} H5P, interactive video, educational technology, AI-assisted content creation, usability assessment, user-centred design.

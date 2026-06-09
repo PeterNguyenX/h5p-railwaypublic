@@ -1,23 +1,24 @@
 
 \chapter{LITERATURE REVIEW}
+\label{ch:litreview}
 
-This chapter surveys the theoretical and technical foundations that inform the design decisions, architectural choices, and pedagogical strategies in this project. Five areas are covered: the development of e-learning infrastructure in Vietnamese higher education; the H5P framework's capabilities and structural limitations; the empirical case for interactive video in education; the emergence of AI for automated educational content generation; and the intersection of cognitive load theory with user-centred design. The chapter closes with a survey of related tools and a clear statement of the gaps this project addresses.
+Five bodies of literature shape the design decisions in this project: the development of e-learning infrastructure in Vietnamese higher education; the H5P framework's capabilities and structural constraints; the empirical record on interactive video pedagogy; AI-based approaches to automated educational content generation; and the intersection of cognitive load theory with user-centred design. The chapter closes with a comparative survey of related tools and a statement of the specific gaps this project fills.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{E-Learning and Interactive Content Frameworks}
 
-Vietnam's national strategy for digital education pushes for aggressive adoption of online delivery and blended learning across higher education. VNU-HCM has been an early implementer of this directive through its centralized MOOC platform, which was designed to standardize course delivery and provide equitable access to lecture materials across distributed campuses.
+Vietnam's national strategy for digital education pushes for aggressive adoption of online delivery and blended learning across higher education. VNU-HCM has been an early implementer through its centralized MOOC platform, which was designed to standardize course delivery and provide equitable access to lecture materials across distributed campuses.
 
-The difficulty is that institutional readiness is uneven. Capital investments---server hardware, network upgrades, Moodle deployments---have moved faster than faculty capacity to use them. Instructors often have access to powerful platforms but face interfaces so complex that they need specialized training just to get started. When that training doesn't happen, the platform sits unused.
+The difficulty is that institutional readiness is uneven. Capital investments---server hardware, network upgrades, Moodle deployments---have moved faster than faculty capacity to use them. Instructors often have access to powerful platforms but face interfaces so complex that they need specialized training just to get started. When that training does not happen, the platform sits unused.
 
-Studies in similar university contexts consistently find that perceived ease of use---a core construct in the Technology Acceptance Model~\cite{davis1989,hadullo2017,garrison2008}---strongly predicts whether faculty will adopt and continue using digital authoring tools. When creating interactive content requires managing plugin dependencies, navigating fragmented interfaces, and handling file structures that mean nothing to a teacher, instructors fall back on familiar, low-friction methods: uploading static PDFs or unedited lecture recordings. The implication for this project is direct. Reducing the cognitive overhead of the authoring workflow is not a cosmetic concern. It is a prerequisite for systemic adoption. Co-locating authoring tasks into a single-page application and programmatically validating AI suggestions before they reach the instructor's screen directly targets the most significant practical obstacle.
+Studies in comparable university contexts consistently find that perceived ease of use---a core construct in the Technology Acceptance Model~\cite{davis1989,hadullo2017,garrison2008}---strongly predicts whether faculty will adopt and continue using digital authoring tools. When creating interactive content requires managing plugin dependencies, navigating fragmented interfaces, and handling file structures that mean nothing to a teacher, instructors fall back on familiar, low-friction methods: uploading static PDFs or unedited lecture recordings. For this project, that finding has a direct design implication. Reducing the cognitive overhead of the authoring workflow is not a cosmetic concern---it is a prerequisite for systemic adoption. Co-locating all authoring tasks into a single-page application and validating AI suggestions server-side before they reach the instructor's screen targets the most significant practical obstacle directly.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Architecture and Content Types}
 
-H5P (HTML5 Package) is a mature open-source framework first released in 2013 by Joubel AS~\cite{h5p2023}. Its architecture is built around entirely self-contained content packages. Unlike traditional web content that depends on server-side rendering and database queries to display interactive elements, each \texttt{.h5p} file is a compressed ZIP archive containing all JavaScript logic, CSS styling, media assets, and a structured JSON configuration document. This self-contained structure makes H5P content portable across any web environment that can serve static assets via an iframe.
+H5P (HTML5 Package) is an open-source framework first released in 2013 by Joubel AS~\cite{h5p2023}. Its architecture is built around entirely self-contained content packages. Unlike traditional web content that depends on server-side rendering and database queries to display interactive elements, each \texttt{.h5p} file is a compressed ZIP archive containing all JavaScript logic, CSS styling, media assets, and a structured JSON configuration document. This self-contained structure makes H5P content portable across any web environment that can serve static assets via an iframe.
 
-The H5P library ecosystem now covers more than 50 distinct content types, from simple presentations to complex gamified scenarios. The six types most relevant to this project are summarized in Table~\ref{tab:h5p_types}, all of which are designed for overlaying directly onto video playback.
+The H5P library ecosystem now covers more than 50 distinct content types, from simple presentations to complex gamified scenarios. The six types most relevant to this project are summarized in Table~\ref{tab:h5p_types}, all designed for overlaying directly onto video playback.
 
 \begin{table}[H]
   \centering
@@ -47,9 +48,17 @@ The H5P library ecosystem now covers more than 50 distinct content types, from s
   \label{tab:h5p_types}
 \end{table}
 
+\textbf{Package Format and Runtime Lifecycle.}
+
+Each \texttt{.h5p} file is a ZIP archive with a fixed internal structure. The root-level \texttt{h5p.json} manifest declares the content title, the entry-point library name (e.g., \texttt{H5P.InteractiveVideo 1.26}), and the embed mode (\texttt{div} or \texttt{iframe}), which tells the host environment how to render the content. The \texttt{content/content.json} file carries the full interaction configuration. For an interactive video, this includes the video source --- either a YouTube URL or a relative path to a locally bundled file --- and an \texttt{interactions} array in which each element describes one embedded question. Each interaction entry specifies its on-screen position as percentage offsets from the video frame, a \texttt{duration} object with \texttt{from} and \texttt{to} fields in seconds marking when the question should appear, a \texttt{pause: true} flag, the H5P library identifier for the question type (e.g., \texttt{H5P.MultiChoice 1.16}), and the full question parameters including correct answers and feedback strings. If the video was uploaded rather than linked from YouTube, the binary video file is bundled under \texttt{content/videos/} inside the same archive.
+
+When an instructor imports this file into Moodle or Canvas, the LMS unpacks the ZIP and reads \texttt{h5p.json} to determine which JavaScript library to load. If the required library version is not already cached, the LMS downloads it automatically from the H5P Hub. The library is then rendered inside a sandboxed \texttt{<iframe>} on the page. Inside that iframe, the \texttt{H5P.InteractiveVideo} JavaScript library reads \texttt{content.json}, constructs the video element, and attaches a \texttt{timeupdate} event listener to it. As the video plays, the listener fires on every animation frame and checks whether the current playback position matches any interaction's \texttt{from} timestamp. On a match, the library pauses the video and renders the appropriate question form directly over the video frame. The learner submits a response; the overlay closes and playback resumes from where it stopped. Each submission can optionally fire an xAPI statement to a Learning Record Store, allowing instructors to track which questions learners answered correctly across a whole cohort.
+
+From the instructor's perspective, producing the file is a single export action. The platform assembles the \texttt{h5p.json} manifest and \texttt{content/content.json} from the video's stored database record, bundles any locally uploaded video, and streams the resulting ZIP buffer to the browser as a file download. The saved \texttt{.h5p} file is structurally identical to one produced by the WordPress H5P plugin or the Lumi Desktop editor, so it imports without modification into any H5P-compatible LMS.
+
 \textbf{Server-Side H5P Libraries and Node.js Integration.}
 
-Traditional H5P deployments embed the content rendering engine inside a monolithic CMS like WordPress, Drupal, or Moodle. The CMS handles library management, database storage, and HTML generation. Lumi Education GmbH recognized the need for a headless alternative and publishes official Node.js libraries---specifically \path{@lumieducation/h5p-server} and \path{@lumieducation/h5p-express}---that expose H5P's core capabilities as a standalone microservice~\cite{lumieducation2023}. These libraries provide a complete API for H5P library management, content CRUD operations, on-the-fly package generation, and a rendering API that produces iframe-ready HTML. This project is built entirely around this library, making it possible to run a fast H5P authoring environment without any WordPress or Moodle overhead.
+Traditional H5P deployments embed the content rendering engine inside a monolithic CMS like WordPress, Drupal, or Moodle. The CMS handles library management, database storage, and HTML generation. Lumi Education GmbH recognized the need for a headless alternative and publishes official Node.js libraries---specifically \path{@lumieducation/h5p-server} and \path{@lumieducation/h5p-express}---that expose H5P's core capabilities as a standalone microservice~\cite{lumieducation2023}. These libraries provide a complete API for H5P library management, content CRUD operations, on-the-fly package generation, and a rendering API that produces iframe-ready HTML. This project is built entirely around these libraries, making it possible to run a fast H5P authoring environment without any WordPress or Moodle overhead.
 
 \textbf{Structural Limitations of WordPress-Based H5P Deployments.}
 
@@ -65,87 +74,105 @@ The WordPress H5P plugin is functionally complete, but deploying it at instituti
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Pedagogical Evidence for Interactive Video}
 
-The learning science literature provides strong empirical support for the claim that interactive video outperforms passive, linear video on both short-term retention and long-term knowledge transfer. Zhang et al.\ conducted one of the earliest controlled experiments comparing interactive and non-interactive video in a university e-learning context, finding that the interactive group scored 20--25\% higher on post-tests and reported significantly higher satisfaction with the module~\cite{zhang2006}. The proposed mechanism is that interactive elements force active processing at regular intervals, preventing the shallow engagement that tends to accompany long-form lecture video.
+Controlled experiments consistently show that interactive video outperforms passive linear video on short-term retention and long-term knowledge transfer. Zhang et al.\ conducted one of the earliest such comparisons in a university e-learning context, finding that the interactive group scored 20--25\% higher on post-tests and reported significantly higher satisfaction~\cite{zhang2006}. Forcing active processing at regular intervals appears to prevent the shallow engagement that tends to accompany long-form lecture video.
 
-Merkt et al.\ extended this by examining the role of control features---pausing, rewinding, and forced interactions---in video-based learning~\cite{merkt2011}. Videos with embedded forced-choice questions produced better retention than equivalent print materials, provided learners actually engaged with them. The effect was strongest for complex STEM content, which is particularly relevant to the VNU-HCM curriculum context.
-
-Freeman et al.\ produced a widely cited meta-analysis across 225 STEM education studies showing that active learning interventions, including interactive video, increased final exam scores by 6\% on average and halved failure rates compared to traditional lecture formats~\cite{freeman2014}.
+Merkt et al.\ examined the specific role of control features---pausing, rewinding, and forced interactions~\cite{merkt2011}. Videos with embedded forced-choice questions produced better retention than equivalent print materials, provided learners actually engaged with them. The effect was strongest for complex STEM content, which is relevant to the VNU-HCM curriculum context. Freeman et al.\ extended the picture with a meta-analysis across 225 STEM education studies: active learning interventions, including interactive video, increased final exam scores by 6\% on average and halved failure rates relative to traditional lecture formats~\cite{freeman2014}.
 
 \textbf{Embedded Question Design and Cognitive Theory.}
 
-Vural identified specific design principles for effective interactive video~\cite{vural2013}. Questions should be positioned immediately after a concept has been fully explained, not mid-sentence. They should be spaced at least 30 to 45 seconds apart to avoid fragmenting the learning experience. Each question should test the single most important idea from the preceding segment. These principles are encoded directly into the system prompt used by the AI pipeline in this project, described in detail in Chapter~3.
+Vural identified concrete design principles for effective interactive video~\cite{vural2013}. Questions should appear immediately after a concept has been fully explained, not mid-sentence. They should be spaced at least 30--45 seconds apart to avoid fragmenting the experience. Each question should test the single most important idea from the preceding segment. These principles are encoded directly into the system prompt used by the AI pipeline in this project, as described in Chapter~\ref{ch:methodology}.
 
-Mayer's Cognitive Theory of Multimedia Learning provides the theoretical basis for these recommendations~\cite{mayer2009}. Mayer identifies three cognitive channels---visual, auditory, and their integration within working memory. Well-designed interactive elements reduce extraneous load (unnecessary processing) while increasing germane load (the productive effort of building mental models). A question that tests exactly what was just explained, positioned immediately when that explanation ends, supports the integration channel without taxing working memory with irrelevant interface processing.
+Mayer's Cognitive Theory of Multimedia Learning provides the theoretical basis for these design choices~\cite{mayer2009}. Mayer identifies three cognitive channels---visual, auditory, and their integration within working memory. Well-designed interactive elements reduce extraneous load (unnecessary processing) while increasing germane load (the effort of building mental models). A question that tests what was just explained, positioned immediately when that explanation ends, supports integration without taxing working memory with irrelevant interface processing.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{User Experience Design and Usability}
 
 \subsection{Cognitive Load Theory in Authoring Tools}
 
-User-centred design (UCD) keeps end-user needs at the center of every design decision. ISO~9241-11 defines usability as the degree to which a product can be used by specified users to achieve specified goals with effectiveness, efficiency, and satisfaction in a specified context~\cite{iso9241}. For educational technology, this definition has to be grounded in the specific context of university instructors who need to produce high-quality interactive content quickly, under the real constraints of heavy teaching loads and tight schedules.
+User-centred design (UCD) keeps end-user needs at the centre of every design decision. ISO~9241-11 defines usability as the degree to which a product can be used by specified users to achieve specified goals with effectiveness, efficiency, and satisfaction in a specified context~\cite{iso9241}. For educational technology, this definition must be grounded in the specific situation of university instructors who need to produce high-quality interactive content quickly, under the real constraints of heavy teaching loads and tight schedules.
 
-Garrett's layered model of user experience decomposes a digital product into five planes: Strategy, Scope, Structure, Skeleton, and Surface~\cite{garrett2010}. Norman's affordance theory adds that good interface design makes correct actions obviously apparent and makes errors difficult to commit~\cite{norman1988}. Both frameworks were applied during the interface design process described in Chapter~3.
+Garrett's layered model of user experience decomposes a digital product into five planes: Strategy, Scope, Structure, Skeleton, and Surface~\cite{garrett2010}. Norman's affordance theory adds that good interface design makes correct actions obviously apparent and makes errors difficult to commit~\cite{norman1988}. Both frameworks were applied during the interface design process described in Chapter~\ref{ch:methodology}.
 
 \textbf{Usability Heuristics and Expert Evaluation.}
 
-Nielsen's ten usability heuristics provide a practical checklist for evaluating interface designs~\cite{nielsen1994}. Three are especially critical for an educational authoring tool:
+Nielsen's ten usability heuristics provide a practical checklist for interface evaluation~\cite{nielsen1994}. Three are especially critical for an educational authoring tool:
 (1)~\emph{Visibility of system status}---instructors must be able to see whether video processing is running, whether AI analysis is in progress, and whether a question has been saved. Silent failures lead to repeated clicks and data loss.
 (2)~\emph{Match between system and the real world}---the interface should use pedagogical vocabulary (Multiple Choice, Feedback, Timestamp) rather than technical terms like database IDs or JSON keys.
-(3)~\emph{Error prevention}---the system should make it impossible to submit a malformed H5P question. Frontend validation enforced before submission is far better than waiting for a server-side error message. Molich and Nielsen showed that heuristic evaluation applied before user testing produces measurable improvements in final software usability~\cite{molich1990}.
+(3)~\emph{Error prevention}---the system should make it impossible to submit a malformed H5P question. Frontend validation before submission is far preferable to a server-side error returned after the fact. Molich and Nielsen demonstrated that heuristic evaluation applied before user testing produces measurable improvements in final software usability~\cite{molich1990}.
 
 \textbf{Measuring Usability: The System Usability Scale (SUS).}
 
-The System Usability Scale (SUS)~\cite{brooke1996} is a ten-item questionnaire that produces a single 0--100 usability score. It has become the standard instrument for usability measurement because it is quick to administer, reliable with small sample sizes, and comparable across thousands of published studies. A SUS score above 68 is considered above average; above 80 is excellent. SUS was selected as the primary quantitative usability instrument for the comparative evaluation in Chapter~5.
+The System Usability Scale~\cite{brooke1996} is a ten-item questionnaire producing a single 0--100 score. It is widely used because it is quick to administer, reliable with small sample sizes, and comparable across thousands of published studies. A score above 68 is above average; above 80 is excellent. SUS was selected as the primary quantitative usability instrument for the comparative evaluation in Chapter~\ref{ch:discussion}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 Sweller's Cognitive Load Theory identifies three categories of load that any software interface imposes on working memory~\cite{sweller1988}:
 
 \begin{itemize}
-  \item \textbf{Intrinsic load} comes from the inherent complexity of the task itself---the intellectual effort required to write a good pedagogical question. This load is irreducible. It's the actual work the instructor came to do.
-  \item \textbf{Extraneous load} comes from poor interface design rather than the task itself---navigating six slow-loading screens, manually copying timestamps between windows. This load is wasteful and must be minimized through good design~\cite{chandler1991}.
+  \item \textbf{Intrinsic load} comes from the inherent complexity of the task itself---the intellectual effort of writing a good pedagogical question. This load is irreducible; it is the actual work the instructor came to do.
+  \item \textbf{Extraneous load} comes from poor interface design rather than the task---navigating six slow-loading screens, copying timestamps between windows. This load is wasteful and must be minimized~\cite{chandler1991}.
   \item \textbf{Germane load} comes from productive cognitive effort---the instructor's growing understanding of how their video content maps to effective learning moments.
 \end{itemize}
 
-Chandler and Sweller showed that splitting related information across multiple screens (the split-attention effect) significantly increases extraneous load, reduces task accuracy, and increases fatigue~\cite{chandler1991}. The direct implication for this project is that all information needed to author a single H5P interaction---the video player, timestamp indicator, question type selector, AI suggestion panel, and question editor---must be co-located on a single screen. Paas, Renkl, and Sweller later confirmed that adhering to this integrated format principle reduces complex task completion times by 30--50\% compared to split-screen or multi-page presentations~\cite{paas2003}.
+Chandler and Sweller showed that splitting related information across multiple screens (the split-attention effect) significantly increases extraneous load, reduces task accuracy, and increases fatigue~\cite{chandler1991}. For this project, the implication is clear: all information needed to author a single H5P interaction---the video player, timestamp indicator, question type selector, AI suggestion panel, and question editor---must be co-located on a single screen. Paas, Renkl, and Sweller later confirmed that this integrated format reduces complex task completion times by 30--50\% compared to split-screen or multi-page presentations~\cite{paas2003}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Artificial Intelligence for Educational Content Generation}
 
-Recent advances in large language models, particularly transformer architectures like GPT-4 and LLaMA-3, have made it possible to generate contextually appropriate, pedagogically structured questions from a video transcript. For this project, a two-step prompting pipeline is used to maximize consistency:
+Transformer-based large language models, including GPT-4 and LLaMA-3, can now generate contextually appropriate, pedagogically structured questions directly from a video transcript. This project uses a two-step prompting pipeline to maximize consistency:
 (1) The LLM first acts as an instructional designer, analyzing the transcript, identifying teaching moments, and grouping content into topics.
 (2) It then generates one H5P question per topic, following a strict pattern matrix that maps content type to question format.
 
-Combined with runtime Zod validation and a prioritized provider chain (Groq's API with LLaMA-3.3-70b-versatile as the primary engine, with a local Ollama server as the offline fallback), this approach balances generation quality with the structural predictability needed for an instructor review workflow.
+Combined with runtime Zod validation and a prioritized provider chain (Groq's API with LLaMA-3.3-70b-versatile as primary, a local Ollama server as offline fallback), this approach balances generation quality with the structural predictability needed for an instructor review workflow.
 
-Bloom's taxonomy~\cite{bloom1956} provides the hierarchical classification of cognitive objectives, from basic recall through analysis and evaluation to creation. Anderson and Krathwohl's revised taxonomy updated this by replacing static nouns with action verbs and clarifying the distinction between lower-order and higher-order cognitive skills~\cite{anderson2001}. The AI pipeline assigns a Bloom's level to every generated question suggestion, which is displayed in the UI. This lets instructors see at a glance whether their interactive video covers a useful spread of cognitive difficulty---without needing specialist instructional design training.
+Bloom's taxonomy~\cite{bloom1956} provides hierarchical classification of cognitive objectives, from basic recall through analysis and evaluation to creation. Anderson and Krathwohl's revised taxonomy updated this framework by replacing static nouns with action verbs and clarifying the distinction between lower-order and higher-order cognitive skills~\cite{anderson2001}. The AI pipeline assigns a Bloom's level to every generated question suggestion, which is displayed in the UI. Instructors can see at a glance whether their interactive video covers a useful spread of cognitive difficulty---without needing formal instructional design training.
 
 \subsection{Automatic Speech Recognition and Prompt Engineering}
 
-Radford et al.\ introduced Whisper~\cite{radford2023}, a large-vocabulary ASR model trained on 680,000 hours of multilingual audio. Whisper achieves near-human word error rates on English audio and performs competitively on Vietnamese. The \texttt{faster-whisper} C++ implementation is used in this project for on-device transcription of uploaded video files where no caption file is available. The quality of the transcript directly determines the quality of AI-generated suggestions, which motivated the choice of a local, high-accuracy model over simpler API-based ASR options.
+Radford et al.\ introduced Whisper~\cite{radford2023}, a large-vocabulary ASR model trained on 680,000 hours of multilingual audio. Whisper achieves near-human word error rates on English audio and performs competitively on Vietnamese. This project uses the \texttt{faster-whisper} C++ implementation for on-device transcription of uploaded video files where no caption file is available. Transcript quality directly determines the quality of AI-generated suggestions, which motivated the choice of a local, high-accuracy model over simpler API-based ASR options.
 
-Prompt engineering---the practice of crafting inputs to guide LLM behavior toward desired outputs---is central to the AI pipeline. The literature on structured output generation identifies the ``output automater'' pattern as particularly effective for producing JSON conforming to a strict schema~\cite{white2023}. Rather than prompting the LLM to generate free text and then trying to parse it, the output automater pattern constrains the model's output space by providing explicit schema definitions and worked examples within the prompt itself. Combined with Zod-based post-generation validation, this approach is how the AI pipeline consistently produces valid H5P JSON.
+Prompt engineering---the practice of crafting inputs to guide LLM behaviour toward desired outputs---is central to the AI pipeline. Work on structured output generation identifies the ``output automater'' pattern as particularly effective for producing JSON conforming to a strict schema~\cite{white2023}. Rather than prompting the LLM to generate free text and then parsing it, this pattern constrains the model's output space by providing explicit schema definitions and worked examples within the prompt itself. Combined with Zod-based post-generation validation, this is how the pipeline consistently produces valid H5P JSON.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Related Work and Research Gap}
 
-Existing H5P authoring platforms each address part of the problem. None address all of it:
+Table~\ref{tab:related_work} compares the most relevant existing tools against the four capabilities identified as gaps:
 
-\begin{itemize}
-    \item \textbf{The WordPress H5P Plugin:} The dominant deployment model in Vietnamese universities. It is burdened with CMS overhead, disjointed interfaces, slow load times, and has no AI support.
-    \item \textbf{Lumi Desktop Editor:} A capable standalone Electron-based editor that completely lacks web accessibility, prevents real-time collaboration, and has no transcript-based AI generation.
-    \item \textbf{Moodle Native H5P:} Integrated into the Moodle LMS but carries the same usability limitations as the WordPress implementation---dense nested menus and high extraneous cognitive load.
-    \item \textbf{Commercial Platforms (e.g., Articulate Storyline, Adobe Captivate):} Powerful and user-friendly, but prohibitively expensive for developing universities. They also use proprietary formats incompatible with the open H5P standard.
-\end{itemize}
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabularx}{\linewidth}{
+    >{\raggedright\arraybackslash}p{3.2cm}
+    >{\centering\arraybackslash}p{1.4cm}
+    >{\centering\arraybackslash}p{1.4cm}
+    >{\centering\arraybackslash}p{2.0cm}
+    >{\centering\arraybackslash}p{1.7cm}
+    >{\raggedright\arraybackslash}X
+  }
+    \toprule
+    \textbf{Tool} & \textbf{Web-based} & \textbf{Open / Free} & \textbf{AI question gen.} & \textbf{Bloom's labels} & \textbf{Empirically evaluated} \\
+    \midrule
+    WordPress H5P Plugin  & \checkmark & \checkmark & $\times$ & $\times$ & No formal study \\
+    \addlinespace
+    Lumi Desktop Editor   & $\times$ & \checkmark & $\times$ & $\times$ & No formal study \\
+    \addlinespace
+    Moodle Native H5P     & \checkmark & \checkmark & $\times$ & $\times$ & No formal study \\
+    \addlinespace
+    Articulate Storyline  & \checkmark & $\times$ & Partial\textsuperscript{a} & $\times$ & Vendor-reported only \\
+    \addlinespace
+    Adobe Captivate       & \checkmark & $\times$ & Partial\textsuperscript{a} & $\times$ & Vendor-reported only \\
+    \addlinespace
+    \textbf{This project} & \checkmark & \checkmark & \checkmark & \checkmark & \textbf{Controlled comparative study} \\
+    \bottomrule
+  \end{tabularx}
+  \footnotesize\textsuperscript{a}Quiz-generation features exist but are not transcript-driven and do not produce H5P-compatible output.
+  \caption{Comparison of H5P authoring tools against the four identified research gaps}
+  \label{tab:related_work}
+\end{table}
 
-None of these tools successfully combine the features this project proposes: a fast, CMS-free web architecture; a transcript-to-H5P AI generation pipeline; automatic Bloom's taxonomy classification; and an interface empirically evaluated with standardized usability metrics against a real baseline.
+No current system simultaneously addresses all four gaps. Understanding why each tool falls short illuminates exactly what the present project needed to build.
 
-No current system simultaneously:
+The most widely deployed free options --- the WordPress H5P plugin, Moodle's native H5P integration, and the Lumi Desktop Editor --- share the same fundamental limitation: they are passive authoring environments with no AI assistance. An instructor must independently decide which questions to ask, at which timestamps, and at which cognitive level, then navigate multi-step interfaces to enter each interaction manually. The WordPress plugin specifically compounds this problem by embedding the H5P editor inside a content management system designed for web publishing, forcing instructors to manage CMS concepts (posts, shortcodes, plugin settings) that are entirely unrelated to the teaching task. For a first-time user at a Vietnamese university with no CMS background, this mismatch creates a steep and unrewarding learning curve. Lumi Desktop reduces the CMS burden but requires local installation and does not integrate with the institutional MOOC infrastructure. None of these tools produce AI-generated question suggestions, and none have been evaluated in a controlled study.
 
-\begin{enumerate}
-  \item Provides a fast, \emph{web-based}, CMS-free H5P authoring environment suitable for institutional deployment;
-  \item Integrates a \emph{transcript-to-H5P AI pipeline} using production-grade LLMs with structured output validation;
-  \item Applies \emph{Bloom's taxonomy classification} to AI-generated suggestions to guide pedagogical design;
-  \item Has been \emph{empirically evaluated} against a widely used authoring baseline with standardized usability metrics.
-\end{enumerate}
+The commercial tools --- Articulate Storyline and Adobe Captivate --- include partial AI features such as quiz-generation assistants, but these are not transcript-driven. They require the instructor to supply content manually, which means the AI saves time on formatting but not on the harder problem of deciding what to ask at a specific point in a video. Critically, neither tool produces H5P-compatible output: their question formats are proprietary and cannot be imported into Moodle or other LTI-compatible LMS platforms without conversion. For VNU-HCM and comparable Vietnamese institutions that have adopted H5P as a standard, this vendor lock-in is a practical barrier. Commercial licensing costs --- Articulate 360 at over USD~1,300 per user per year and Captivate at a similar price point --- also place these tools outside the budget of most public universities in the region.
 
-This thesis addresses all four gaps, building a full-stack solution that is both technically novel in its AI integration and practically relevant for VNU-HCM and the broader field of AI-assisted educational content authoring.
+This project therefore addresses a gap that existing tools do not fill: a web-based, open-source platform that (1) integrates a transcript-driven AI pipeline producing H5P-compatible structured JSON output, (2) labels each suggestion with a Bloom's taxonomy level, (3) operates entirely within a browser with no installation required, and (4) has been evaluated in a controlled comparative study. The combination of technical novelty (transcript-to-H5P AI pipeline), cost profile (open-source, self-hostable), and institutional fit (VNU-HCM MOOC compatibility) is what distinguishes this work from all prior tools reviewed above.

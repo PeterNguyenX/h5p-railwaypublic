@@ -47,7 +47,7 @@ export default function Login() {
               {(
                 [
                   { icon: Sparkles, text: "AI-powered interaction suggestions", cls: "animation-delay-0" },
-                  { icon: BookOpen, text: "Seamless classroom integration", cls: "animation-delay-80" },
+                  { icon: BookOpen, text: "H5P export for Moodle, Canvas, and more", cls: "animation-delay-80" },
                   { icon: Video, text: "Upload or use YouTube videos", cls: "animation-delay-160" },
                 ] as const
               ).map((item) => (

@@ -1,6 +1,7 @@
 \chapter{IMPLEMENTATION AND RESULTS}
+\label{ch:implementation}
 
-This chapter covers the software engineering work and its measured outcomes. The first part describes the backend and frontend implementation, the H5P integration, and the security controls. The second part presents performance results for the AI pipeline, API endpoints, scalability, and Vietnamese language support.
+The software engineering effort and measured results are described, including the implementation of the backend and frontend of the software as well as the integration of H5P and the implementation of security controls, followed by performance results for the AI pipeline, API endpoints, scalability, and support for the Vietnamese language.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Implement}
@@ -24,7 +25,7 @@ Authentication is stateless using JWT with a 7-day expiry. Passwords are hashed 
 
 The frontend is a React 18 SPA built with Vite~\cite{vite2023} and TypeScript~\cite{typescript2023}. Zustand manages global state---the authenticated user profile, the active video object, and the array of AI suggestions. The component structure is organized around the ``co-location'' principle from cognitive load theory: rather than splitting tasks across pages, the editor presents three vertically scrolling panels side by side. The left panel handles video upload and metadata. The centre panel has the video player and the custom H5P timeline. The right panel shows the AI suggestion review and manual authoring forms.
 
-The most technically interesting part of the frontend is how it handles the AI generation process. LLM generation can take upwards of 15 seconds, and waiting for a synchronous HTTP response would freeze the UI. The frontend uses the native \texttt{EventSource} API to establish an SSE connection with the backend instead. As questions are validated and enriched on the backend, they stream individually to the UI, appearing one at a time rather than all at once. From a user experience perspective, this makes the system feel responsive and active---the instructor can start reviewing the first questions while the rest are still being generated.
+How the frontend handles the AI generation process is worth explaining in detail. LLM generation can take upwards of 15 seconds, and waiting for a synchronous HTTP response would freeze the UI. The frontend uses the native \texttt{EventSource} API to open an SSE connection with the backend instead. As questions are validated and enriched on the backend, they stream individually to the UI, appearing one at a time rather than all at once. From a user experience perspective, this makes the system feel responsive and active---the instructor can start reviewing the first questions while the rest are still being generated.
 
 Type safety is maintained across the network boundary. The frontend TypeScript interfaces mirror the backend Zod validation schemas, so a \texttt{MultiChoice} suggestion received from the AI has the same type shape as one the instructor creates manually.
 
@@ -45,7 +46,6 @@ The headless \path{@lumieducation/h5p-server} library~\cite{lumieducation2023} p
 
 When an instructor accepts a set of AI-generated suggestions in the UI, those suggestions are sent as a JSON array to the \texttt{POST}~\path{/api/ai/inject} endpoint. The backend calls \texttt{injectAll()} from \texttt{aiInjectionService.js}:
 
-\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[language=JavaScript,caption={injectAll() — key structure: per-suggestion try/catch, single DB write}]
 async function injectAll(suggestions, videoId, userId) {
   const video = await Video.findOne({ where: { id: videoId, userId } });
@@ -76,7 +76,6 @@ async function injectAll(suggestions, videoId, userId) {
   return { injected, errors };
 }
 \end{lstlisting}
-\end{minipage}
 
 Each accepted suggestion is built into a content object by \texttt{buildContentData()}, which resolves the H5P library identifier from \texttt{H5P\_TYPE\_MAP} and constructs the content metadata:
 
@@ -97,7 +96,7 @@ function buildContentData(suggestion) {
 
 The \texttt{buildTitle()} helper formats a human-readable label combining the question type and timestamp (e.g., ``Multiple Choice @ 05:30''). This gives the instructor a scannable label for each interaction in the timeline while making the timestamp immediately visible.
 
-After iterating through all accepted suggestions, the function performs a \textbf{single database write} (one \texttt{UPDATE} on the video row). The alternative---issuing one database write per suggestion---would produce N separate SQL UPDATE statements for N accepted suggestions. The single-write approach reduces database round-trips to one regardless of how many suggestions are accepted, which matters when an instructor accepts a full batch of 6--10 AI-generated questions at once.
+After iterating through all accepted suggestions, the function performs a \textbf{single database write} (one \texttt{UPDATE} on the video row). The alternative---one write per suggestion---would produce N separate SQL UPDATE statements for N accepted suggestions. The single-write approach reduces database round-trips to one regardless of batch size, which matters when an instructor accepts a full batch of 6--10 AI-generated questions at once.
 
 This design also means the entire injection operation either succeeds atomically or fails before modifying the database. Individual suggestions that fail \texttt{buildContentData()} are caught in the per-suggestion try/catch and appended to the \texttt{errors} array rather than aborting the entire batch.
 
@@ -113,7 +112,6 @@ When an instructor clicks the export button, the frontend sends a \texttt{POST} 
 
 The function first constructs the JSON documents in memory, then uses \texttt{adm-zip} to assemble them into a ZIP buffer returned directly to the HTTP response:
 
-\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[language=JavaScript,caption={createH5PPackage() — key structure of ZIP assembly}]
 async createH5PPackage(video, h5pContents) {
   const AdmZip = require('adm-zip');
@@ -144,19 +142,17 @@ async createH5PPackage(video, h5pContents) {
   return zip.toBuffer();
 }
 \end{lstlisting}
-\end{minipage}
 
 The interaction layout distributes buttons across the video frame using an index-based offset for both x and y coordinates, preventing buttons from stacking when multiple interactions share a timestamp. The route handler for \texttt{POST}~\path{/api/h5p/video/:videoId/export} returns the ZIP buffer as a file download (\texttt{Content-Type: application/zip} with a derived \texttt{Content-Disposition} filename), so the browser presents a save dialog. The instructor imports the saved \texttt{.h5p} file into Moodle, Canvas, or any other LTI-compatible LMS.
 
 \textbf{How the SSE Streaming Works.}
 
-The streaming AI analysis request flow deserves detailed explanation because it's one of the defining technical features of the platform.
+The streaming AI analysis request flow warrants detailed explanation because it is one of the defining technical features of the platform.
 
 When the instructor clicks ``Analyse Video'' in the UI, the frontend opens an \texttt{EventSource} connection to \texttt{POST} \path{/api/ai/analyze-stream}. The route handler writes SSE headers immediately, enqueues the job in the provider queue, and begins sending position-update events to the client while the job waits. When the job's turn arrives, it calls the provider chain.
 
 The most architecturally important detail is the ordering of the Groq API call and the SSE headers. SSE requires the server to commit HTTP headers before writing any data, which means a Groq API failure after headers are already sent is unrecoverable. The provider function therefore initiates the Groq streaming request \emph{before} committing any SSE headers. If the key is invalid or rate-limited, Groq throws synchronously at this point---no headers have been written yet, so the outer function can catch the error and route the job to the Ollama fallback instead.
 
-\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}[language=JavaScript,caption={Groq provider — init stream before headers, throw on failure so fallback can catch}]
 async function runGroqAnalysis(segments, send, lang) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -186,7 +182,6 @@ async function runGroqAnalysis(segments, send, lang) {
   return fullText; // raw JSON string — parsed by parseAndPersist()
 }
 \end{lstlisting}
-\end{minipage}
 
 Once \texttt{runGroqAnalysis()} returns the full JSON string, the shared \texttt{parseAndPersist()} pipeline validates it with Zod, snaps timestamps to the nearest real segment boundary, writes the analysis to a JSON file for auditability, saves to the database, and sends a final SSE event of type \texttt{result} to the client, carrying the full topics array and the provider name. On the frontend, the Zustand store receives the \texttt{result} event, converts topics to H5P interaction objects, and automatically calls the injection endpoint. Because Zustand triggers a re-render on every state change, the interaction timeline updates immediately---the instructor sees questions appearing as soon as the AI finishes, without any manual refresh.
 
@@ -220,6 +215,7 @@ Security controls were built in from the start, explicitly targeting the OWASP T
   \label{tab:security}
 \end{table}
 
+\clearpage
 \textbf{Authentication Sequence and Workflows.}
 
 Figure~\ref{fig:seq_auth} shows the complete sequence for user registration, email verification, login, and protected-request authorization.
@@ -244,7 +240,7 @@ Password resets follow a similar pattern. The server generates a 32-byte cryptog
 
 \subsection{AI Pipeline Performance Results}
 
-The pedagogical quality of the AI-generated suggestions was evaluated by having the project supervisor---acting as an expert instructional design rater---blind-rate 30 randomly selected AI-generated suggestions from three diverse videos. Three criteria were used:
+The pedagogical quality of AI-generated suggestions was evaluated by having the project supervisor---acting as an expert instructional design rater---blind-rate 30 randomly selected suggestions from three diverse videos. Three criteria were used:
 \emph{Relevance:} Does the question test the most important concept from the preceding transcript segment, as recommended by Vural~\cite{vural2013}?
 \emph{Accuracy:} Is the correct answer factually right, and are the distractors plausible but definitively incorrect?
 \emph{Bloom's Alignment:} Does the AI-assigned taxonomy level match the question's actual cognitive demand, per Anderson and Krathwohl~\cite{anderson2001}?
@@ -270,6 +266,8 @@ This evaluation used English-language transcripts and outputs from the primary G
 \end{table}
 
 Overall, 93\% of suggestions were rated Excellent or Good on pedagogical relevance, and 100\% were rated Excellent or Good on factual accuracy. The two relevance failures both came from noisy transcript segments, consistent with the fundamental sensitivity of any transcript-based pipeline to upstream transcription quality~\cite{radford2023}.
+
+The weakest result was Bloom's taxonomy alignment, where 12 of 30 suggestions were rated Good rather than Excellent and 2 were rated Poor. The rater noted that ``Create''-level suggestions consistently clustered near ``Evaluate'', which aligns with known limitations of general-purpose LLMs on abstract hierarchical classification tasks: models trained to predict likely continuations have no inherent understanding of Bloom's cognitive hierarchy and rely on surface-level lexical cues (e.g., ``design'', ``propose'') rather than genuine cognitive analysis. Addressing this would require either fine-tuning on annotated instructional examples or a dedicated post-generation classification step with a specialised model.
 
 AI analysis latency was measured across 20 test runs using a standardized 5-minute technical video with 47 transcript segments.
 
@@ -300,6 +298,8 @@ The 1.2-second Time-to-First-Token with Groq is practically significant. Even th
 \textbf{Vietnamese Audio and Video Processing.}
 
 The platform handles Vietnamese-language content at every stage of the pipeline. At the transcript acquisition stage, uploaded Vietnamese videos are transcribed by \texttt{faster-whisper}, which achieves competitive word-error rates on Vietnamese academic speech~\cite{radford2023}. YouTube-hosted Vietnamese lecture videos are processed via the automatic captions API. At the AI stage, the pipeline automatically detects Vietnamese by checking the transcript for diacritical characters (\emph{à, ă, â, đ, ơ, ư}, etc.) and switches the system prompt to Vietnamese mode. The prompt explicitly names Vietnamese topic-transition markers (``Tiếp theo'', ``Bây giờ'', ``Chuyển sang'', ``Tóm lại'') and instructs the model to return all question text, answer options, and feedback in Vietnamese while keeping JSON keys in English. The result is a fully Vietnamese-language H5P interactive video without any manual language configuration.
+
+That said, while Vietnamese processing is functional end-to-end, its output quality falls noticeably short of the English pipeline. Two factors contribute to this gap. First, \texttt{faster-whisper}'s Vietnamese transcription is more sensitive to recording conditions: background noise, non-standard accents, and heavy domain-specific vocabulary (common in technical lectures) produce more transcription errors than equivalent English audio, which in turn degrades the quality of AI-generated questions downstream. Second, the \texttt{llama-3.3-70b-versatile} model has substantially less Vietnamese training data than English, meaning its understanding of Vietnamese sentence structure and its ability to identify appropriate topic boundaries and question-worthy content is weaker. In practice, Vietnamese-language suggestions require more instructor editing before they are ready to accept. Improving this --- through Whisper fine-tuning on Vietnamese academic speech and evaluation of Vietnamese-optimized LLM alternatives --- is a planned direction for future development.
 
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -352,82 +352,25 @@ Ten diverse H5P packages containing AI-generated interactions were exported and 
 
 \subsection{Frontend Results}
 
+Figures~\ref{fig:login_page}--\ref{fig:editor_page} show the three primary screens of the platform in light mode.
+
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/homepagelight.png}
+  \includegraphics[width=0.9\linewidth,height=0.42\textheight,keepaspectratio]{images/login-lightmode.png}
   \caption{Login page}
   \label{fig:login_page}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/Home page.png}
-  \caption{Home page}
+  \includegraphics[width=0.9\linewidth,height=0.42\textheight,keepaspectratio]{images/home-lightmode.png}
+  \caption{Dashboard (home page)}
   \label{fig:home_page}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/Upload page.png}
-  \caption{Upload page}
-  \label{fig:upload_page}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/Editor page.png}
+  \includegraphics[width=0.9\linewidth,height=0.42\textheight,keepaspectratio]{images/editor-lightmode.png}
   \caption{Editor page}
   \label{fig:editor_page}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/Question types menu.png}
-  \caption{Question types menu}
-  \label{fig:question_types}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/UI when editing an interaction.png}
-  \caption{Editing an interaction}
-  \label{fig:editing_interaction}
-\end{figure}
-
-% Correct / incorrect kept side-by-side for direct visual comparison
-\begin{figure}[H]
-  \centering
-  \begin{minipage}[t]{0.47\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{images/Answered correct.png}
-    \caption{Correct answer feedback}
-    \label{fig:answer_correct}
-  \end{minipage}\hfill
-  \begin{minipage}[t]{0.47\linewidth}
-    \centering
-    \includegraphics[width=\linewidth]{images/Answered incorrect.png}
-    \caption{Incorrect answer feedback}
-    \label{fig:answer_incorrect}
-  \end{minipage}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{chapters/Admin Console page.png}
-  \caption{Admin Console page}
-  \label{fig:admin_console}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/Profile page.png}
-  \caption{Profile page}
-  \label{fig:profile_page}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.9\linewidth,height=0.65\textheight,keepaspectratio]{images/Settings page.png}
-  \caption{Settings page}
-  \label{fig:settings_page}
 \end{figure}

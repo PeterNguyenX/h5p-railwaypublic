@@ -3,29 +3,17 @@
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Conclusion}
 
-This thesis described the design, development, and evaluation of a web-based H5P interactive video authoring platform built specifically for university instructors. Two primary goals drove the work: simplifying the authoring workflow through user-centred interface design, and making AI-assisted question generation practical enough to use in a production environment.
+The aims of this thesis were to reduce the complexity of the H5P interactive video authoring workflow by designing a user-centred interface, and to make AI-assisted question generation viable for use in the production of interactive videos at a Vietnamese university. Both aims were achieved in a single web platform designed from scratch and tested against the dominant WordPress H5P workflow.
 
-The core technical achievement is an architecture that integrates a React~18 + TypeScript SPA~\cite{react2023,typescript2023}, a stateless Express.js REST API~\cite{expressjs2023}, a SQLite data tier via Sequelize ORM~\cite{sqlite2023,sequelize2023}, and the Lumieducation headless H5P server library~\cite{lumieducation2023}. An AI pipeline extracts timestamped transcripts from video sources (YouTube captions, uploaded WebVTT files, or local Whisper transcription~\cite{radford2023}), passes them to a large language model (\texttt{llama-3.3-70b-versatile} via Groq, with a local Ollama fallback), validates the structured output with Zod schemas, and streams results to the browser via Server-Sent Events. Each suggestion carries a Bloom's taxonomy classification so instructors can gauge cognitive depth at a glance~\cite{anderson2001}.
+The core technical result is an architecture that integrates a React~18 + TypeScript SPA~\cite{react2023,typescript2023}, a stateless Express.js REST API~\cite{expressjs2023}, a SQLite data tier via Sequelize ORM~\cite{sqlite2023,sequelize2023}, and the Lumieducation headless H5P server library~\cite{lumieducation2023}. An AI pipeline extracts timestamped transcripts from video sources (YouTube captions, uploaded WebVTT files, or local Whisper transcription~\cite{radford2023}), passes them to a large language model (\texttt{llama-3.3-70b-versatile} via Groq, with a local Ollama fallback), validates the structured output with Zod schemas, and streams results to the browser via Server-Sent Events. Each suggestion carries a Bloom's taxonomy classification so instructors can gauge cognitive depth at a glance~\cite{anderson2001}.
 
-The platform was evaluated against the WordPress H5P workflow in a comparative usability study with ten participants, each manually creating five randomly chosen interactions on the same video. The results: 95\% task completion versus 30\% for the baseline; median task time of 3.2 minutes versus 45.0 minutes; and a mean SUS score of 82.5 versus 38.0. These improvements hold across every metric, which makes it difficult to attribute them to any single design choice. Co-locating all authoring tools on a single screen, eliminating context switching, and adding AI suggestion review together removed the barriers that made the WordPress workflow so slow.
+The platform was evaluated against the WordPress H5P workflow in a comparative usability study with ten participants, each manually creating five randomly chosen interactions on the same video. Task completion rose from 30\% to 95\%; median task time fell from 18 minutes to 5 minutes; and the mean SUS score moved from 38.0 to 82.5. These improvements hold across every metric, which makes it difficult to attribute them to any single design choice. Putting all authoring tools on one screen, removing the need to switch between pages, and adding AI suggestion review together removed the barriers that made the WordPress workflow so slow.
 
 \textbf{Revisiting the Research Questions.}
 
-\textbf{RQ1: What are the specific usability barriers in current H5P authoring workflows?}
+Full answers to each research question are developed in Chapter~\ref{ch:discussion}, Section~\ref{sec:rq_answers}. The key conclusions are summarised here.
 
-The primary barriers are multi-screen navigation fragmentation, the cognitive burden of managing CMS concepts irrelevant to the teaching task, the lack of real-time preview during form entry, and no AI scaffolding for question generation. All four were addressed in the new platform.
-
-\textbf{RQ2: How can user-centred design reduce extraneous cognitive load?}
-
-By co-locating the video player, timestamp capture, question editor, and AI suggestion panel on a single viewport, the platform eliminates the split-attention effect identified by Chandler and Sweller~\cite{chandler1991}. The total number of required interface interactions dropped from 47 in WordPress to 8 in the new platform. This structural change---putting everything in one place---drove the 42-minute reduction in median task time more than any individual feature.
-
-\textbf{RQ3: What architecture best supports AI-assisted H5P authoring?}
-
-A multi-provider LLM architecture with aggressive Zod-based structured output validation works well for this use case. The ``output automater'' prompting pattern~\cite{white2023} forces the LLM to conform to strict JSON schemas, which prevents hallucination of unknown field names or broken JSON structures. SSE streaming is essential for managing perceived latency---a 1.2-second Time-to-First-Token with an 8.4-second total generation time feels far more acceptable than a 15-second blank wait. Decoupling H5P from a CMS using the headless Lumieducation library~\cite{lumieducation2023} enables a clean three-tier REST architecture that can scale to institutional deployment~\cite{bass2012}.
-
-\textbf{RQ4: To what extent does the platform outperform the baseline?}
-
-The platform increases task completion by 65 percentage points, reduces time-on-task by 93\%, and raises the SUS score from 38.0 (rated ``Poor'' on Brooke's scale~\cite{brooke1996}) to 82.5 (rated ``Excellent''). Given that the Technology Acceptance Model identifies perceived ease of use as a prerequisite for adoption~\cite{davis1989}, these improvements have direct practical implications for how many VNU-HCM instructors will actually create interactive content.
+RQ1 identified four principal usability barriers in the WordPress H5P workflow: multi-screen navigation fragmentation, CMS cognitive overhead irrelevant to the teaching task, absence of real-time preview, and no AI question scaffolding. All four were addressed in the new platform. RQ2 showed that co-locating all authoring components on a single viewport --- eliminating the split-attention effect~\cite{chandler1991} --- reduced the interaction count from 47 to 8 steps and drove most of the 13-minute task-time reduction. RQ3 established that a multi-provider LLM pipeline with Zod-based output validation and SSE streaming balances generation quality, perceived latency, and structural reliability. RQ4 found that task completion rose from 30\% to 95\%, median time-on-task fell from 18 minutes to 5 minutes, and the mean SUS score moved from 38.0 (``Poor'') to 82.5 (``Excellent'') on Brooke's scale~\cite{brooke1996}. These outcomes are consistent with Technology Acceptance Model predictions~\cite{davis1989} that reductions in perceived effort raise adoption likelihood, though confirming this causal link requires a longitudinal study.
 
 \textbf{Summary of Contributions.}
 
@@ -35,7 +23,7 @@ Five contributions come out of this work:
   \item \textbf{A production-ready authoring platform:} An open-source, CMS-free H5P authoring environment designed for institutional deployment.
   \item \textbf{A functional AI-to-H5P pipeline:} The first documented integration of a production LLM pipeline directly generating complex, schema-compliant H5P content types guided by Bloom's taxonomy.
   \item \textbf{Structured output prompt engineering:} Reusable prompt matrices and Zod validation strategies that address the problem of forcing LLMs to produce valid nested instructional JSON.
-  \item \textbf{Empirical evidence for UCD in EdTech:} Quantitative proof that a purpose-built user-centred interface substantially outperforms a general-purpose CMS workflow for this specific task.
+  \item \textbf{Empirical evidence for UCD in EdTech:} Quantitative confirmation that a purpose-built user-centred interface substantially outperforms a general-purpose CMS workflow for this specific task.
   \item \textbf{Alignment with national digital education goals:} A locally deployable, open-source tool that supports VNU-HCM's digital transformation strategy without commercial licensing costs~\cite{vietnam_strategy2021}.
 \end{enumerate}
 
@@ -50,7 +38,7 @@ Finally, this evaluation measured short-term usability. Long-term adoption rates
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Future work}
 
-Several extensions are naturally enabled by the modular architecture.
+The modular architecture opens several natural directions for extension.
 
 \textbf{Longitudinal Faculty Evaluation Study.} A semester-long study with actual university faculty across diverse disciplines at VNU-HCM would provide the most ecologically valid evidence for the platform's impact. Measuring organic adoption rates, content production volume, and student performance data over a full academic term would answer questions this initial study could not.
 
@@ -62,7 +50,7 @@ Several extensions are naturally enabled by the modular architecture.
 
 \textbf{End-of-Video Score Summary Interaction.} The current platform places all interactions at specific timestamps during video playback, but provides no final summary once the video ends. A dedicated end-of-video interaction could calculate and display the learner's total score and percentage of correctly answered questions across the entire session. This gives learners immediate, contextualised feedback on their overall performance and helps instructors identify whether the embedded questions are collectively well-calibrated. The H5P \texttt{InteractiveVideo} format already reserves a summary screen slot in \texttt{content.json}; wiring the platform to populate that slot requires extending the \texttt{createH5PPackage()} function and adding a corresponding UI option in the editor.
 
-\textbf{Deep Learning Analytics and xAPI Integration.} The current platform exports standard \texttt{.h5p} packages but doesn't capture learner interaction data. Implementing xAPI tracking that reports events (video replays, question failures, time per interaction) to a Learning Record Store would unlock learning analytics, allowing instructors to see which specific concepts students are struggling with~\cite{siemens2011}.
+\textbf{Deep Learning Analytics and xAPI Integration.} The current platform exports standard \texttt{.h5p} packages but does not capture learner interaction data. Implementing xAPI tracking that reports events (video replays, question failures, time per interaction) to a Learning Record Store would unlock learning analytics, allowing instructors to see which specific concepts students are struggling with~\cite{siemens2011}.
 
 \textbf{Collaborative Real-Time Authoring.} Adding real-time collaborative editing would enable team-based content production between senior professors and teaching assistants. The backend already uses Express, so integrating WebSockets via \texttt{Socket.io} to broadcast state changes across connected clients is architecturally straightforward.
 

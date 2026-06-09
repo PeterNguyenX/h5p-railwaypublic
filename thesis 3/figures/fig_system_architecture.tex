@@ -71,18 +71,18 @@
   {Data Layer};
 
 % ── External Services ─────────────────────────────────────────────────────────
-\node[box, fill=gray!15] (claude) at (2.2,-8.9)
-  {\textbf{Anthropic Claude}\\ API (cloud)\\ claude-sonnet-4\\ (fallback)};
+\node[box, fill=gray!15] (groq) at (2.2,-8.9)
+  {\textbf{Groq Cloud API}\\ llama-3.3-70b\\ llama-3.1-8b\\ (primary)};
 \node[box, fill=gray!15] (ollama) at (6.0,-8.9)
-  {\textbf{Ollama}\\ Local LLM\\ localhost:11434\\ (first choice)};
+  {\textbf{Ollama}\\ Local LLM\\ localhost:11434\\ (fallback)};
 \node[box, fill=gray!15] (youtube) at (9.8,-8.9)
   {\textbf{YouTube}\\ Transcript API\\ oEmbed metadata\\ ytdl-core};
 \node[above, font=\footnotesize\itshape] at (6.7,-8.15)
   {External Service Dependencies};
 
 % ── AI routes $\to$ External arrows ──────────────────────────────────────────
+\draw[dasharrow] (aiapi.south) -- (2.2,-7.3) -- (groq.north);
 \draw[dasharrow] (aiapi.south) -- (6.0,-7.3) -- (ollama.north);
-\draw[dasharrow] (aiapi.south) -- (2.2,-7.3) -- (claude.north);
 \draw[dasharrow] (videoapi.south) -- (9.8,-7.3) -- (youtube.north);
 
 \end{tikzpicture}

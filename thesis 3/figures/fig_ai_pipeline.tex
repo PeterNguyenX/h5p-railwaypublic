@@ -34,9 +34,9 @@
 \node[sub]   (s3a) at (4.2,-4.2)  {Normalise to\\{start, end, text}};
 
 % Stage 4: AI provider selection
-\node[decision] (d1) at (0,-6.0)   {Ollama\\running?};
-\node[sub]   (d1y) at (-3.5,-6.0) {Use Ollama\\(free, local)};
-\node[sub]   (d1n) at (3.5,-6.0)  {Use Claude\\(cloud fallback)};
+\node[decision] (d1) at (0,-6.0)   {Groq API\\available?};
+\node[sub]   (d1y) at (-3.5,-6.0) {Use Groq\\(llama-3.3-70b\\or 3.1-8b)};
+\node[sub]   (d1n) at (3.5,-6.0)  {Use Ollama\\(local fallback)};
 
 % Stage 4b: Generation
 \node[stage] (s4) at (0,-8.0)      {Stage 4\\LLM Generation\\(structured prompt)};

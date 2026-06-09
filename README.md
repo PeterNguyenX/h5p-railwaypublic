@@ -85,7 +85,6 @@ Pick **one** AI provider and add its key (all free options available):
 |----------|-------|------|------------|
 | **Groq** (recommended) | Fastest | Free tier | `GROQ_API_KEY` |
 | **Ollama** | Local, offline | Free | `OLLAMA_ENABLED=true` |
-| **Claude** | Paid fallback | Paid | `ANTHROPIC_API_KEY` |
 
 > For Groq: sign up at [console.groq.com](https://console.groq.com) and paste your key into `GROQ_API_KEY`.
 >

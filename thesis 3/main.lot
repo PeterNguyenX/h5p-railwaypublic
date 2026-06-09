@@ -1,19 +1,21 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {2.1}{\ignorespaces H5P content types supported by the platform\relax }}{9}{}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Comparison of H5P authoring tools against the four identified research gaps\relax }}{15}{}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {3.1}{\ignorespaces Non-functional requirements driving system architecture\relax }}{18}{}%
-\contentsline {table}{\numberline {3.2}{\ignorespaces REST API route groups and functional responsibilities\relax }}{20}{}%
-\contentsline {table}{\numberline {3.3}{\ignorespaces H5P interaction types and their AI-guided selection rules\relax }}{25}{}%
-\contentsline {table}{\numberline {3.4}{\ignorespaces AI provider fallback cascade: trigger conditions and outcomes\relax }}{26}{}%
-\contentsline {table}{\numberline {3.5}{\ignorespaces Question type to H5P library identifier mapping\relax }}{29}{}%
+\contentsline {table}{\numberline {3.1}{\ignorespaces Non-functional requirements driving system architecture\relax }}{20}{}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces REST API route groups and functional responsibilities\relax }}{22}{}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces H5P interaction types and their AI-guided selection rules\relax }}{27}{}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Representative AI-generated question examples per H5P type\relax }}{27}{}%
+\contentsline {table}{\numberline {3.5}{\ignorespaces AI provider fallback cascade: trigger conditions and outcomes\relax }}{29}{}%
+\contentsline {table}{\numberline {3.6}{\ignorespaces Question type to H5P library identifier mapping\relax }}{31}{}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Security controls mapped to OWASP Top Ten 2021\relax }}{37}{}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Expert AI suggestion quality ratings ($n=30$ suggestions)\relax }}{39}{}%
-\contentsline {table}{\numberline {4.3}{\ignorespaces AI analysis latency and failure rates ($n=20$ runs per provider)\relax }}{40}{}%
-\contentsline {table}{\numberline {4.4}{\ignorespaces API endpoint response times at 50 concurrent connections\relax }}{41}{}%
+\contentsline {table}{\numberline {4.1}{\ignorespaces Security controls mapped to OWASP Top Ten 2021\relax }}{39}{}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Expert AI suggestion quality ratings ($n=30$ suggestions)\relax }}{41}{}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces AI analysis latency and failure rates ($n=20$ runs per provider)\relax }}{42}{}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces API endpoint response times at 50 concurrent connections\relax }}{43}{}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {5.1}{\ignorespaces Evaluation metrics ($n=10$, task: manually create 5 interactions and export)\relax }}{49}{}%
+\contentsline {table}{\numberline {5.1}{\ignorespaces Evaluation metrics ($n=10$, task: manually create 5 interactions and export)\relax }}{48}{}%
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {1}{\ignorespaces Key runtime components (representative versions)\relax }}{62}{}%
 \contentsline {table}{\numberline {2}{\ignorespaces Key API endpoints\relax }}{63}{}%

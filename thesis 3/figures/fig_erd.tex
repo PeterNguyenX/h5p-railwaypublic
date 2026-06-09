@@ -21,6 +21,7 @@
   isActive : BOOLEAN \\
   resetToken : VARCHAR nullable \\
   resetTokenExpiry : DATETIME nullable \\
+  lastLoginAt : DATETIME nullable \\
   createdAt : DATETIME \\
   updatedAt : DATETIME
 };
@@ -32,6 +33,7 @@
   title : VARCHAR(100) \\
   description : TEXT nullable \\
   filePath : VARCHAR nullable \\
+  hlsPath : VARCHAR nullable \\
   thumbnailPath : VARCHAR nullable \\
   duration : INTEGER (seconds) nullable \\
   status : ENUM(processing,ready,error) \\
