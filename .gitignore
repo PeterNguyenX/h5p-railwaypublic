@@ -1,16 +1,58 @@
-h5p-hub-client/
+# ── Dependencies ─────────────────────────────────────────────────────────────
 node_modules/
-frontend/build/
-backend/build/
-dist/
-.DS_Store
-*.log
 
-# Local secret env files
+# ── Environment / secrets ────────────────────────────────────────────────────
 .env
 .env.*
+*.env
 backend/.env
 frontend/.env
-node_modules
-node_modules
-node_modules
+
+# ── Build artifacts ──────────────────────────────────────────────────────────
+dist/
+build/
+frontend/build/
+frontend/dist/
+backend/build/
+backend/public/static/
+backend/public/dist/
+
+# ── LaTeX build output ───────────────────────────────────────────────────────
+*.aux
+*.lof
+*.log
+*.lot
+*.toc
+*.bak
+*.synctex.gz
+thesis_report_latex/tectonic
+
+# ── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Runtime / generated data ─────────────────────────────────────────────────
+backend/uploads/videos/
+backend/uploads/hls/
+backend/uploads/ai-results/
+backend/uploads/tmp/
+backend/logs/
+
+# ── Large binary submission files (upload to Drive separately) ───────────────
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# ── Test artifacts ────────────────────────────────────────────────────────────
+frontend/test-results/
+
+# ── AI tool configuration (not part of the project) ─────────────────────────
+.claude/
+.codex/
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
