@@ -1,0 +1,141 @@
+================================================================================
+INSTALLATION GUIDE
+Project: Autonomous AI-Based Generation of Interactive Questions for MOOC Videos
+Student: Nguyen Toan Phuc - ITITIU21093
+================================================================================
+
+
+SYSTEM REQUIREMENTS
+-------------------
+- Node.js v18 or later  (https://nodejs.org)
+- npm v9 or later       (bundled with Node.js)
+- Git
+
+Verify your versions:
+  node -v    # must be v18.x.x or higher
+  npm -v     # must be 9.x.x or higher
+
+
+STEP 1 — INSTALL DEPENDENCIES
+------------------------------
+From the project root folder (itp-h5p/):
+
+  npm install
+
+Then install backend dependencies:
+
+  cd backend
+  npm install
+  cd ..
+
+Then install frontend dependencies:
+
+  cd frontend
+  npm install
+  cd ..
+
+
+STEP 2 — CONFIGURE ENVIRONMENT VARIABLES
+-----------------------------------------
+Copy the example environment file:
+
+  Mac/Linux:  cp backend/.env.example backend/.env
+  Windows:    copy backend\.env.example backend\.env
+
+Open backend/.env in any text editor and set the following required values:
+
+  PORT=5001
+  JWT_SECRET=any-long-random-string-here
+  SESSION_SECRET=any-other-long-random-string-here
+
+Choose ONE AI provider and add its key (all free):
+
+  Option A — Groq (recommended, fastest):
+    Sign up at https://console.groq.com and paste your key:
+    GROQ_API_KEY=your-groq-key-here
+
+  Option B — Ollama (local, offline):
+    Install from https://ollama.ai, then run:
+      ollama pull mistral
+    Set in .env:
+    OLLAMA_ENABLED=true
+
+
+STEP 3 — INITIALISE THE DATABASE AND SEED ADMIN ACCOUNT
+---------------------------------------------------------
+  cd backend
+  npm run init-db
+  npm run seed-admin
+  cd ..
+
+This creates all database tables and seeds the default admin account:
+
+  Username : ADMIN1
+  Password : admin123
+
+The seed command is safe to run multiple times — it skips creation if the
+account already exists.
+
+NOTE: If you pulled from GitHub and did NOT run init-db, the bundled h5p.db
+already contains this admin account. You can skip directly to Step 4.
+
+
+STEP 4 — RUN THE APPLICATION
+------------------------------
+You need TWO terminals running at the same time.
+
+Terminal 1 (backend):
+  cd backend
+  npm run dev
+  Expected output: Server running on port 5001
+
+Terminal 2 (frontend):
+  cd frontend
+  npm run dev
+  Expected output: VITE  Local: http://localhost:3002/
+
+Open http://localhost:3002 in your browser.
+
+Alternatively, from the project root you can start both together:
+  npm run dev
+
+Log in with the default admin account:
+  Username : ADMIN1
+  Password : admin123
+
+
+ARCHITECTURE
+------------
+  Layer     | Technology              | Port
+  ----------|-------------------------|------
+  Frontend  | React + Vite + Tailwind | 3002
+  Backend   | Node.js + Express       | 5001
+  Database  | SQLite (h5p.db)         | —
+
+The frontend proxies all /api requests to the backend automatically.
+You only need to open http://localhost:3002 in your browser.
+
+
+TROUBLESHOOTING
+---------------
+Error: listen EADDRINUSE :::5001
+  -> Something is already running on port 5001.
+  Mac/Linux:  lsof -ti:5001 | xargs kill -9
+  Windows:    netstat -ano | findstr :5001
+              taskkill /PID <PID_NUMBER> /F
+
+CORS error in browser
+  -> Make sure BOTH the backend (5001) and frontend (3002) servers are running.
+
+Cannot find module errors
+  -> Run npm install inside the correct folder (backend/ or frontend/).
+
+AI features not working
+  -> Check that at least one AI provider key is set in backend/.env
+     and restart the backend after editing the file.
+
+npm install fails with permission errors (Mac)
+  -> Do NOT use sudo npm install. Fix npm permissions:
+     sudo chown -R $(whoami) ~/.npm
+
+================================================================================

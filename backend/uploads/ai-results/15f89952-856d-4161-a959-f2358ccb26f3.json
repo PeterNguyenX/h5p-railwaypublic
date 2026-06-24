@@ -1,0 +1,128 @@
+{
+  "videoId": "15f89952-856d-4161-a959-f2358ccb26f3",
+  "provider": "groq",
+  "generatedAt": "2026-06-24T07:26:52.336Z",
+  "topics": [
+    {
+      "title": "Understanding Personal Energy Levels",
+      "start": 5,
+      "end": 173,
+      "question": {
+        "type": "FillBlanks",
+        "fillText": "To be productive, it's essential to understand your *energy* levels and work with them.",
+        "feedback": {
+          "correct": "Energy is crucial for productivity.",
+          "incorrect": "The correct term is energy, which refers to the level of physical and mental vitality a person has to accomplish tasks."
+        }
+      }
+    },
+    {
+      "title": "Morning Routine and Its Importance",
+      "start": 173,
+      "end": 367,
+      "question": {
+        "type": "TrueFalse",
+        "question": "Having a morning routine can help increase productivity.",
+        "correct": true,
+        "feedback": {
+          "correct": "A morning routine sets the tone for the day and can significantly boost productivity.",
+          "incorrect": "Actually, having a morning routine is beneficial for productivity as it helps create a sense of structure and normalcy."
+        }
+      }
+    },
+    {
+      "title": "Optimizing Workspace and Removing Distractions",
+      "start": 367,
+      "end": 571,
+      "question": {
+        "type": "MultiChoice",
+        "question": "What is the main goal of optimizing your workspace?",
+        "answers": [
+          {
+            "text": "To minimize distractions and maximize focus",
+            "correct": true
+          },
+          {
+            "text": "To increase clutter and decrease productivity",
+            "correct": false
+          },
+          {
+            "text": "To create a space that is only used for work",
+            "correct": false
+          },
+          {
+            "text": "To make your workspace less comfortable",
+            "correct": false
+          }
+        ],
+        "feedback": {
+          "correct": "Optimizing your workspace is crucial for minimizing distractions and maximizing focus, leading to increased productivity.",
+          "incorrect": "The correct answer is to minimize distractions and maximize focus. Optimizing your workspace is essential for creating an environment that promotes productivity and reduces distractions."
+        }
+      }
+    },
+    {
+      "title": "Managing Time and Tasks with ADHD",
+      "start": 571,
+      "end": 878,
+      "question": {
+        "type": "DragText",
+        "taskDescription": "Identify the correct sequence of tasks for managing time and tasks with ADHD.",
+        "textField": "To manage time and tasks with ADHD, you need to *break down tasks* into smaller chunks, *set realistic goals*, and *use a planner* or calendar to stay organized.",
+        "feedback": {
+          "correct": "The correct sequence involves breaking down tasks, setting realistic goals, and using a planner or calendar.",
+          "incorrect": "The correct sequence is to break down tasks, set realistic goals, and use a planner or calendar. This will help you stay organized and manage your time more effectively."
+        }
+      }
+    },
+    {
+      "title": "Prioritizing Tasks and Energy Levels",
+      "start": 878,
+      "end": 990,
+      "question": {
+        "type": "MarkWords",
+        "taskDescription": "Identify the key terms related to prioritizing tasks and energy levels.",
+        "textField": "To prioritize tasks effectively, it's essential to understand your *energy* levels, *focus*, and *productivity* patterns, and use them to guide your task management.",
+        "feedback": {
+          "correct": "The key terms are energy, focus, and productivity.",
+          "incorrect": "The correct key terms are energy, focus, and productivity. These terms are essential for understanding how to prioritize tasks effectively and manage your time with ADHD."
+        }
+      }
+    },
+    {
+      "title": "Video Recap",
+      "start": 990,
+      "end": 1102,
+      "question": {
+        "type": "Matching",
+        "taskDescription": "Match each concept with its definition.",
+        "pairs": [
+          {
+            "prompt": "Energy Levels",
+            "answer": "The level of physical and mental vitality a person has to accomplish tasks."
+          },
+          {
+            "prompt": "Morning Routine",
+            "answer": "A consistent pattern of activities performed in the morning to set the tone for the day."
+          },
+          {
+            "prompt": "Optimizing Workspace",
+            "answer": "The process of creating an environment that promotes productivity and reduces distractions."
+          },
+          {
+            "prompt": "ADHD Time Management",
+            "answer": "The use of strategies and techniques to manage time and tasks effectively with ADHD."
+          },
+          {
+            "prompt": "Task Prioritization",
+            "answer": "The process of identifying and prioritizing tasks based on importance and energy levels."
+          }
+        ],
+        "feedback": {
+          "correct": "You have correctly matched all the concepts with their definitions.",
+          "incorrect": "Review the concepts and try again. Make sure to match each concept with the correct definition."
+        }
+      }
+    }
+  ]
+}

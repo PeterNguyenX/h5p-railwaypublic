@@ -1,77 +1,76 @@
 {
   "videoId": "19877c17-4f74-4eee-85a6-6154e807ce10",
   "provider": "groq",
-  "generatedAt": "2026-06-06T22:30:08.190Z",
+  "generatedAt": "2026-06-10T03:07:13.426Z",
   "topics": [
     {
-      "title": "Introduction to Caching",
+      "title": "Understanding the Need for Caching",
       "start": 0,
       "end": 51,
       "question": {
         "type": "FillBlanks",
-        "fillText": "The secret to making apps load *instantly* is caching",
+        "fillText": "The secret sauce that separates the fast from the frustratingly slow is related to *caching*.",
         "feedback": {
-          "correct": "Caching is a key concept in software engineering",
-          "incorrect": "The blank should be filled with the term 'instantly' to describe the benefits of caching"
+          "correct": "Caching is a technique used to improve performance by storing frequently accessed data in a faster, more accessible location.",
+          "incorrect": "Caching is a technique used to improve performance by storing frequently accessed data in a faster, more accessible location."
         }
       }
     },
     {
-      "title": "Understanding Databases",
+      "title": "The Database as a Central Repository",
       "start": 51,
       "end": 72,
       "question": {
         "type": "TrueFalse",
-        "question": "Databases are optimized for speed",
+        "question": "A database is always fast and always complete.",
         "correct": false,
         "feedback": {
-          "correct": "Databases prioritize being complete and accurate over being fast",
-          "incorrect": "Databases are often slow due to their focus on being complete and accurate"
+          "correct": "A database is designed to be complete and accurate, but it is not always fast.",
+          "incorrect": "A database is designed to be complete and accurate, but it is not always fast."
         }
       }
     },
     {
-      "title": "The Library Analogy",
+      "title": "The Analogy of the Library",
       "start": 72,
       "end": 135,
       "question": {
-        "type": "DragText",
-        "taskDescription": "Put the steps in order",
-        "textField": "The librarian has to *walk* to the *archives* and then *bring* the book *back*",
-        "feedback": {
-          "correct": "The correct order is walk, archives, bring, back",
-          "incorrect": "The steps should be in the order of walking to the archives, then bringing the book back"
-        }
-      }
-    },
-    {
-      "title": "Caching Fundamentals",
-      "start": 135,
-      "end": 174,
-      "question": {
         "type": "MultiChoice",
-        "question": "What is caching",
+        "question": "What is the main idea behind the library analogy?",
         "answers": [
           {
-            "text": "Storing data in a database",
+            "text": "The library is a fast and efficient system.",
             "correct": false
           },
           {
-            "text": "Storing the result of an expensive operation",
+            "text": "The library is a central repository of information.",
             "correct": true
           },
           {
-            "text": "Updating data in real-time",
+            "text": "The library is a cache of frequently accessed books.",
             "correct": false
           },
           {
-            "text": "Deleting unnecessary data",
+            "text": "The library is a database of user profiles.",
             "correct": false
           }
         ],
         "feedback": {
-          "correct": "Caching is the act of storing the result of an expensive operation to reduce the time it takes to retrieve the data",
-          "incorrect": "Caching is not about storing data in a database, updating data in real-time, or deleting unnecessary data"
+          "correct": "The library analogy is used to illustrate the concept of a central repository of information, where data is stored and retrieved.",
+          "incorrect": "The library analogy is used to illustrate the concept of a central repository of information, where data is stored and retrieved."
+        }
+      }
+    },
+    {
+      "title": "Introduction to Caching",
+      "start": 135,
+      "end": 174,
+      "question": {
+        "type": "FillBlanks",
+        "fillText": "Caching is the act of storing the result of an *expensive operation*.",
+        "feedback": {
+          "correct": "Caching is a technique used to improve performance by storing the result of an expensive operation, such as a database query.",
+          "incorrect": "Caching is a technique used to improve performance by storing the result of an expensive operation, such as a database query."
         }
       }
     },
@@ -80,78 +79,74 @@
       "start": 174,
       "end": 313,
       "question": {
-        "type": "MarkWords",
-        "taskDescription": "Identify the key terms",
-        "textField": "A *cache hit* occurs when the data is found in the *cache*, while a *cache miss* occurs when the data is not found and the *librarian* has to go to the *archives*",
+        "type": "MultiChoice",
+        "question": "What happens when the librarian finds the book on the desk?",
+        "answers": [
+          {
+            "text": "The librarian has to go to the archives.",
+            "correct": false
+          },
+          {
+            "text": "The librarian returns the book to the archives.",
+            "correct": false
+          },
+          {
+            "text": "The request is a cache hit.",
+            "correct": true
+          },
+          {
+            "text": "The request is a cache miss.",
+            "correct": false
+          }
+        ],
         "feedback": {
-          "correct": "The key terms are cache hit, cache, cache miss, librarian, and archives",
-          "incorrect": "The key terms should include cache hit, cache, cache miss, librarian, and archives"
+          "correct": "When the librarian finds the book on the desk, it is a cache hit, and the request can be fulfilled quickly.",
+          "incorrect": "When the librarian finds the book on the desk, it is a cache hit, and the request can be fulfilled quickly."
         }
       }
     },
     {
       "title": "Cache Invalidation",
       "start": 313,
-      "end": 392,
+      "end": 363,
       "question": {
-        "type": "MultiChoice",
-        "question": "What is cache invalidation",
-        "answers": [
-          {
-            "text": "Updating the cache with new data",
-            "correct": false
-          },
-          {
-            "text": "Actively removing data from the cache",
-            "correct": true
-          },
-          {
-            "text": "Checking the cache for errors",
-            "correct": false
-          },
-          {
-            "text": "Optimizing the cache for performance",
-            "correct": false
-          }
-        ],
+        "type": "TrueFalse",
+        "question": "Cache invalidation is the process of automatically updating the cache with new data.",
+        "correct": false,
         "feedback": {
-          "correct": "Cache invalidation is the process of actively removing data from the cache to ensure it remains up-to-date",
-          "incorrect": "Cache invalidation is not about updating the cache with new data, checking for errors, or optimizing performance"
+          "correct": "Cache invalidation is the process of removing outdated or invalid data from the cache.",
+          "incorrect": "Cache invalidation is the process of removing outdated or invalid data from the cache."
         }
       }
     },
     {
       "title": "Video Recap",
-      "start": 392,
+      "start": 363,
       "end": 437,
       "question": {
         "type": "Matching",
-        "taskDescription": "Match each concept",
+        "taskDescription": "Match each concept with its definition.",
         "pairs": [
           {
-            "prompt": "Cache",
-            "answer": "A store of data that reduces the time it takes to retrieve the data"
+            "prompt": " Cache",
+            "answer": "A fast, accessible storage location for frequently accessed data"
           },
           {
             "prompt": "Database",
-            "answer": "A store of data that prioritizes being complete and accurate"
+            "answer": "A central repository of information"
           },
           {
-            "prompt": "Cache Hit",
-            "answer": "When the data is found in the cache"
+            "prompt": "Cache hit",
+            "answer": "When the requested data is found in the cache"
           },
           {
-            "prompt": "Cache Miss",
-            "answer": "When the data is not found in the cache and the system has to go to the database"
-          },
-          {
-            "prompt": "Cache Invalidation",
-            "answer": "The process of actively removing data from the cache to ensure it remains up-to-date"
+            "prompt": "Cache miss",
+            "answer": "When the requested data is not found in the cache"
           }
         ],
         "feedback": {
-          "correct": "The concepts are matched correctly",
-          "incorrect": "The concepts should be matched as follows: cache, database, cache hit, cache miss, and cache invalidation"
+          "correct": "You have correctly matched each concept with its definition.",
+          "incorrect": "Review the concepts and try again."
         }
       }
     }

@@ -22,18 +22,18 @@ function buildSuggestion(question: TopicQuestion, timestamp: number, nodeTitle: 
   let config: Record<string, unknown>;
 
   if (question.type === 'MultiChoice') {
-    config = { question: question.question, answers: question.answers };
+    config = { question: question.question, answers: question.answers, feedback: question.feedback };
   } else if (question.type === 'TrueFalse') {
-    config = { question: question.question, correct: question.correct ? 'true' : 'false' };
+    config = { question: question.question, correct: question.correct ? 'true' : 'false', feedback: question.feedback };
   } else if (question.type === 'DragText') {
-    config = { taskDescription: question.taskDescription, textField: question.textField };
+    config = { taskDescription: question.taskDescription, textField: question.textField, feedback: question.feedback };
   } else if (question.type === 'MarkWords') {
-    config = { taskDescription: question.taskDescription, textField: question.textField };
+    config = { taskDescription: question.taskDescription, textField: question.textField, feedback: question.feedback };
   } else if (question.type === 'Matching') {
-    config = { taskDescription: question.taskDescription, pairs: question.pairs };
+    config = { taskDescription: question.taskDescription, pairs: question.pairs, feedback: question.feedback };
   } else {
     // FillBlanks
-    config = { text: question.fillText, showSolutions: 'end', autoCheck: false };
+    config = { text: question.fillText, showSolutions: 'end', autoCheck: false, feedback: question.feedback };
   }
 
   return {

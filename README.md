@@ -90,11 +90,14 @@ Pick **one** AI provider and add its key (all free options available):
 >
 > For Ollama: install from [ollama.ai](https://ollama.ai), then run `ollama pull mistral` before starting the backend.
 
-Initialize the database:
+Initialize the database and create the default admin account:
 
 ```bash
 npm run init-db
+npm run seed-admin
 ```
+
+`seed-admin` is safe to run multiple times — it skips creation if the account already exists.
 
 ### 3. Set up the frontend
 
@@ -164,16 +167,23 @@ Open **[http://localhost:3002](http://localhost:3002)** in your browser.
 
 ---
 
-## Creating an Admin Account
+## Default Admin Account
 
-After starting the backend, run this once to create an admin user:
+A default admin account is included. Use these credentials to log in:
+
+| Field    | Value      |
+|----------|------------|
+| Username | `ADMIN1`   |
+| Password | `admin123` |
+
+If you ran `npm run init-db` (which drops all tables), restore the account with:
 
 ```bash
 cd backend
-node create-admin.js
+npm run seed-admin
 ```
 
-Follow the prompts to set an email and password.
+This is idempotent — safe to run anytime, skips if the account already exists.
 
 ---
 

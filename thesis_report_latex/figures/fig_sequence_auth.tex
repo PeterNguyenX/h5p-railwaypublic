@@ -1,0 +1,66 @@
+% Sequence Diagram — User Authentication Flow (Registration + Login)
+% Diagram prompt/description: thesis 3/data/diagram_descriptions.md — fig_sequence_auth.tex
+\begin{tikzpicture}[
+  obj/.style={draw, rectangle, minimum width=2.0cm, minimum height=0.55cm,
+              fill=white, font=\small\bfseries, align=center},
+  msg/.style={->, >=Stealth, font=\footnotesize},
+  ret/.style={->, >=Stealth, dashed, font=\footnotesize},
+  life/.style={draw, dashed, thin}
+]
+
+% ── Lifeline headers ─────────────────────────────────────────────────────────
+\node[obj] (browser)  at (0,0)     {Browser};
+\node[obj] (frontend) at (3.2,0)   {React SPA};
+\node[obj] (api)      at (6.4,0)   {Express API};
+\node[obj] (email)    at (9.6,0)   {Email\\Service};
+\node[obj] (db)       at (12.8,0)  {SQLite DB};
+
+% ── Lifelines ────────────────────────────────────────────────────────────────
+\foreach \x in {0,3.2,6.4,9.6,12.8}
+  \draw[life] (\x,-0.3) -- (\x,-13.5);
+
+% ── REGISTRATION PHASE ───────────────────────────────────────────────────────
+\node[font=\small\itshape, anchor=west] at (-1.0,-0.8) {Registration};
+
+\draw[msg] (0,-1.1) -- node[above]{\texttt{POST /api/auth/register}} (6.4,-1.1);
+\draw[msg] (6.4,-1.5) -- node[above]{Validate inputs (Zod)} (6.4,-1.5);
+\draw[msg] (6.4,-1.9) -- node[above]{bcrypt.hash(password, 12)} (6.4,-1.9);
+\draw[msg] (6.4,-2.3) -- node[above]{INSERT user (isActive=false)} (12.8,-2.3);
+\draw[ret] (12.8,-2.7) -- node[above]{user record} (6.4,-2.7);
+\draw[msg] (6.4,-3.1) -- node[above]{crypto.randomInt(6-digit code)} (6.4,-3.1);
+\draw[msg] (6.4,-3.5) -- node[above]{sendVerificationEmail()} (9.6,-3.5);
+\draw[ret] (9.6,-3.9) -- node[above]{delivered} (6.4,-3.9);
+\draw[ret] (6.4,-4.3) -- node[above]{\texttt{201 \{message: "Verify email"\}}} (3.2,-4.3);
+\draw[ret] (3.2,-4.7) -- node[above]{Show verification screen} (0,-4.7);
+
+% Email verification step
+\draw[msg] (0,-5.3) -- node[above]{\texttt{POST /api/auth/verify-email \{code\}}} (6.4,-5.3);
+\draw[msg] (6.4,-5.7) -- node[above]{Check code + expiry} (12.8,-5.7);
+\draw[ret] (12.8,-6.1) -- node[above]{match} (6.4,-6.1);
+\draw[msg] (6.4,-6.5) -- node[above]{UPDATE user SET isActive=true} (12.8,-6.5);
+\draw[ret] (6.4,-6.9) -- node[above]{\texttt{200 OK}} (3.2,-6.9);
+
+% ── LOGIN PHASE ──────────────────────────────────────────────────────────────
+\node[font=\small\itshape, anchor=west] at (-1.0,-7.6) {Login};
+
+\draw[msg] (0,-7.9) -- node[above]{\texttt{POST /api/auth/login \{email, password\}}} (6.4,-7.9);
+\draw[msg] (6.4,-8.3) -- node[above]{Rate-limit check (100 req/15 min)} (6.4,-8.3);
+\draw[msg] (6.4,-8.7) -- node[above]{SELECT user WHERE email=?} (12.8,-8.7);
+\draw[ret] (12.8,-9.1) -- node[above]{user record} (6.4,-9.1);
+\draw[msg] (6.4,-9.5) -- node[above]{bcrypt.compare(password, hash)} (6.4,-9.5);
+\draw[msg] (6.4,-9.9) -- node[above]{jwt.sign(\{sub, role\}, secret, 7d)} (6.4,-9.9);
+\draw[msg] (6.4,-10.3) -- node[above]{UPDATE lastLoginAt} (12.8,-10.3);
+\draw[ret] (6.4,-10.7) -- node[above]{\texttt{200 \{token: "eyJ...\}}} (3.2,-10.7);
+\draw[ret] (3.2,-11.1) -- node[above]{Store token, redirect /dashboard} (0,-11.1);
+
+% ── PROTECTED REQUEST ────────────────────────────────────────────────────────
+\node[font=\small\itshape, anchor=west] at (-1.0,-11.8) {Protected Request};
+
+\draw[msg] (0,-12.1) -- node[above]{\texttt{GET /api/videos} [Authorization: Bearer <token>]} (6.4,-12.1);
+\draw[msg] (6.4,-12.5) -- node[above]{jwt.verify(token, secret)} (6.4,-12.5);
+\draw[msg] (6.4,-12.9) -- node[above]{SELECT videos WHERE userId=?} (12.8,-12.9);
+\draw[ret] (12.8,-13.3) -- node[above]{video list} (6.4,-13.3);
+\draw[ret] (6.4,-13.3) -- (3.2,-13.3);
+\draw[ret] (3.2,-13.3) -- node[above]{\texttt{200 \{videos: [...]\}}} (0,-13.3);
+
+\end{tikzpicture}
