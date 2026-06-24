@@ -1,6 +1,9 @@
 # ── Dependencies ─────────────────────────────────────────────────────────────
 node_modules/
 
+# ── H5P external libraries (large, not part of source) ───────────────────────
+h5p-hub-client/
+
 # ── Environment / secrets ────────────────────────────────────────────────────
 .env
 .env.*
